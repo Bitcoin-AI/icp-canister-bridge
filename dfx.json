@@ -1,0 +1,33 @@
+{
+  "canisters": {
+    "send_http_get_backend": {
+      "main": "src/send_http_get_backend/main.mo",
+      "type": "motoko"
+    },
+    "send_http_get_backend_alby": {
+      "main": "src/send_http_get_backend/alby.mo",
+      "type": "motoko"
+    },
+    "send_http_get_frontend": {
+      "dependencies": [
+        "send_http_get_backend"
+      ],
+      "frontend": {
+        "entrypoint": "src/send_http_get_frontend/src/index.html"
+      },
+      "source": [
+        "src/send_http_get_frontend/assets",
+        "dist/send_http_get_frontend/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
