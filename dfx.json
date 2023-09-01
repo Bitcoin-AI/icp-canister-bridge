@@ -3,6 +3,10 @@
     "alby_testnet": {
       "main": "src/alby_testnet.mo",
       "type": "motoko"
+    },
+    "rsk_testnet":{
+      "main": "src/rsk_testnet.mo",
+      "type": "motoko"
     }
   },
   "evm-txs": {
