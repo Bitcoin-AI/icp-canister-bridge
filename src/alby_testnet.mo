@@ -9,6 +9,7 @@ import Text "mo:base/Text";
 
 // Import the custom types we have in Types.mo
 import Types "Types";
+import Hex "Hex";
 
 // Actor
 actor {
@@ -97,9 +98,12 @@ actor {
 
     // Return the decoded response body
     decodedText
+    // Once payment is done, we trigger release of rbtc from rsk
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/send-payment
   public func payInvoice(invoice: Text) : async Text {
+
+    // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
 
     // Setup URL and request headers
     let url: Text = lndBaseUrl # "/v1/channels/transaction-stream";
@@ -109,9 +113,8 @@ actor {
       { name = "Grpc-Metadata-macaroon"; value = macaroon}
     ];
 
-    // Here need to convert to base64 some way
-    let invoiceBytes: [Nat8] = Blob.toArray(Text.encodeUtf8(invoice));
-    let request_body_json: Text = "{ \"dest_string\" : \"" # invoice # "\" }";
+
+    let request_body_json: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
     let request_body_as_Blob: Blob = Text.encodeUtf8(request_body_json);
     let request_body_as_nat8: [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
 
@@ -141,16 +144,17 @@ actor {
     // Return the decoded response body
     decodedText
   };
+  // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
   public func checkInvoice(payment_hash: Text) : async Text {
 
     // Setup URL and request headers
-    let url: Text = lndBaseUrl # "/v1/invoices/" # payment_hash;
+    let url: Text = lndBaseUrl # "/v1/invoice/" # payment_hash;
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "Grpc-Metadata-macaroon"; value = macaroon}
     ];
-
+    Debug.print(url);
     // Prepare the HTTP request
     let httpRequest: Types.HttpRequestArgs = {
       url = url;
@@ -177,4 +181,5 @@ actor {
     // Return the decoded response body
     decodedText
   };
+
 };
