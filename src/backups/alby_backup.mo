@@ -19,6 +19,9 @@ actor {
   let lndBaseUrl: Text = "https://localhost:8084";
   let albyBaseUrl: Text = "https://api.getalby.com";
   let accessToken = "TEST";
+  let ethereumRpcUrl: Text = "YOUR_ETHEREUM_RPC_URL";
+
+  // Disable TLS certificate verification
   // This method sends a GET request to retrieve information from a Lightning node
   public func getLightningInfo() : async Text {
 

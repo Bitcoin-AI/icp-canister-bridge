@@ -15,7 +15,7 @@ actor {
   // Declare IC management canister
   let ic: Types.IC = actor ("aaaaa-aa");
   // Disable TLS certificate verification
-  // Set the base URL of your LND REST API => Need to fix TLS self signed certificates
+  // Set the base URL of your LND REST API => Need to fix TLS self signed certificates => Lightning Polar
   let lndBaseUrl: Text = "https://localhost:8084";
 
   // This method sends a GET request to retrieve information from a Lightning node

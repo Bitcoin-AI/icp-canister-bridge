@@ -1,26 +1,14 @@
 {
   "canisters": {
-    "send_http_get_backend": {
-      "main": "src/send_http_get_backend/main.mo",
+    "alby_testnet": {
+      "main": "src/alby_testnet.mo",
       "type": "motoko"
-    },
-    "send_http_get_backend_alby": {
-      "main": "src/send_http_get_backend/alby.mo",
-      "type": "motoko"
-    },
-    "send_http_get_frontend": {
-      "dependencies": [
-        "send_http_get_backend"
-      ],
-      "frontend": {
-        "entrypoint": "src/send_http_get_frontend/src/index.html"
-      },
-      "source": [
-        "src/send_http_get_frontend/assets",
-        "dist/send_http_get_frontend/"
-      ],
-      "type": "assets"
     }
+  },
+  "evm-txs": {
+    "dependencies": [
+      "https://github.com/av1ctor/evm-txs.mo/archive/refs/tags/v0.1.3.tar.gz"
+    ]
   },
   "defaults": {
     "build": {
