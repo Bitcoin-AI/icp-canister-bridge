@@ -9,7 +9,6 @@ import Text "mo:base/Text";
 
 // Import the custom types we have in Types.mo
 import Types "Types";
-import Hex "Hex";
 
 // Actor
 actor {
