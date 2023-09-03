@@ -30,6 +30,8 @@ module Types {
         body : [Nat8];
     };
 
+
+
     //2. HTTPS outcalls have an optional "transform" key. These two types help describe it.
     //"The transform function may, for example, transform the body in any way, add or remove headers,
     //modify headers, etc. "
