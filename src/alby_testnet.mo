@@ -1,11 +1,11 @@
-import Debug "mo:base/Debug";
-import Blob "mo:base/Blob";
-import Cycles "mo:base/ExperimentalCycles";
-import Error "mo:base/Error";
-import Array "mo:base/Array";
-import Nat8 "mo:base/Nat8";
-import Nat64 "mo:base/Nat64";
-import Text "mo:base/Text";
+import Debug "mo:base-0.7.3/Debug";
+import Blob "mo:base-0.7.3/Blob";
+import Cycles "mo:base-0.7.3/ExperimentalCycles";
+import Error "mo:base-0.7.3/Error";
+import Array "mo:base-0.7.3/Array";
+import Nat8 "mo:base-0.7.3/Nat8";
+import Nat64 "mo:base-0.7.3/Nat64";
+import Text "mo:base-0.7.3/Text";
 
 // Import the custom types we have in Types.mo
 import Types "Types";

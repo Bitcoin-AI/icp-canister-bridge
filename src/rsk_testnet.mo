@@ -1,16 +1,20 @@
 // Existing imports
 import Types "Types";
-import Debug "mo:base/Debug";
-import Blob "mo:base/Blob";
-import Cycles "mo:base/ExperimentalCycles";
-import Error "mo:base/Error";
-import Array "mo:base/Array";
-import Nat8 "mo:base/Nat8";
-import Nat64 "mo:base/Nat64";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
+import Debug "mo:base-0.7.3/Debug";
+import Blob "mo:base-0.7.3/Blob";
+import Cycles "mo:base-0.7.3/ExperimentalCycles";
+import Error "mo:base-0.7.3/Error";
+import Array "mo:base-0.7.3/Array";
+import Nat8 "mo:base-0.7.3/Nat8";
+import Nat64 "mo:base-0.7.3/Nat64";
+import Text "mo:base-0.7.3/Text";
+import Nat "mo:base-0.7.3/Nat";
+import Int "mo:base-0.7.3/Int";
+import List "mo:base-0.7.3/List";
 
+
+import JSON "mo:json/JSON";
+import Buffer "mo:base-0.7.3/Buffer";
 
 
 
@@ -20,6 +24,12 @@ actor {
     type Event = {
         address: Text;
     };
+
+    type JSONField = (Text, JSON.JSON);
+
+
+
+
 
 
     public func readRSKSmartContractEvents() :  async [Event] {
@@ -91,18 +101,37 @@ actor {
 public func handleLogs(decodedText: Text) : async [Event] {
   Debug.print("Decoded Text: " # decodedText);
   
-  let logs = Text.split(decodedText, #text("\"result\":"));
-  let _ = logs.next(); // Skip the first part
-  let maybeLogText = logs.next(); // Get the second part
+  let parsedJson = JSON.parse(decodedText);
   
-  switch (maybeLogText) {
+  switch (parsedJson) {
     case (null) { 
-      Debug.print("No logs found.");
+      Debug.print("JSON parsing failed.");
       return []; 
-    }; // Do nothing if no logs
-    case (?logText) { 
-      Debug.print("Processing logs: " # logText);
-      return await processLog(logText); 
+    };
+    case (?parsedObj) {
+      switch (parsedObj) {
+        case (#Object(fields)) {
+          let resultField = Array.find(fields, func((k : Text, _ : JSON.JSON)) : Bool { k == "result" });
+          switch (resultField) {
+            case (null) {
+              Debug.print("Result field not found.");
+              return [];
+            };
+            case (?(_, #Array(logArray))) {
+              Debug.print("Processing logs: " # JSON.show(#Array(logArray)));
+              return await processLog(JSON.show(#Array(logArray)));
+            };
+            case (_) {
+              Debug.print("Result field is not an array or not found");
+              return [];
+            };
+          };
+        };
+        case (_) {
+          Debug.print("JSON parsing did not produce an object");
+          return [];
+        };
+      };
     };
   };
 };
@@ -110,46 +139,60 @@ public func handleLogs(decodedText: Text) : async [Event] {
 
 
 public func processLog(logText: Text) : async [Event] {
+  Debug.print("Input logText: " # logText); // Print the input logText to verify its structure
+
   var events: [Event] = [];
-  let logArray = Text.split(logText, #text("},"));
+    
+  let parsedJSON = JSON.parse(logText);
 
+  switch (parsedJSON) {
+    case (null) {
+      Debug.print("JSON parsing failed");
+    };
+    case (? v) switch (v) {
+      case (#Array(logArray)) {
 
-  for (log in logArray) {
-    Debug.print("Processing log: " # log);
+        for (log in logArray.vals()) {
+          Debug.print("Processing log: " # JSON.show(log)); // Print each log entry before parsing
 
-    let maybeAddress = Text.split(log, #text("\"address\":\"")).next();
-    let maybeData = Text.split(log, #text("\"data\":\"")).next();
-    let maybeTimestamp = Text.split(log, #text("\"blockNumber\":\"")).next();
+          switch (log) {
+            case (#Object(logFields)) {
+              let finalAddress = getFieldAsString(logFields, "address");
 
-    switch (maybeAddress, maybeData, maybeTimestamp) {
-      case (?address, ?data, ?timestamp) {
-        let finalAddress = switch (Text.split(address, #text("\"")).next()) { case null { "Unknown" }; case (?a) { a } };
-        let finalData = switch (Text.split(data, #text("\"")).next()) { case null { "Unknown" }; case (?d) { d } };
-        let finalTimestamp = switch (Text.split(timestamp, #text("\"")).next()) { case null { "Unknown" }; case (?t) { t } };
+              // Extract amount and invoiceId from 'data' field
+              // ... (continue with your existing code to extract amount and invoiceId)
 
-        // Extract amount and invoiceId from 'data' field
-        let amountHex = switch (Text.split(finalData, #text("000000000000000000000000000000000000000000000000")).next()) { case null { "0" }; case (?a) { a } };
-        let invoiceIdHex = switch (Text.split(finalData, #text("000000000000000000000000000000000000000000000000")).next()) { case null { "Unknown" }; case (?i) { i } };
-        let amount = await hexToNat(amountHex); // Now you can use await here
+              Debug.print("finalAddress: " # finalAddress);
 
-      //  let invoiceIdBlob = Blob.fromArray(Blob.toArray(Blob.fromHex(invoiceIdHex)).unwrap());
-      //   let invoiceId = switch (Text.decodeUtf8(invoiceIdBlob)) {
-      //     case (null) "Unknown";
-      //     case (?text) text;
-      //   };
-
-        Debug.print("finalAddress" # finalAddress);
-
-
-        events := Array.append<Event>(events, [ { address = finalAddress } ]);
+              events := Array.append(events, [{ address = finalAddress }]);
+            };
+            case _ { Debug.print("Unexpected JSON structure"); };
+          };
+        };
       };
-      case _ { /* Handle error or skip */ };
+      case _ { Debug.print("Parsed JSON is not an array"); };
     };
   };
-  Debug.print("Finished processing logs.");
 
-  events; // This should work now
+  Debug.print("Finished processing logs.");
+  return events;
 };
+
+
+
+
+private func getFieldAsString(fields: [JSONField], key: Text) : Text {
+let field = Array.find(fields, func((k: Text, v: JSON.JSON)): Bool { k == key });
+  switch (field) {
+    case (?(_, #string(value))) { value };
+    case _ { "Unknown" };
+  };
+};
+
+
+
+
+
 
   public func hexToNat(hex: Text) :  async Nat {
   var value : Nat = 0;
