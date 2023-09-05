@@ -87,18 +87,18 @@ actor {
 
 
 
-    private func encodeTopics(topics: [Text]) : Text {
-        let joinedTopics = Array.foldLeft<Text, Text>(topics, "", func (acc, topic) {
-            if (acc == "") {
-                "\"" # topic # "\""
-            } else {
-                acc # "," # "\"" # topic # "\""
-            }
-        });
-        return "[" # joinedTopics # "]";
-    };
+  private func encodeTopics(topics: [Text]) : Text {
+      let joinedTopics = Array.foldLeft<Text, Text>(topics, "", func (acc, topic) {
+          if (acc == "") {
+              "\"" # topic # "\""
+          } else {
+              acc # "," # "\"" # topic # "\""
+          }
+      });
+      return "[" # joinedTopics # "]";
+  };
 
-public func handleLogs(decodedText: Text) : async [Event] {
+private func handleLogs(decodedText: Text) : async [Event] {
   Debug.print("Decoded Text: " # decodedText);
   
   let parsedJson = JSON.parse(decodedText);
@@ -137,7 +137,6 @@ public func handleLogs(decodedText: Text) : async [Event] {
 };
 
 
-
 public func processLog(logText: Text) : async [Event] {
   Debug.print("Input logText: " # logText); // Print the input logText to verify its structure
 
@@ -157,7 +156,7 @@ public func processLog(logText: Text) : async [Event] {
 
           switch (log) {
             case (#Object(logFields)) {
-              let finalAddress = getFieldAsString(logFields, "address");
+              let finalAddress = await getFieldAsString(logFields, "address");
 
               // Extract amount and invoiceId from 'data' field
               // ... (continue with your existing code to extract amount and invoiceId)
@@ -179,15 +178,26 @@ public func processLog(logText: Text) : async [Event] {
 };
 
 
-
-
-private func getFieldAsString(fields: [JSONField], key: Text) : Text {
-let field = Array.find(fields, func((k: Text, v: JSON.JSON)): Bool { k == key });
+private func getFieldAsString(fields: [JSONField], key: Text) : async Text {
+  Debug.print("Searching for key: " # key);
+  let field = Array.find(fields, func((k: Text, v: JSON.JSON)): Bool { 
+    Debug.print("Checking key: " # k);
+    k == key 
+  });
   switch (field) {
-    case (?(_, #string(value))) { value };
-    case _ { "Unknown" };
+    case (?(_, value)) { 
+      Debug.print("Found value: " # JSON.show(value));
+      JSON.show(value);
+    };
+    case _ { 
+      Debug.print("Field not found");
+      "Unknown" 
+    };
   };
 };
+
+
+
 
 
 
