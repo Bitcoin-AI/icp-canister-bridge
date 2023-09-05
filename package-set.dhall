@@ -7,11 +7,40 @@ let additions = [
   , version = "v0.2.1"
   , dependencies = [ "base-0.7.3" ] : List Text
   },
+
+  { name = "base", 
+      repo = "https://github.com/dfinity/motoko-base", 
+      version = "f8112331eb94dcea41741e59c7e2eaf367721866", 
+      dependencies = [] : List Text
+  },
   { name = "parser-combinators"
     , repo = "https://github.com/aviate-labs/parser-combinators.mo"
     , version = "v0.1.0"
   , dependencies = [ "base-0.7.3" ] : List Text
-    }
+    },
+  { name = "evm-tx"
+    , repo = "https://github.com/av1ctor/evm-txs.mo"
+    , version = "v0.1.3"
+  , dependencies = [ "base" ] : List Text
+    },
+        { 
+      name = "sha3", 
+      repo = "https://github.com/hanbu97/motoko-sha3", 
+      version = "v0.1.1", 
+      dependencies = [] : List Text
+    },
+    { 
+      name = "rlp", 
+      repo = "https://github.com/relaxed04/rlp-motoko", 
+      version = "master", 
+      dependencies = [] : List Text
+    },
+    { 
+      name = "libsecp256k1", 
+      repo = "https://github.com/av1ctor/libsecp256k1.mo", 
+      version = "main", 
+      dependencies = ["base-0.7.3"] : List Text
+    },
 ] : List Package
 
 in  base # additions

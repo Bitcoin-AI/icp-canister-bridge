@@ -11,10 +11,16 @@ import Text "mo:base-0.7.3/Text";
 import Nat "mo:base-0.7.3/Nat";
 import Int "mo:base-0.7.3/Int";
 import List "mo:base-0.7.3/List";
+import Iter "mo:base-0.7.3/Iter";
+
 
 
 import JSON "mo:json/JSON";
 import Buffer "mo:base-0.7.3/Buffer";
+
+import Helper "mo:evm-tx/transactions/Helper";
+import AU "mo:evm-tx/utils/ArrayUtils";
+import TU "mo:evm-tx/utils/TextUtils";
 
 
 
@@ -157,6 +163,28 @@ public func processLog(logText: Text) : async [Event] {
           switch (log) {
             case (#Object(logFields)) {
               let finalAddress = await getFieldAsString(logFields, "address");
+
+
+
+            let data = "000000000000000000000000000000000000000000000000002386f26fc100003132330000000000000000000000000000000000000000000000000000000000";
+             let dataBytes = AU.fromText(data);
+            Debug.print("dataBytes length: " # Nat.toText(Iter.size(Array.vals(dataBytes))));
+
+              
+let amountBytes = AU.slice(dataBytes, 0, 32); // Changed start index to 0 and length to 32
+let invoiceIdBytes = AU.slice(dataBytes, 32, 32); // Changed start index to 32 and length to 32
+
+
+              let amount = AU.toNat256(amountBytes);
+              let invoiceId = AU.toText(invoiceIdBytes);
+
+
+
+              Debug.print("amount: " # Nat.toText(amount));
+
+              Debug.print("invoiceId: " # invoiceId);
+
+
 
               // Extract amount and invoiceId from 'data' field
               // ... (continue with your existing code to extract amount and invoiceId)
