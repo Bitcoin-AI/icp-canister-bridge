@@ -170,41 +170,42 @@ public func processLog(logText: Text) : async [Event] {
 
 
             let data = "000000000000000000000000000000000000000000000000002386f26fc100003132330000000000000000000000000000000000000000000000000000000000";
+
+            // let data = await getFieldAsString(logFields, "data");
+
              let dataBytes = AU.fromText(data);
             Debug.print("dataBytes length: " # Nat.toText(Iter.size(Array.vals(dataBytes))));
 
               
-let amountBytes = AU.slice(dataBytes, 0, 32); // Changed start index to 0 and length to 32
-let invoiceIdBytes = AU.slice(dataBytes, 32, 32); // Changed start index to 32 and length to 32
+            let amountBytes = AU.slice(dataBytes, 0, 32); // Changed start index to 0 and length to 32
+            let invoiceIdBytes = AU.slice(dataBytes, 32, 32); // Changed start index to 32 and length to 32
 
 
               let amount = AU.toNat256(amountBytes);
-              let invoiceId = AU.toText(invoiceIdBytes);
+              let invoiceIdHexString = AU.toText(invoiceIdBytes);
 
 
-              Debug.print("hex invoice : " # invoiceId);
+              Debug.print("hex invoice : " # invoiceIdHexString);
 
 
 
 
-            let test = await bytes32ToString(invoiceId);
-            switch (test) {
+            let invoiceIdString = await bytes32ToString(invoiceIdHexString);
+            switch (invoiceIdString) {
               case (null) {
                 Debug.print("invoiceId is null");
               };
-              case (?validTest) {
+              case (?invoiceIdString) {
                 Debug.print("amount: " # Nat.toText(amount));
-                Debug.print("invoiceId: " # validTest);
+                Debug.print("invoiceId: " # invoiceIdString);
               };
 };
 
 
 
+            // Check if event/invoice is paid
+            // if it is not paid then pay it ?   ---> Connection to lightning netwrk node alby_testnet.mo payInvoice send as input the macaroon string
 
-
-
-              // Extract amount and invoiceId from 'data' field
-              // ... (continue with your existing code to extract amount and invoiceId)
 
               Debug.print("finalAddress: " # finalAddress);
 
