@@ -12,6 +12,7 @@ import Nat "mo:base-0.7.3/Nat";
 import Int "mo:base-0.7.3/Int";
 import List "mo:base-0.7.3/List";
 import Iter "mo:base-0.7.3/Iter";
+import Char "mo:base-0.7.3/Char";
 
 
 
@@ -21,6 +22,8 @@ import Buffer "mo:base-0.7.3/Buffer";
 import Helper "mo:evm-tx/transactions/Helper";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
+import RLP "mo:rlp/hex/lib";
+
 
 
 
@@ -179,10 +182,24 @@ let invoiceIdBytes = AU.slice(dataBytes, 32, 32); // Changed start index to 32 a
               let invoiceId = AU.toText(invoiceIdBytes);
 
 
+              Debug.print("hex invoice : " # invoiceId);
 
-              Debug.print("amount: " # Nat.toText(amount));
 
-              Debug.print("invoiceId: " # invoiceId);
+
+
+            let test = await bytes32ToString(invoiceId);
+            switch (test) {
+              case (null) {
+                Debug.print("invoiceId is null");
+              };
+              case (?validTest) {
+                Debug.print("amount: " # Nat.toText(amount));
+                Debug.print("invoiceId: " # validTest);
+              };
+};
+
+
+
 
 
 
@@ -227,47 +244,78 @@ private func getFieldAsString(fields: [JSONField], key: Text) : async Text {
 
 
 
+public func bytes32ToString(hexString: Text) : async ?Text {
+  Debug.print("Entering bytes32ToString function");
 
-
-
-
-
-  public func hexToNat(hex: Text) :  async Nat {
-  var value : Nat = 0;
-  let iter = Text.toIter(hex);
-  var done = false;
-  while (not done) {
-    switch (iter.next()) {
-      case null { done := true };
-      case (?c) {
-        let digitValue : Nat = switch (c) {
-          case '0' { 0 };
-          case '1' { 1 };
-          case '2' { 2 };
-          case '3' { 3 };
-          case '4' { 4 };
-          case '5' { 5 };
-          case '6' { 6 };
-          case '7' { 7 };
-          case '8' { 8 };
-          case '9' { 9 };
-          case 'A' { 10 };
-          case 'B' { 11 };
-          case 'C' { 12 };
-          case 'D' { 13 };
-          case 'E' { 14 };
-          case 'F' { 15 };
-          case _ { 0 };
-        };
-        value := value * 16 + digitValue;
-      };
+  switch (RLP.decode(hexString)) {
+    case (#ok bytes) {
+      let bytes32Value : Blob = Blob.fromArray(bytes);
+      return Text.decodeUtf8(bytes32Value);
+    };
+    case (#err err) {
+      Debug.print("Hex decoding error: " # err);
+      return null;
     };
   };
-  value
 };
 
 
 
+
+
+public func hexToNat(hex: Text) : async Nat {
+  let result = RLP.decode(hex);
+  switch (result) {
+    case (#ok bytes) {
+      var value : Nat = 0;
+      let length = bytes.size();
+      for (i in Iter.range(0, length - 1)) {
+          let byte = bytes[i];
+          value := value * 16 + Nat8.toNat(byte);
+      };
+      return value;
+    };
+    case (#err err) {
+      // handle error case here, for simplicity returning 0
+      return 0;
+    };
+  };
+};
+
+private func subText(value : Text, indexStart : Nat, indexEnd : Nat) :  Text {
+    Debug.print("Entering subText function");
+    Debug.print("Value: " # value);
+    Debug.print("IndexStart: " # Nat.toText(indexStart));
+    Debug.print("IndexEnd: " # Nat.toText(indexEnd));
+
+    if (indexStart == 0 and indexEnd >= value.size()) {
+        Debug.print("Returning entire value");
+        return value;
+    }
+    else if (indexStart >= value.size()) {
+        Debug.print("IndexStart is greater than or equal to value size, returning empty string");
+        return "";
+    };
+    
+    var indexEndValid = indexEnd;
+    if (indexEnd > value.size()) {
+        Debug.print("Adjusting indexEndValid to value size");
+        indexEndValid := value.size();
+    };
+
+    Debug.print("IndexEndValid: " # Nat.toText(indexEndValid));
+
+    var result : Text = "";
+    var iter = Iter.toArray<Char>(Text.toIter(value));
+    for (index in Iter.range(indexStart, indexEndValid - 1)) {
+        Debug.print("Appending character at index: " # Nat.toText(index));
+        result := result # Char.toText(iter[index]);
+    };
+
+    Debug.print("Result: " # result);
+
+    return result;
+};
 
 
 
