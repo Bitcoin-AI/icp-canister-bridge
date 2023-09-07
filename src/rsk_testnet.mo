@@ -20,15 +20,42 @@ import Buffer "mo:base-0.7.3/Buffer";
 import Helper "mo:evm-tx/transactions/Helper";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
+
+import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
+
 import RLP "mo:rlp/hex/lib";
 
+
 actor {
+
+
+
+  //Create the ECDSA pair here for this canister
+
+  // let keyName = "rsk_key";
+  //  Derivaton path : m / purpose' / coin_type' / account' / change / address_index
+
+  // let derivationPath = [Blob.fromArray([0x44, 0x89, 0x00, 0x00, 0x00]), Blob.fromArray([0x89, 0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00])];
+  // let publicKey : async Blob = IcEcdsaApi.create(keyName, derivationPath);
 
   type Event = {
     address : Text;
   };
 
+
   type JSONField = (Text, JSON.JSON);
+
+
+  // Sign transactions 
+
+//   public func signTransaction(messageHash: Blob) : async Blob {
+//     if (Principal.caller() != Principal.fromActor(this)) {
+//         throw "Unauthorized caller";
+//     };
+//     let signature : async Blob = IcEcdsaApi.sign(keyName, derivationPath, messageHash);
+//     return await signature;
+// };
+
 
   public func readRSKSmartContractEvents() : async [Event] {
 
@@ -154,9 +181,12 @@ actor {
               case (#Object(logFields)) {
                 let finalAddress = await getFieldAsString(logFields, "address");
 
-                let data = "000000000000000000000000000000000000000000000000002386f26fc100003132330000000000000000000000000000000000000000000000000000000000";
 
-                // let data = await getFieldAsString(logFields, "data");
+                let data0x = await getFieldAsString(logFields, "data");
+
+                let data = subText(data0x, 3 , data0x.size()-1);
+
+                Debug.print("data: " # data);
 
                 let dataBytes = AU.fromText(data);
                 Debug.print("dataBytes length: " # Nat.toText(Iter.size(Array.vals(dataBytes))));
@@ -183,6 +213,9 @@ actor {
                 // Check if event/invoice is paid
                 // if it is not paid then pay it ?   ---> Connection to lightning netwrk node alby_testnet.mo payInvoice send as input the macaroon string
 
+
+                // call function
+                // 
                 Debug.print("finalAddress: " # finalAddress);
 
                 events := Array.append(events, [{ address = finalAddress }]);
@@ -234,6 +267,8 @@ actor {
       };
     };
   };
+
+
 
   public func hexToNat(hex : Text) : async Nat {
     let result = RLP.decode(hex);
