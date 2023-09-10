@@ -21,14 +21,14 @@ import Helper "mo:evm-tx/transactions/Helper";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 
+import HU "mo:evm-tx/utils/HashUtils";
+import Context "mo:evm-tx/Context";
+
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 
 import RLP "mo:rlp/hex/lib";
 
-
 actor {
-
-
 
   //Create the ECDSA pair here for this canister
 
@@ -42,29 +42,190 @@ actor {
     address : Text;
   };
 
-
   type JSONField = (Text, JSON.JSON);
 
+  let rskNodeUrl : Text = "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/";
 
-  // Sign transactions 
+  let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
-//   public func signTransaction(messageHash: Blob) : async Blob {
-//     if (Principal.caller() != Principal.fromActor(this)) {
-//         throw "Unauthorized caller";
-//     };
-//     let signature : async Blob = IcEcdsaApi.sign(keyName, derivationPath, messageHash);
-//     return await signature;
-// };
+  // Sign transactions
 
+  //   public func signTransaction(messageHash: Blob) : async Blob {
+  //     if (Principal.caller() != Principal.fromActor(this)) {
+  //         throw "Unauthorized caller";
+  //     };
+  //     let signature : async Blob = IcEcdsaApi.sign(keyName, derivationPath, messageHash);
+  //     return await signature;
+  // };
 
+  public func swapToLightningNetwork() : async Text {
+
+    let address = "01110101";
+
+    // Building transactionData
+
+    let method_sig = "transfer(address,uint256)";
+    let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
+    let method_id = TU.left(keccak256_hex, 7);
+
+    let address_64 = TU.fill(TU.right(address, 2), '0', 64);
+
+    let amount_hex = AU.toText(AU.fromNat256(1000));
+    let amount_256 = TU.fill(amount_hex, '0', 256);
+
+    let data = "0x" #method_id # address_64 # amount_256;
+
+    //Getting gas Price
+    let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
+    let responseGasPrice : Text = await httpRequest(gasPricePayload);
+    let parsedGasPrice = JSON.parse(responseGasPrice);
+    let gasPrice = await getValue(parsedGasPrice);
+
+    Debug.print("gasPrice" # gasPrice);
+
+    //Estimating gas
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # amount_256 # "\", \"data\": \"" # data # "\" }] }";
+    let responseGas : Text = await httpRequest(estimateGasPayload);
+    let parsedGasValue = JSON.parse(responseGas);
+    let gas = await getValue(parsedGasValue);
+
+    Debug.print("gas" # gas);
+
+    //Getting nonce
+
+    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # address # "\", \"latest\"] }";
+    let responseNoncepayLoad : Text = await httpRequest(noncePayLoad);
+
+    Debug.print("nonceResponse" # responseNoncepayLoad);
+
+    let parsedNonce = JSON.parse(responseNoncepayLoad);
+    let nonce = await getValue(parsedNonce);
+
+    Debug.print("nonce" # nonce);
+
+    // Transaction details
+    let transaction = {
+      nonce = nonce; // nonce obtained from your existing code
+      gasPrice = gasPrice; // gasPrice obtained from your existing code
+      gasLimit = gas; // gas obtained from your existing code
+      to = contractAddress; // replace with your contract address
+      value = amount_256; // replace with the actual value
+      data = data;
+      chainId = 1; // replace with the actual chain ID
+      v = 0;
+      r = 0;
+      s = 0;
+    };
+
+    // Step 3.2: Hash the RLP encoded transaction using Keccak256
+    let transaction_encoded = RLP.encode(transaction);
+
+    //   // Step 3.3: Sign the hash using the private key with ECDSA
+    //   let signature = ECDSA.signWithPrivateKey(transaction_hash, privateKey);
+
+    //   // Step 3.4: RLP encode the signed transaction
+    //   let signed_transaction = RLP.encode({
+    //     nonce = transaction.nonce,
+    //     gasPrice = transaction.gasPrice,
+    //     gasLimit = transaction.gasLimit,
+    //     to = transaction.to,
+    //     value = transaction.value,
+    //     data = transaction.data,
+    //     chainId = transaction.chainId,
+    //     v = signature.v,
+    //     r = signature.r,
+    //     s = signature.s
+    //   });
+
+    //   // Step 3.5: Convert the signed transaction to a hex string
+    //   let signed_transaction_hex = toHex(signed_transaction);
+
+    //   return signed_transaction_hex;
+
+    return "";
+  };
+
+  private func signWithPrivateKey(transaction_hash : Blob, privateKeyText : Text) : async ?Text {
+    let context = Context.allocECMultContext(null);
+    let privateKeyBlob = Blob.fromText(privateKeyText);
+    let privateKeyArray = Blob.toArray(privateKeyBlob);
+
+    switch (SecretKey.parse(privateKeyArray)) {
+      case (#err(msg)) {
+        return null;
+      };
+      case (#ok(privateKey)) {
+        let message_parsed = Message.parse(Blob.toArray(transaction_hash));
+        switch (Ecdsa.sign_with_context(message_parsed, privateKey, context, null)) {
+          case (#err(msg)) {
+            return null;
+          };
+          case (#ok(signature)) {
+            return ?signature;
+          };
+        };
+      };
+    };
+  };
+
+  private func httpRequest(jsonRpcPayload : Text) : async Text {
+
+    let ic : Types.IC = actor ("aaaaa-aa");
+
+    let payloadAsBlob : Blob = Text.encodeUtf8(jsonRpcPayload);
+    let payloadAsNat8 : [Nat8] = Blob.toArray(payloadAsBlob);
+
+    // Prepare the HTTP request
+    let httpRequest : Types.HttpRequestArgs = {
+      url = rskNodeUrl;
+      headers = [{ name = "Content-Type"; value = "application/json" }];
+      method = #post;
+      body = ?payloadAsNat8;
+      max_response_bytes = null;
+      transform = null;
+    };
+
+    // Add cycles to pay for the HTTP request
+    Cycles.add(17_000_000_000);
+
+    // Make the HTTP request and wait for the response
+    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+
+    // Decode the response body into readable text
+    let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+      case (null) "No value returned";
+      case (?y) y;
+    };
+
+    return decodedText;
+
+  };
+
+  private func getValue(parsedGasPrice : ?JSON.JSON) : async Text {
+    switch (parsedGasPrice) {
+      case (null) {
+        Debug.print("JSON parsing failed");
+        return "";
+      };
+      case (?v) switch (v) {
+        case (#Object(gasPriceFields)) {
+          let gasPrice = await getFieldAsString(gasPriceFields, "result");
+          return gasPrice;
+        };
+        case _ {
+          Debug.print("Unexpected JSON structure");
+          return "";
+        };
+      };
+    };
+
+  };
   public func readRSKSmartContractEvents() : async [Event] {
 
     let ic : Types.IC = actor ("aaaaa-aa");
 
     // RSK Testnet Node URL and Contract Address
-
-    let rskNodeUrl : Text = "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/";
-    let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
     // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
     let topics : [Text] = ["0x2fe70d4bbeafbc963084344fa9d6159351d9a2323787c90fba21fdc1909dc596"];
@@ -160,7 +321,7 @@ actor {
     };
   };
 
-  public func processLog(logText : Text) : async [Event] {
+  private func processLog(logText : Text) : async [Event] {
     Debug.print("Input logText: " # logText); // Print the input logText to verify its structure
 
     var events : [Event] = [];
@@ -181,10 +342,9 @@ actor {
               case (#Object(logFields)) {
                 let finalAddress = await getFieldAsString(logFields, "address");
 
-
                 let data0x = await getFieldAsString(logFields, "data");
 
-                let data = subText(data0x, 3 , data0x.size()-1);
+                let data = subText(data0x, 3, data0x.size() -1);
 
                 Debug.print("data: " # data);
 
@@ -213,12 +373,18 @@ actor {
                 // Check if event/invoice is paid
                 // if it is not paid then pay it ?   ---> Connection to lightning netwrk node alby_testnet.mo payInvoice send as input the macaroon string
 
-
                 // call function
-                // 
+                //
                 Debug.print("finalAddress: " # finalAddress);
 
-                events := Array.append(events, [{ address = finalAddress }]);
+                let newEvent : Event = {
+                  address = switch (invoiceIdString) {
+                    case (null) { "" }; // or some other default value
+                    case (?validString) { validString };
+                  };
+                };
+                events := Array.append(events, [newEvent]);
+
               };
               case _ { Debug.print("Unexpected JSON structure") };
             };
@@ -253,7 +419,7 @@ actor {
     };
   };
 
-  public func bytes32ToString(hexString : Text) : async ?Text {
+  private func bytes32ToString(hexString : Text) : async ?Text {
     Debug.print("Entering bytes32ToString function");
 
     switch (RLP.decode(hexString)) {
@@ -268,9 +434,7 @@ actor {
     };
   };
 
-
-
-  public func hexToNat(hex : Text) : async Nat {
+  private func hexToNat(hex : Text) : async Nat {
     let result = RLP.decode(hex);
     switch (result) {
       case (#ok bytes) {
@@ -290,35 +454,23 @@ actor {
   };
 
   private func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
-    Debug.print("Entering subText function");
-    Debug.print("Value: " # value);
-    Debug.print("IndexStart: " # Nat.toText(indexStart));
-    Debug.print("IndexEnd: " # Nat.toText(indexEnd));
 
     if (indexStart == 0 and indexEnd >= value.size()) {
-      Debug.print("Returning entire value");
       return value;
     } else if (indexStart >= value.size()) {
-      Debug.print("IndexStart is greater than or equal to value size, returning empty string");
       return "";
     };
 
     var indexEndValid = indexEnd;
     if (indexEnd > value.size()) {
-      Debug.print("Adjusting indexEndValid to value size");
       indexEndValid := value.size();
     };
-
-    Debug.print("IndexEndValid: " # Nat.toText(indexEndValid));
 
     var result : Text = "";
     var iter = Iter.toArray<Char>(Text.toIter(value));
     for (index in Iter.range(indexStart, indexEndValid - 1)) {
-      Debug.print("Appending character at index: " # Nat.toText(index));
       result := result # Char.toText(iter[index]);
     };
-
-    Debug.print("Result: " # result);
 
     return result;
   };
