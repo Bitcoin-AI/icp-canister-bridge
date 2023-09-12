@@ -31,6 +31,7 @@ import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import RLP "mo:rlp/hex/lib";
 
 import Legacy "mo:evm-tx/transactions/Legacy";
+import Transaction "mo:evm-tx/Transaction";
 
 import PublicKey "mo:libsecp256k1/PublicKey";
 
@@ -66,7 +67,18 @@ actor {
 
   public shared (msg) func swapToLightningNetwork() : async Text {
 
-    let address = "7c1dC6845f1f5bBE8aEEe35E10af48ABe47cCCC7"; // Remove '0x' prefix
+    let keyName = "dfx_test_key";
+    let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+
+    if(address == "") {
+      Debug.print("Could not get address!");
+      return "";
+    } else {
+      Debug.print("Address: 0x" # address);
+    };
 
     // Building transactionData
 
@@ -111,6 +123,8 @@ actor {
 
     Debug.print("nonce" # nonce);
 
+    let chainId = hexStringToNat64("0x1f");
+
     // Transaction details
     let transaction = {
       nonce = hexStringToNat64(nonce);
@@ -119,55 +133,83 @@ actor {
       to = contractAddress;
       value = 1000;
       data = data;
-      chainId = hexStringToNat64("0x1f");
+      chainId = chainId;
       v = "0x00";
       r = "0x00";
       s = "0x00";
     };
 
-    // Step 3.2: Hash the RLP encoded transaction using Keccak256
-    // let transaction_encoded = RLP.encode(transaction);
-    let serializedTx = Legacy.serialize(transaction);
+    let ecCtx = Context.allocECMultContext(null);
+
+    let serializedTx = await* Transaction.signTx(
+      #Legacy(?transaction),
+      chainId,
+      keyName,
+      derivationPath,
+      publicKey,
+      ecCtx,
+      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign }
+    );
 
     switch (serializedTx) {
       case (#ok value) {
-        Debug.print("serializedTx: " # AU.toText(value));
+        Debug.print("serializedTx: " # AU.toText(value.1));
 
-        let keyName = "dfx_test_key";
-        let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
-
-        let principalId = msg.caller;
-
-        // let derivationPath = [Principal.toBlob(principalId)];
-
-        let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-
-        let ecCtx = Context.allocECMultContext(null);
-
-        Debug.print("publickeysize: " # Nat.toText(publicKey.size()));
-
-        // let decodedText : Text = switch (Text.decodeUtf8(publicKeyƒ)) {
-        //   case (null) "No value returned";
-        //   case (?y) y;
-        // };
-
-        // Debug.print("publicKey: " # decodedText);
-
-        let p = switch (PublicKey.parse_compressed(publicKey)) {
-          case (#err(e)) {
-            "No value returned";
-          };
-          case (#ok(p)) {
-            let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
-            let address : Text = "0x" # TU.right(keccak256_hex, 24);
-
-            Debug.print("address" # address);
-          };
-        };
-
+        let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
+        Debug.print("Sending tx: " # sendTxPayload);
+        let sendTxResponse : Text = await httpRequest(sendTxPayload);
+        Debug.print("Tx response: " # sendTxResponse);
       };
       case (#err errMsg) { Debug.print("Error: " # errMsg) };
     };
+
+    // Step 3.2: Hash the RLP encoded transaction using Keccak256
+    // let transaction_encoded = RLP.encode(transaction);
+    // let serializedTx = Transaction.serialize(#Legacy(?transaction));
+
+    // switch (serializedTx) {
+    //   case (#ok value) {
+    //     Debug.print("serializedTx: " # AU.toText(value));
+
+    //     let keyName = "dfx_test_key";
+    //     let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+
+    //     let principalId = msg.caller;
+
+    //     // let derivationPath = [Principal.toBlob(principalId)];
+
+    //     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    //     let ecCtx = Context.allocECMultContext(null);
+
+    //     Debug.print("publickeysize: " # Nat.toText(publicKey.size()));
+
+    //     // let decodedText : Text = switch (Text.decodeUtf8(publicKeyƒ)) {
+    //     //   case (null) "No value returned";
+    //     //   case (?y) y;
+    //     // };
+
+    //     // Debug.print("publicKey: " # decodedText);
+
+    //     let p = switch (PublicKey.parse_compressed(publicKey)) {
+    //       case (#err(e)) {
+    //         "No value returned";
+    //       };
+    //       case (#ok(p)) {
+    //         let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
+    //         let address : Text = "0x" # TU.right(keccak256_hex, 24);
+
+    //         Debug.print("address" # address);
+    //       };
+    //     };
+            
+    //     let signature = await* IcEcdsaApi.sign(keyName, derivationPath, Blob.fromArray(value));
+
+    //     Debug.print("signature: " # Nat.toText(Blob.toArray(signature).size()))
+
+    //   };
+    //   case (#err errMsg) { Debug.print("Error: " # errMsg) };
+    // };
 
     //   // Step 3.3: Sign the hash using the private key with ECDSA
     //   let signature = ECDSA.signWithPrivateKey(transaction_hash, privateKey);
@@ -578,5 +620,19 @@ actor {
 
     result;
   };
+
+  private func publicKeyToAddress(publicKey : [Nat8]) : Text {
+    let p = switch (PublicKey.parse_compressed(publicKey)) {
+      case (#err(e)) {
+        return "";
+      };
+      case (#ok(p)) {
+        let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
+        let address : Text = TU.right(keccak256_hex, 24);
+
+        return address;
+      };
+    };
+  }
 
 };
