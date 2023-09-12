@@ -14,6 +14,8 @@ import List "mo:base-0.7.3/List";
 import Iter "mo:base-0.7.3/Iter";
 import Char "mo:base-0.7.3/Char";
 
+import Principal "mo:base/Principal";
+
 import JSON "mo:json/JSON";
 import Buffer "mo:base-0.7.3/Buffer";
 
@@ -27,6 +29,10 @@ import Context "mo:evm-tx/Context";
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 
 import RLP "mo:rlp/hex/lib";
+
+import Legacy "mo:evm-tx/transactions/Legacy";
+
+import PublicKey "mo:libsecp256k1/PublicKey";
 
 actor {
 
@@ -58,22 +64,24 @@ actor {
   //     return await signature;
   // };
 
-  public func swapToLightningNetwork() : async Text {
+  public shared (msg) func swapToLightningNetwork() : async Text {
 
-    let address = "01110101";
+    let address = "7c1dC6845f1f5bBE8aEEe35E10af48ABe47cCCC7"; // Remove '0x' prefix
 
     // Building transactionData
 
-    let method_sig = "transfer(address,uint256)";
+    let method_sig = "swapFromLightningNetwork(address,uint256)";
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
     let method_id = TU.left(keccak256_hex, 7);
 
-    let address_64 = TU.fill(TU.right(address, 2), '0', 64);
+    let address_64 = TU.fill(address, '0', 64);
 
     let amount_hex = AU.toText(AU.fromNat256(1000));
-    let amount_256 = TU.fill(amount_hex, '0', 256);
+    let amount_64 = TU.fill(amount_hex, '0', 64);
 
-    let data = "0x" #method_id # address_64 # amount_256;
+    let data = "0x" # method_id # address_64 # amount_64;
+
+    Debug.print("DATA: " #data);
 
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
@@ -84,7 +92,7 @@ actor {
     Debug.print("gasPrice" # gasPrice);
 
     //Estimating gas
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # amount_256 # "\", \"data\": \"" # data # "\" }] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # amount_64 # "\", \"data\": \"" # data # "\" }] }";
     let responseGas : Text = await httpRequest(estimateGasPayload);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await getValue(parsedGasValue);
@@ -105,20 +113,61 @@ actor {
 
     // Transaction details
     let transaction = {
-      nonce = nonce; // nonce obtained from your existing code
-      gasPrice = gasPrice; // gasPrice obtained from your existing code
-      gasLimit = gas; // gas obtained from your existing code
-      to = contractAddress; // replace with your contract address
-      value = amount_256; // replace with the actual value
+      nonce = hexStringToNat64(nonce);
+      gasPrice = hexStringToNat64(gasPrice);
+      gasLimit = hexStringToNat64(gas);
+      to = contractAddress;
+      value = 1000;
       data = data;
-      chainId = 1; // replace with the actual chain ID
-      v = 0;
-      r = 0;
-      s = 0;
+      chainId = hexStringToNat64("0x1f");
+      v = "0x00";
+      r = "0x00";
+      s = "0x00";
     };
 
     // Step 3.2: Hash the RLP encoded transaction using Keccak256
-    let transaction_encoded = RLP.encode(transaction);
+    // let transaction_encoded = RLP.encode(transaction);
+    let serializedTx = Legacy.serialize(transaction);
+
+    switch (serializedTx) {
+      case (#ok value) {
+        Debug.print("serializedTx: " # AU.toText(value));
+
+        let keyName = "dfx_test_key";
+        let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+
+        let principalId = msg.caller;
+
+        // let derivationPath = [Principal.toBlob(principalId)];
+
+        let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+        let ecCtx = Context.allocECMultContext(null);
+
+        Debug.print("publickeysize: " # Nat.toText(publicKey.size()));
+
+        // let decodedText : Text = switch (Text.decodeUtf8(publicKeyƒ)) {
+        //   case (null) "No value returned";
+        //   case (?y) y;
+        // };
+
+        // Debug.print("publicKey: " # decodedText);
+
+        let p = switch (PublicKey.parse_compressed(publicKey)) {
+          case (#err(e)) {
+            "No value returned";
+          };
+          case (#ok(p)) {
+            let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
+            let address : Text = "0x" # TU.right(keccak256_hex, 24);
+
+            Debug.print("address" # address);
+          };
+        };
+
+      };
+      case (#err errMsg) { Debug.print("Error: " # errMsg) };
+    };
 
     //   // Step 3.3: Sign the hash using the private key with ECDSA
     //   let signature = ECDSA.signWithPrivateKey(transaction_hash, privateKey);
@@ -145,28 +194,30 @@ actor {
     return "";
   };
 
-  private func signWithPrivateKey(transaction_hash : Blob, privateKeyText : Text) : async ?Text {
-    let context = Context.allocECMultContext(null);
-    let privateKeyBlob = Blob.fromText(privateKeyText);
-    let privateKeyArray = Blob.toArray(privateKeyBlob);
+  // private func signWithPrivateKey(transaction_hash : Blob, privateKeyText : Text) : async ?Text {
+  //   // let context = Context.allocECMultContext(null);
+  //   // let privateKeyBlob = Blob.fromText(privateKeyText);
+  //   // let privateKeyArray = Blob.toArray(privateKeyBlob);
 
-    switch (SecretKey.parse(privateKeyArray)) {
-      case (#err(msg)) {
-        return null;
-      };
-      case (#ok(privateKey)) {
-        let message_parsed = Message.parse(Blob.toArray(transaction_hash));
-        switch (Ecdsa.sign_with_context(message_parsed, privateKey, context, null)) {
-          case (#err(msg)) {
-            return null;
-          };
-          case (#ok(signature)) {
-            return ?signature;
-          };
-        };
-      };
-    };
-  };
+  //   // switch (SecretKey.parse(privateKeyArray)) {
+  //   //   case (#err(msg)) {
+  //   //     return null;
+  //   //   };
+  //   //   case (#ok(privateKey)) {
+  //   //     let message_parsed = Message.parse(Blob.toArray(transaction_hash));
+  //   //     switch (Ecdsa.sign_with_context(message_parsed, privateKey, context, null)) {
+  //   //       case (#err(msg)) {
+  //   //         return null;
+  //   //       };
+  //   //       case (#ok(signature)) {
+  //   //         return ?signature;
+  //   //       };
+  //   //     };
+  //   //   };
+  //   // };
+
+  //   return "";
+  // };
 
   private func httpRequest(jsonRpcPayload : Text) : async Text {
 
@@ -193,10 +244,13 @@ actor {
 
     // Decode the response body into readable text
     let responseBody : Blob = Blob.fromArray(httpResponse.body);
+
     let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
       case (null) "No value returned";
       case (?y) y;
     };
+
+    Debug.print(jsonRpcPayload # decodedText);
 
     return decodedText;
 
@@ -473,6 +527,56 @@ actor {
     };
 
     return result;
+  };
+  private func hexStringToNat64(hexString : Text) : Nat64 {
+
+    Debug.print("Input hexString: " # hexString);
+
+    Debug.print("Size  hexString: " # Nat.toText(hexString.size()));
+
+    let hexStringArray = Iter.toArray(Text.toIter(hexString));
+    let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
+      subText(hexString, 3, hexString.size() -1);
+    } else {
+      hexString;
+    };
+
+    Debug.print("Clean hexString: " # cleanHexString);
+
+    var result : Nat64 = 0;
+    var power : Nat64 = 1;
+
+    let charsArray = Iter.toArray(cleanHexString.chars());
+    let arraySize = charsArray.size();
+
+    for (i in Iter.range(0, arraySize - 1)) {
+      let char = charsArray[arraySize - i - 1];
+      let digitValue = switch (char) {
+        case ('0') { 0 };
+        case ('1') { 1 };
+        case ('2') { 2 };
+        case ('3') { 3 };
+        case ('4') { 4 };
+        case ('5') { 5 };
+        case ('6') { 6 };
+        case ('7') { 7 };
+        case ('8') { 8 };
+        case ('9') { 9 };
+        case ('a') { 10 };
+        case ('b') { 11 };
+        case ('c') { 12 };
+        case ('d') { 13 };
+        case ('e') { 14 };
+        case ('f') { 15 };
+        case (_) { 0 }; // Default case, you might want to handle this differently
+      };
+      result += Nat64.fromNat(digitValue) * power;
+      power *= 16;
+    };
+
+    Debug.print("Result: " # Nat64.toText(result));
+
+    result;
   };
 
 };
