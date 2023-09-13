@@ -104,7 +104,7 @@ actor {
     Debug.print("gasPrice" # gasPrice);
 
     //Estimating gas
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # amount_64 # "\", \"data\": \"" # data # "\" }] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
     let responseGas : Text = await httpRequest(estimateGasPayload);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await getValue(parsedGasValue);
@@ -131,7 +131,7 @@ actor {
       gasPrice = hexStringToNat64(gasPrice);
       gasLimit = hexStringToNat64(gas);
       to = contractAddress;
-      value = 1000;
+      value = 0;
       data = data;
       chainId = chainId;
       v = "0x00";
