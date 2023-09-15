@@ -8,8 +8,6 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 const app = express();
 
-const privateKey = fs.readFileSync( 'tls/privatekey.pem' );
-const certificate = fs.readFileSync( 'tls/certificate.pem' );
 
 // Test Route
 app.get('/', (req, res) => {
