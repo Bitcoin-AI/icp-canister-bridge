@@ -2,7 +2,9 @@ import express from 'express';
 import request from 'request';
 import https from 'https';
 import fs from 'fs';
+import {ethers} from 'ethers'
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 const app = express();
 
@@ -29,6 +31,17 @@ app.get('/', (req, res) => {
 // Post to pay invoice to user, verify conditions firts (must come from canister)
 app.post('/', (req, res) => {
 
+
+  // Verify if request comes from icp canister
+  const signature = req.header.signature;
+  const message = req.body.payment_request;
+
+  const address = ethers.utils.verifyMessage( message , signature );
+
+  if(address != process.env.CANISTER_ADDRESS){
+    res.send("Invalid signature");
+  }
+
   let options = {
     url: `https://${process.env.REST_HOST}/v2/router/send`,
     // Work-around for self-signed certificates.
@@ -49,9 +62,6 @@ app.post('/', (req, res) => {
 });
 
 
-https.createServer({
-    key: privateKey,
-    cert: certificate
-}, app).listen(8085,() => {
-  console.log("Service initiated at port 8085")
+app.listen(8086,() => {
+  console.log("Service initiated at port 8086")
 });

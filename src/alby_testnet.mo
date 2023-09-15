@@ -7,6 +7,7 @@ import Nat8 "mo:base-0.7.3/Nat8";
 import Nat64 "mo:base-0.7.3/Nat64";
 import Text "mo:base-0.7.3/Text";
 
+
 // Import the custom types we have in Types.mo
 import Types "Types";
 
@@ -109,6 +110,7 @@ actor {
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" }
+      // { name = "signature"; value = SIGN_OF_INVOICE_HERE }
     ];
 
 
