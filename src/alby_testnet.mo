@@ -105,11 +105,10 @@ actor {
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
 
     // Setup URL and request headers
-    let url: Text = lndBaseUrl # "/v1/channels/transaction-stream";
+    let url: Text = "https://127.0.0.1:8085";
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-      { name = "Grpc-Metadata-macaroon"; value = macaroon}
+      { name = "Accept"; value = "application/json" }
     ];
 
 

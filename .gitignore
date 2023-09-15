@@ -17,6 +17,7 @@ src/declarations/
 # frontend code
 node_modules/
 dist/
+tls/
 
 # environment variables
 .env

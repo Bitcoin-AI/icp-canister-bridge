@@ -1,6 +1,7 @@
 {
   "name": "send_http_get_frontend",
   "version": "0.2.0",
+  "type": "module",
   "description": "Internet Computer starter application",
   "keywords": [
     "Internet Computer",
