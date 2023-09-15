@@ -202,7 +202,7 @@ actor {
     //         Debug.print("address" # address);
     //       };
     //     };
-            
+
     //     let signature = await* IcEcdsaApi.sign(keyName, derivationPath, Blob.fromArray(value));
 
     //     Debug.print("signature: " # Nat.toText(Blob.toArray(signature).size()))
