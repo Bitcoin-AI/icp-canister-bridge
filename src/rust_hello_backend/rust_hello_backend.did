@@ -1,0 +1,24 @@
+type EncryptionInput = record {
+    key: text;
+    iv: text;
+    plaintext: text;
+};
+
+type EncryptionOutput = record {
+    ciphertext: text;
+};
+
+type DecryptionInput = record {
+    key: text;
+    iv: text;
+    ciphertext: text;
+};
+
+type DecryptionOutput = record {
+    plaintext: text;
+};
+
+service : {
+    encrypt : (EncryptionInput) -> (EncryptionOutput) query;
+    decrypt : (DecryptionInput) -> (DecryptionOutput) query;
+}

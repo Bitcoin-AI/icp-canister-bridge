@@ -34,16 +34,9 @@ import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
 
 import PublicKey "mo:libsecp256k1/PublicKey";
+import RustHelloBackend "canister:rust_hello_backend";
 
 actor {
-
-  //Create the ECDSA pair here for this canister
-
-  // let keyName = "rsk_key";
-  //  Derivaton path : m / purpose' / coin_type' / account' / change / address_index
-
-  // let derivationPath = [Blob.fromArray([0x44, 0x89, 0x00, 0x00, 0x00]), Blob.fromArray([0x89, 0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00])];
-  // let publicKey : async Blob = IcEcdsaApi.create(keyName, derivationPath);
 
   type Event = {
     address : Text;
@@ -55,15 +48,39 @@ actor {
 
   let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
-  // Sign transactions
+  public shared (msg) func tests() : async Text {
 
-  //   public func signTransaction(messageHash: Blob) : async Blob {
-  //     if (Principal.caller() != Principal.fromActor(this)) {
-  //         throw "Unauthorized caller";
-  //     };
-  //     let signature : async Blob = IcEcdsaApi.sign(keyName, derivationPath, messageHash);
-  //     return await signature;
-  // };
+    let keyName = "dfx_test_key";
+    let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+
+    if (address == "") {
+      Debug.print("Could not get address!");
+      return "";
+    } else {
+      Debug.print("Address: 0x" # address);
+    };
+
+    let messageToSign = "012345678901234567890123456789012";
+
+    let messageHash : Blob = Text.encodeUtf8(messageToSign);
+
+    let signedMessage = (await* IcEcdsaApi.sign(keyName, derivationPath, messageHash));
+
+
+    Debug.print("Message was signed:");
+
+    let decodedText : Text = switch (Text.decodeUtf8(signedMessage)) {
+      case (null) "No value returned";
+      case (?y) y;
+    };
+
+    Debug.print("decodedText: " # decodedText);
+
+    return decodedText;
+  };
 
   public shared (msg) func swapToLightningNetwork() : async Text {
 
@@ -73,7 +90,7 @@ actor {
 
     let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
 
-    if(address == "") {
+    if (address == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
@@ -122,12 +139,12 @@ actor {
     let nonce = await getValue(parsedNonce);
 
     Debug.print("nonce" # nonce);
-
+c
     let chainId = hexStringToNat64("0x1f");
 
     // Transaction details
     let transaction = {
-      nonce = hexStringToNat64(nonce);
+      nonce = hexStringToNat64("0x00");
       gasPrice = hexStringToNat64(gasPrice);
       gasLimit = hexStringToNat64(gas);
       to = contractAddress;
@@ -148,7 +165,7 @@ actor {
       derivationPath,
       publicKey,
       ecCtx,
-      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign }
+      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
     );
 
     switch (serializedTx) {
@@ -164,102 +181,9 @@ actor {
     };
 
     // Step 3.2: Hash the RLP encoded transaction using Keccak256
-    // let transaction_encoded = RLP.encode(transaction);
-    // let serializedTx = Transaction.serialize(#Legacy(?transaction));
-
-    // switch (serializedTx) {
-    //   case (#ok value) {
-    //     Debug.print("serializedTx: " # AU.toText(value));
-
-    //     let keyName = "dfx_test_key";
-    //     let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
-
-    //     let principalId = msg.caller;
-
-    //     // let derivationPath = [Principal.toBlob(principalId)];
-
-    //     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-
-    //     let ecCtx = Context.allocECMultContext(null);
-
-    //     Debug.print("publickeysize: " # Nat.toText(publicKey.size()));
-
-    //     // let decodedText : Text = switch (Text.decodeUtf8(publicKeyƒ)) {
-    //     //   case (null) "No value returned";
-    //     //   case (?y) y;
-    //     // };
-
-    //     // Debug.print("publicKey: " # decodedText);
-
-    //     let p = switch (PublicKey.parse_compressed(publicKey)) {
-    //       case (#err(e)) {
-    //         "No value returned";
-    //       };
-    //       case (#ok(p)) {
-    //         let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
-    //         let address : Text = "0x" # TU.right(keccak256_hex, 24);
-
-    //         Debug.print("address" # address);
-    //       };
-    //     };
-            
-    //     let signature = await* IcEcdsaApi.sign(keyName, derivationPath, Blob.fromArray(value));
-
-    //     Debug.print("signature: " # Nat.toText(Blob.toArray(signature).size()))
-
-    //   };
-    //   case (#err errMsg) { Debug.print("Error: " # errMsg) };
-    // };
-
-    //   // Step 3.3: Sign the hash using the private key with ECDSA
-    //   let signature = ECDSA.signWithPrivateKey(transaction_hash, privateKey);
-
-    //   // Step 3.4: RLP encode the signed transaction
-    //   let signed_transaction = RLP.encode({
-    //     nonce = transaction.nonce,
-    //     gasPrice = transaction.gasPrice,
-    //     gasLimit = transaction.gasLimit,
-    //     to = transaction.to,
-    //     value = transaction.value,
-    //     data = transaction.data,
-    //     chainId = transaction.chainId,
-    //     v = signature.v,
-    //     r = signature.r,
-    //     s = signature.s
-    //   });
-
-    //   // Step 3.5: Convert the signed transaction to a hex string
-    //   let signed_transaction_hex = toHex(signed_transaction);
-
-    //   return signed_transaction_hex;
 
     return "";
   };
-
-  // private func signWithPrivateKey(transaction_hash : Blob, privateKeyText : Text) : async ?Text {
-  //   // let context = Context.allocECMultContext(null);
-  //   // let privateKeyBlob = Blob.fromText(privateKeyText);
-  //   // let privateKeyArray = Blob.toArray(privateKeyBlob);
-
-  //   // switch (SecretKey.parse(privateKeyArray)) {
-  //   //   case (#err(msg)) {
-  //   //     return null;
-  //   //   };
-  //   //   case (#ok(privateKey)) {
-  //   //     let message_parsed = Message.parse(Blob.toArray(transaction_hash));
-  //   //     switch (Ecdsa.sign_with_context(message_parsed, privateKey, context, null)) {
-  //   //       case (#err(msg)) {
-  //   //         return null;
-  //   //       };
-  //   //       case (#ok(signature)) {
-  //   //         return ?signature;
-  //   //       };
-  //   //     };
-  //   //   };
-  //   // };
-
-  //   return "";
-  // };
 
   private func httpRequest(jsonRpcPayload : Text) : async Text {
 
@@ -633,6 +557,6 @@ actor {
         return address;
       };
     };
-  }
+  };
 
 };
