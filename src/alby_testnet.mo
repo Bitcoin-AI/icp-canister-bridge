@@ -185,6 +185,12 @@ actor {
 
         Debug.print("signature:" #AU.toText(serializedSignature));
 
+
+            let request_icp_bridge_macaroon: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
+
+            let response_icp_bridge_macaroon = httpRequest(request_icp_bridge_macaroon, AU.toText(serializedSignature));
+
+
       };
     };
 
@@ -231,7 +237,7 @@ actor {
     return "";
   };
 
-  private func httpRequest(jsonRpcPayload : Text, signature : Text, message : Text) : async Text {
+  private func httpRequest(jsonRpcPayload : Text, signature : Text) : async Text {
 
     let ic : Types.IC = actor ("aaaaa-aa");
 
@@ -242,7 +248,6 @@ actor {
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "signature"; value = signature },
-      { name = "message"; value = message },
     ];
 
     // Prepare the HTTP request
