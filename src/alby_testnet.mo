@@ -9,8 +9,12 @@ import Text "mo:base-0.7.3/Text";
 import Nat "mo:base-0.7.3/Nat";
 import Iter "mo:base-0.7.3/Iter";
 import Char "mo:base-0.7.3/Char";
+import Buffer "mo:base/Buffer";
 
 import PublicKey "mo:libsecp256k1/PublicKey";
+
+import Signature "mo:libsecp256k1/Signature";
+
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
@@ -22,6 +26,13 @@ import Transaction "mo:evm-tx/Transaction";
 import JSON "mo:json/JSON";
 import RLP "mo:rlp/hex/lib";
 import Context "mo:evm-tx/Context";
+import Result "mo:base/Result";
+
+import Rlp "mo:rlp";
+
+import RlpUtils "mo:evm-tx/utils/RlpUtils";
+
+import RlpTypes "mo:rlp/types";
 
 // Import the custom types we have in Types.mo
 import Types "Types";
@@ -29,29 +40,29 @@ import Types "Types";
 // Actor
 actor {
   // Declare IC management canister
-  let ic: Types.IC = actor ("aaaaa-aa");
+  let ic : Types.IC = actor ("aaaaa-aa");
   type JSONField = (Text, JSON.JSON);
   let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
   // Set the base URL of your LND REST API: https://github.com/getAlby/lightning-browser-extension/wiki/Test-setup
-  let lndBaseUrl: Text = "https://lnd1.regtest.getalby.com";
-  let serviceRest: Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/";
-  let macaroon: Text = "0201036c6e6402f801030a10b3bf6906c1937139ac0684ac4417139d1201301a160a0761646472657373120472656164120577726974651a130a04696e666f120472656164120577726974651a170a08696e766f69636573120472656164120577726974651a210a086d616361726f6f6e120867656e6572617465120472656164120577726974651a160a076d657373616765120472656164120577726974651a170a086f6666636861696e120472656164120577726974651a160a076f6e636861696e120472656164120577726974651a140a057065657273120472656164120577726974651a180a067369676e6572120867656e657261746512047265616400000620a3f810170ad9340a63074b6dded31ed83a7140fd26c7758856111583b7725b2b";
+  let lndBaseUrl : Text = "https://lnd1.regtest.getalby.com";
+  let serviceRest : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/";
+  let macaroon : Text = "0201036c6e6402f801030a10b3bf6906c1937139ac0684ac4417139d1201301a160a0761646472657373120472656164120577726974651a130a04696e666f120472656164120577726974651a170a08696e766f69636573120472656164120577726974651a210a086d616361726f6f6e120867656e6572617465120472656164120577726974651a160a076d657373616765120472656164120577726974651a170a086f6666636861696e120472656164120577726974651a160a076f6e636861696e120472656164120577726974651a140a057065657273120472656164120577726974651a180a067369676e6572120867656e657261746512047265616400000620a3f810170ad9340a63074b6dded31ed83a7140fd26c7758856111583b7725b2b";
 
   // This method sends a GET request to retrieve information from a Lightning node
   // https://lightning.engineering/api-docs/api/lnd/lightning/get-info
   public func getLightningInfo() : async Text {
 
     // Setup URL and request headers
-    let url: Text = lndBaseUrl # "/v1/getinfo";
+    let url : Text = lndBaseUrl # "/v1/getinfo";
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
-      { name = "Grpc-Metadata-macaroon"; value = macaroon}
+      { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
     // Prepare the HTTP request
-    let httpRequest: Types.HttpRequestArgs = {
+    let httpRequest : Types.HttpRequestArgs = {
       url = url;
       headers = requestHeaders;
       method = #get;
@@ -64,35 +75,35 @@ actor {
     Cycles.add(17_000_000_000);
 
     // Make the HTTP request and wait for the response
-    let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
     // Decode the response body into readable text
-    let responseBody: Blob = Blob.fromArray(httpResponse.body);
-    let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
+    let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
       case (null) { "No value returned" };
       case (?y) { y };
     };
 
     // Return the decoded response body
-    decodedText
+    decodedText;
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice/index.html
-  public func generateInvoice(amount: Nat) : async Text {
+  public func generateInvoice(amount : Nat) : async Text {
 
     // Setup URL and request headers
-    let url: Text = lndBaseUrl # "/v1/invoices";
+    let url : Text = lndBaseUrl # "/v1/invoices";
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
-      { name = "Grpc-Metadata-macaroon"; value = macaroon}
+      { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    let request_body_json: Text = "{ \"value\" : 100,\"memo\" : \"Test ICP\", \"is_amp\": true }";
-    let request_body_as_Blob: Blob = Text.encodeUtf8(request_body_json);
-    let request_body_as_nat8: [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
+    let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"Test ICP\", \"is_amp\": true }";
+    let request_body_as_Blob : Blob = Text.encodeUtf8(request_body_json);
+    let request_body_as_nat8 : [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
 
     // Prepare the HTTP request
-    let httpRequest: Types.HttpRequestArgs = {
+    let httpRequest : Types.HttpRequestArgs = {
       url = url;
       headers = requestHeaders;
       method = #post;
@@ -105,11 +116,11 @@ actor {
     Cycles.add(17_000_000_000);
 
     // Make the HTTP request and wait for the response
-    let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
     // Decode the response body into readable text
-    let responseBody: Blob = Blob.fromArray(httpResponse.body);
-    let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
+    let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
       case (null) { "No value returned" };
       case (?y) { y };
     };
@@ -119,36 +130,127 @@ actor {
     // Once payment is done, we trigger release of rbtc from rsk
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/send-payment
-  public func payInvoice(invoice: Text) : async Text {
+  public func payInvoice(invoice : Text) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
     let keyName = "dfx_test_key";
     let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-    let messageHash = AU.toText(HU.keccak(TU.encodeUtf8(invoice), 256));
-    Debug.print(messageHash);
-    let signature = await* IcEcdsaApi.sign(keyName, derivationPath, Text.encodeUtf8(messageHash));
+
+    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+
+    if (address == "") {
+      Debug.print("Could not get address!");
+      return "";
+    } else {
+      Debug.print("Address: 0x" # address);
+    };
+    let ecCtx = Context.allocECMultContext(null);
+
+    // let transaction = {
+    //   nonce = hexStringToNat64("0x00");
+    //   gasPrice = hexStringToNat64("0x00");
+    //   gasLimit = hexStringToNat64("0x00");
+    //   to = "0x0000000000000000000000000000000000000000";
+    //   value = 0;
+    //   data = "0x00";
+    //   chainId = hexStringToNat64("0x1f");
+    //   v = "0x00";
+    //   r = "0x00";
+    //   s = "0x00";
+    // };
+
+    // let request_body_json : Text = "{ \"payment_request\" : \"" # invoice # "\" }";
+
+
+
+    let keccak256_hex = HU.keccak(TU.encodeUtf8(invoice), 256);
+
+
+    let message = AU.toText(HU.keccak(TU.encodeUtf8(invoice), 256));
+
+
+    Debug.print("Message: " # message);
+
+    let signatureBlob = Blob.toArray(await* IcEcdsaApi.sign(keyName, derivationPath, Blob.fromArray(keccak256_hex)));
+
+    let signature = Signature.parse_standard(signatureBlob);
+
+    switch (signature) {
+      case (#err(msg)) {
+        return "";
+      };
+      case (#ok(signature)) {
+        let serializedSignature = signature.serialize();
+
+        Debug.print("signature:" #AU.toText(serializedSignature));
+
+      };
+    };
+
     // Building transactionData
 
     // Setup URL and request headers
-    let url: Text = serviceRest;
+    // let url: Text = serviceRest;
+    // let requestHeaders = [
+    //   { name = "Content-Type"; value = "application/json" },
+    //   { name = "Accept"; value = "application/json" },
+    //   { name = "signature"; value = Nat.toText(Blob.toArray(signature).size()) }
+    // ];
+
+    // let request_body_json: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
+    // let request_body_as_Blob: Blob = Text.encodeUtf8(request_body_json);
+    // let request_body_as_nat8: [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
+
+    // // Prepare the HTTP request
+    // let httpRequest: Types.HttpRequestArgs = {
+    //   url = url;
+    //   headers = requestHeaders;
+    //   method = #post;
+    //   body = ?request_body_as_nat8;
+    //   max_response_bytes = null;
+    //   transform = null;
+    // };
+
+    // // Add cycles to pay for the HTTP request
+    // Cycles.add(17_000_000_000);
+
+    // // Make the HTTP request and wait for the response
+    // let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
+
+    // // Decode the response body into readable text
+    // let responseBody: Blob = Blob.fromArray(httpResponse.body);
+    // let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
+    //   case (null) { "No value returned" };
+    //   case (?y) { y };
+    // };
+
+    // // Return the decoded response body
+    // decodedText
+
+    return "";
+  };
+
+  private func httpRequest(jsonRpcPayload : Text, signature : Text, message : Text) : async Text {
+
+    let ic : Types.IC = actor ("aaaaa-aa");
+
+    let payloadAsBlob : Blob = Text.encodeUtf8(jsonRpcPayload);
+    let payloadAsNat8 : [Nat8] = Blob.toArray(payloadAsBlob);
+
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
-      { name = "signature"; value = Nat.toText(Blob.toArray(signature).size()) }
+      { name = "signature"; value = signature },
+      { name = "message"; value = message },
     ];
 
-
-    let request_body_json: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
-    let request_body_as_Blob: Blob = Text.encodeUtf8(request_body_json);
-    let request_body_as_nat8: [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
-
     // Prepare the HTTP request
-    let httpRequest: Types.HttpRequestArgs = {
-      url = url;
+    let httpRequest : Types.HttpRequestArgs = {
+      url = serviceRest;
       headers = requestHeaders;
       method = #post;
-      body = ?request_body_as_nat8;
+      body = ?payloadAsNat8;
       max_response_bytes = null;
       transform = null;
     };
@@ -157,31 +259,34 @@ actor {
     Cycles.add(17_000_000_000);
 
     // Make the HTTP request and wait for the response
-    let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
     // Decode the response body into readable text
-    let responseBody: Blob = Blob.fromArray(httpResponse.body);
-    let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) { "No value returned" };
-      case (?y) { y };
+    let responseBody : Blob = Blob.fromArray(httpResponse.body);
+
+    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+      case (null) "No value returned";
+      case (?y) y;
     };
 
-    // Return the decoded response body
-    decodedText
+    Debug.print(jsonRpcPayload # decodedText);
+
+    return decodedText;
+
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
-  public func checkInvoice(payment_hash: Text) : async Text {
+  public func checkInvoice(payment_hash : Text) : async Text {
 
     // Setup URL and request headers
-    let url: Text = lndBaseUrl # "/v1/invoice/" # payment_hash;
+    let url : Text = lndBaseUrl # "/v1/invoice/" # payment_hash;
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
-      { name = "Grpc-Metadata-macaroon"; value = macaroon}
+      { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
     Debug.print(url);
     // Prepare the HTTP request
-    let httpRequest: Types.HttpRequestArgs = {
+    let httpRequest : Types.HttpRequestArgs = {
       url = url;
       headers = requestHeaders;
       method = #get;
@@ -194,20 +299,20 @@ actor {
     Cycles.add(17_000_000_000);
 
     // Make the HTTP request and wait for the response
-    let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
     // Decode the response body into readable text
-    let responseBody: Blob = Blob.fromArray(httpResponse.body);
-    let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
+    let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
       case (null) { "No value returned" };
       case (?y) { y };
     };
 
     // Return the decoded response body
-    decodedText
+    decodedText;
   };
 
-  public func getEvmAddr(): async Text {
+  public func getEvmAddr() : async Text {
     let keyName = "dfx_test_key";
     let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
@@ -229,6 +334,7 @@ actor {
       };
     };
   };
+
   private func getValue(parsedGasPrice : ?JSON.JSON) : async Text {
     switch (parsedGasPrice) {
       case (null) {
@@ -373,4 +479,30 @@ actor {
 
     return result;
   };
+
+  // private func processSignature(signature : [Nat8]) : async Result.Result<Text, Text> {
+  //   if (signature.size() != 65) {
+  //     return #err("Invalid signature size");
+  //   };
+
+  //   let r = AU.slice(signature, 0, 32);
+  //   let s = AU.slice(signature, 32, 32);
+  //   let v = signature[64];
+
+  //   // Convert r and s to hex strings using AU.toText
+  //   let rHex = AU.toText(r);
+  //   let sHex = AU.toText(s);
+
+  //   // Convert v to hex string
+  //   let vHex = Int.toText(v, 16);
+
+  //   // Concatenate the hex strings to form the complete signature hex string
+  //   let signatureHex = rHex # sHex # vHex;
+
+  //   // Optionally, you can hash the signature using keccak256
+  //   let signatureHash = HU.keccak(AU.fromText(signatureHex), 256);
+  //   let signatureHashHex = AU.toText(signatureHash);
+
+  //   return #ok(signatureHashHex);
+  // };
 };
