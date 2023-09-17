@@ -98,7 +98,7 @@ actor {
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"Test ICP\", \"is_amp\": true }";
+    let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"Test ICP\" }";
     let request_body_as_Blob : Blob = Text.encodeUtf8(request_body_json);
     let request_body_as_nat8 : [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
 
@@ -283,7 +283,7 @@ actor {
   public func checkInvoice(payment_hash : Text) : async Text {
 
     // Setup URL and request headers
-    let url : Text = lndBaseUrl # "/v1/invoice/" # payment_hash;
+    let url : Text = lndBaseUrl # "/v2/invoices/subscribe/" # payment_hash;
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
