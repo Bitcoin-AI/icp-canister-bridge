@@ -1,12 +1,25 @@
 {
   "canisters": {
     "alby_testnet": {
-      "main": "src/alby_testnet.mo",
+      "main": "src/backend/alby_testnet.mo",
       "type": "motoko"
     },
     "rsk_testnet":{
-      "main": "src/rsk_testnet.mo",
+      "main": "src/backend/rsk_testnet.mo",
       "type": "motoko"
+    },
+    "frontend": {
+      "dependencies": [
+        "alby_testnet"
+      ],
+      "frontend": {
+        "entrypoint": "src/frontend/src/index.html"
+      },
+      "source": [
+        "src/frontend/assets",
+        "dist/frontend/"
+      ],
+      "type": "assets"
     }
   },
   "evm-txs": {

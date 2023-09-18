@@ -1,7 +1,6 @@
 {
   "name": "send_http_get_frontend",
   "version": "0.2.0",
-  "type": "module",
   "description": "Internet Computer starter application",
   "keywords": [
     "Internet Computer",
@@ -22,6 +21,8 @@
     "@dfinity/candid": "^0.19.2",
     "@dfinity/principal": "^0.19.2",
     "ethers": "^6.7.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "request": "^2.88.2"
   },
   "devDependencies": {
@@ -34,6 +35,8 @@
     "process": "0.11.10",
     "stream-browserify": "3.0.0",
     "terser-webpack-plugin": "^5.3.3",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.2.2",
     "util": "0.12.4",
     "webpack": "^5.73.0",
     "webpack-cli": "^4.10.0",

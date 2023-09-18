@@ -21,3 +21,6 @@ tls/
 
 # environment variables
 .env
+
+yarn.lock
+yarn-*

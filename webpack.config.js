@@ -7,18 +7,18 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-const frontendDirectory = "send_http_get_frontend";
+const frontendDirectory = "frontend";
 
 const frontend_entry = path.join("src", frontendDirectory, "src", "index.html");
 
 module.exports = {
   target: "web",
   mode: isDevelopment ? "development" : "production",
-  entry: {
-    // The frontend.entrypoint points to the HTML file for this build, so we need
-    // to replace the extension to `.js`.
-    index: path.join(__dirname, frontend_entry).replace(/\.html$/, ".js"),
-  },
+        entry: {
+          // The frontend.entrypoint points to the HTML file for this build, so we need
+          // to replace the extension to `.js`.
+          index: path.join(__dirname, frontend_entry).replace(/\.html$/, ".js"),
+        },
   devtool: isDevelopment ? "source-map" : false,
   optimization: {
     minimize: !isDevelopment,
@@ -38,7 +38,11 @@ module.exports = {
     filename: "index.js",
     path: path.join(__dirname, "dist", frontendDirectory),
   },
-
+  module: {
+    rules: [
+      { test: /\.(js|ts)x?$/, loader: "ts-loader" }
+    ]
+  },
   // Depending in the language or framework you are using for
   // front-end development, add module loaders to the default
   // webpack configuration. For example, if you are using React
