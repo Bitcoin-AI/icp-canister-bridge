@@ -1,4 +1,3 @@
-// Existing imports
 import Types "Types";
 import Debug "mo:base-0.7.3/Debug";
 import Blob "mo:base-0.7.3/Blob";
@@ -13,37 +12,22 @@ import Int "mo:base-0.7.3/Int";
 import List "mo:base-0.7.3/List";
 import Iter "mo:base-0.7.3/Iter";
 import Char "mo:base-0.7.3/Char";
-
 import Principal "mo:base/Principal";
-
 import JSON "mo:json/JSON";
 import Buffer "mo:base-0.7.3/Buffer";
-
 import Helper "mo:evm-tx/transactions/Helper";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
-
 import HU "mo:evm-tx/utils/HashUtils";
 import Context "mo:evm-tx/Context";
-
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
-
 import RLP "mo:rlp/hex/lib";
-
 import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
-
 import PublicKey "mo:libsecp256k1/PublicKey";
+import utils "utils";
 
 actor {
-
-  //Create the ECDSA pair here for this canister
-
-  // let keyName = "rsk_key";
-  //  Derivaton path : m / purpose' / coin_type' / account' / change / address_index
-
-  // let derivationPath = [Blob.fromArray([0x44, 0x89, 0x00, 0x00, 0x00]), Blob.fromArray([0x89, 0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00]), Blob.fromArray([0x00, 0x00, 0x00, 0x00])];
-  // let publicKey : async Blob = IcEcdsaApi.create(keyName, derivationPath);
 
   type Event = {
     address : Text;
@@ -55,25 +39,22 @@ actor {
 
   let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
-  // Sign transactions
 
-  //   public func signTransaction(messageHash: Blob) : async Blob {
-  //     if (Principal.caller() != Principal.fromActor(this)) {
-  //         throw "Unauthorized caller";
-  //     };
-  //     let signature : async Blob = IcEcdsaApi.sign(keyName, derivationPath, messageHash);
-  //     return await signature;
-  // };
-
+  // TODO :
+  // This function will only be callable by the alby_mo function `checkInvoices` that  will decide
+  // which user should be be paid in RSK, by adding balance in the Smart Contract
+  // Check how to do access control e.g. This canister function can only called by the alby canister 
+  // Right now it will be maintained as public for testing.
   public shared (msg) func swapToLightningNetwork() : async Text {
 
     let keyName = "dfx_test_key";
-    let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+    let address = utils.publicKeyToAddress(publicKey);
 
-    if(address == "") {
+    if (address == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
@@ -85,51 +66,39 @@ actor {
     let method_sig = "swapFromLightningNetwork(address,uint256)";
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
     let method_id = TU.left(keccak256_hex, 7);
-
     let address_64 = TU.fill(address, '0', 64);
-
     let amount_hex = AU.toText(AU.fromNat256(1000));
     let amount_64 = TU.fill(amount_hex, '0', 64);
 
     let data = "0x" # method_id # address_64 # amount_64;
 
-    Debug.print("DATA: " #data);
-
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await httpRequest(gasPricePayload);
+    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rskNodeUrl, null, "post");
     let parsedGasPrice = JSON.parse(responseGasPrice);
     let gasPrice = await getValue(parsedGasPrice);
 
-    Debug.print("gasPrice" # gasPrice);
-
     //Estimating gas
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
-    let responseGas : Text = await httpRequest(estimateGasPayload);
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, rskNodeUrl, null, "post");
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await getValue(parsedGasValue);
-
-    Debug.print("gas" # gas);
 
     //Getting nonce
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # address # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await httpRequest(noncePayLoad);
-
-    Debug.print("nonceResponse" # responseNoncepayLoad);
+    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post");
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await getValue(parsedNonce);
 
-    Debug.print("nonce" # nonce);
-
-    let chainId = hexStringToNat64("0x1f");
+    let chainId = utils.hexStringToNat64("0x1f");
 
     // Transaction details
     let transaction = {
-      nonce = hexStringToNat64(nonce);
-      gasPrice = hexStringToNat64(gasPrice);
-      gasLimit = hexStringToNat64(gas);
+      nonce = utils.hexStringToNat64(nonce);
+      gasPrice = utils.hexStringToNat64(gasPrice);
+      gasLimit = utils.hexStringToNat64(gas);
       to = contractAddress;
       value = 0;
       data = data;
@@ -148,7 +117,7 @@ actor {
       derivationPath,
       publicKey,
       ecCtx,
-      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign }
+      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
     );
 
     switch (serializedTx) {
@@ -157,144 +126,17 @@ actor {
 
         let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
         Debug.print("Sending tx: " # sendTxPayload);
-        let sendTxResponse : Text = await httpRequest(sendTxPayload);
+        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, rskNodeUrl, null, "post");
         Debug.print("Tx response: " # sendTxResponse);
+
+        return sendTxResponse;
+
       };
-      case (#err errMsg) { Debug.print("Error: " # errMsg) };
+      case (#err errMsg) {
+        Debug.print("Error: " # errMsg);
+        return errMsg;
+      };
     };
-
-    // Step 3.2: Hash the RLP encoded transaction using Keccak256
-    // let transaction_encoded = RLP.encode(transaction);
-    // let serializedTx = Transaction.serialize(#Legacy(?transaction));
-
-    // switch (serializedTx) {
-    //   case (#ok value) {
-    //     Debug.print("serializedTx: " # AU.toText(value));
-
-    //     let keyName = "dfx_test_key";
-    //     let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
-
-    //     let principalId = msg.caller;
-
-    //     // let derivationPath = [Principal.toBlob(principalId)];
-
-    //     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-
-    //     let ecCtx = Context.allocECMultContext(null);
-
-    //     Debug.print("publickeysize: " # Nat.toText(publicKey.size()));
-
-    //     // let decodedText : Text = switch (Text.decodeUtf8(publicKeyƒ)) {
-    //     //   case (null) "No value returned";
-    //     //   case (?y) y;
-    //     // };
-
-    //     // Debug.print("publicKey: " # decodedText);
-
-    //     let p = switch (PublicKey.parse_compressed(publicKey)) {
-    //       case (#err(e)) {
-    //         "No value returned";
-    //       };
-    //       case (#ok(p)) {
-    //         let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
-    //         let address : Text = "0x" # TU.right(keccak256_hex, 24);
-
-    //         Debug.print("address" # address);
-    //       };
-    //     };
-
-    //     let signature = await* IcEcdsaApi.sign(keyName, derivationPath, Blob.fromArray(value));
-
-    //     Debug.print("signature: " # Nat.toText(Blob.toArray(signature).size()))
-
-    //   };
-    //   case (#err errMsg) { Debug.print("Error: " # errMsg) };
-    // };
-
-    //   // Step 3.3: Sign the hash using the private key with ECDSA
-    //   let signature = ECDSA.signWithPrivateKey(transaction_hash, privateKey);
-
-    //   // Step 3.4: RLP encode the signed transaction
-    //   let signed_transaction = RLP.encode({
-    //     nonce = transaction.nonce,
-    //     gasPrice = transaction.gasPrice,
-    //     gasLimit = transaction.gasLimit,
-    //     to = transaction.to,
-    //     value = transaction.value,
-    //     data = transaction.data,
-    //     chainId = transaction.chainId,
-    //     v = signature.v,
-    //     r = signature.r,
-    //     s = signature.s
-    //   });
-
-    //   // Step 3.5: Convert the signed transaction to a hex string
-    //   let signed_transaction_hex = toHex(signed_transaction);
-
-    //   return signed_transaction_hex;
-
-    return "";
-  };
-
-  // private func signWithPrivateKey(transaction_hash : Blob, privateKeyText : Text) : async ?Text {
-  //   // let context = Context.allocECMultContext(null);
-  //   // let privateKeyBlob = Blob.fromText(privateKeyText);
-  //   // let privateKeyArray = Blob.toArray(privateKeyBlob);
-
-  //   // switch (SecretKey.parse(privateKeyArray)) {
-  //   //   case (#err(msg)) {
-  //   //     return null;
-  //   //   };
-  //   //   case (#ok(privateKey)) {
-  //   //     let message_parsed = Message.parse(Blob.toArray(transaction_hash));
-  //   //     switch (Ecdsa.sign_with_context(message_parsed, privateKey, context, null)) {
-  //   //       case (#err(msg)) {
-  //   //         return null;
-  //   //       };
-  //   //       case (#ok(signature)) {
-  //   //         return ?signature;
-  //   //       };
-  //   //     };
-  //   //   };
-  //   // };
-
-  //   return "";
-  // };
-
-  private func httpRequest(jsonRpcPayload : Text) : async Text {
-
-    let ic : Types.IC = actor ("aaaaa-aa");
-
-    let payloadAsBlob : Blob = Text.encodeUtf8(jsonRpcPayload);
-    let payloadAsNat8 : [Nat8] = Blob.toArray(payloadAsBlob);
-
-    // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = rskNodeUrl;
-      headers = [{ name = "Content-Type"; value = "application/json" }];
-      method = #post;
-      body = ?payloadAsNat8;
-      max_response_bytes = null;
-      transform = null;
-    };
-
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
-
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
-
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) "No value returned";
-      case (?y) y;
-    };
-
-    Debug.print(jsonRpcPayload # decodedText);
-
-    return decodedText;
 
   };
 
@@ -306,7 +148,7 @@ actor {
       };
       case (?v) switch (v) {
         case (#Object(gasPriceFields)) {
-          let gasPrice = await getFieldAsString(gasPriceFields, "result");
+          let gasPrice = await utils.getFieldAsString(gasPriceFields, "result");
           return gasPrice;
         };
         case _ {
@@ -315,47 +157,26 @@ actor {
         };
       };
     };
-
   };
+
+  // TODO:
+
+  //Check how to run this function periodically and save the status of the invoices, if they have been paid in Lightning network or not
+  //If they have not been paid this function should call the alby_testnet.mo `payInvoice` with the corresponding invocieId
+
   public func readRSKSmartContractEvents() : async [Event] {
 
     let ic : Types.IC = actor ("aaaaa-aa");
 
-    // RSK Testnet Node URL and Contract Address
-
     // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
     let topics : [Text] = ["0x2fe70d4bbeafbc963084344fa9d6159351d9a2323787c90fba21fdc1909dc596"];
 
-    let blockNumber : Text = "0x409492"; // Hexadecimal representation of 4,244,146
+    let blockNumber : Text = "0x409492"; // We will filter after the contract creation
 
     // Prepare the JSON-RPC request payload
     let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
 
-    let payloadAsBlob : Blob = Text.encodeUtf8(jsonRpcPayload);
-    let payloadAsNat8 : [Nat8] = Blob.toArray(payloadAsBlob);
-
-    // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = rskNodeUrl;
-      headers = [{ name = "Content-Type"; value = "application/json" }];
-      method = #post;
-      body = ?payloadAsNat8;
-      max_response_bytes = null;
-      transform = null;
-    };
-
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
-
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
-
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) "No value returned";
-      case (?y) y;
-    };
+    let decodedText = await utils.httpRequest(?jsonRpcPayload, rskNodeUrl, null, "post");
 
     // Use a helper function to handle the rest of the logic
     let events = await handleLogs(decodedText);
@@ -436,11 +257,11 @@ actor {
 
             switch (log) {
               case (#Object(logFields)) {
-                let finalAddress = await getFieldAsString(logFields, "address");
+                let finalAddress = await utils.getFieldAsString(logFields, "address");
 
-                let data0x = await getFieldAsString(logFields, "data");
+                let data0x = await utils.getFieldAsString(logFields, "data");
 
-                let data = subText(data0x, 3, data0x.size() -1);
+                let data = utils.subText(data0x, 3, data0x.size() -1);
 
                 Debug.print("data: " # data);
 
@@ -455,7 +276,7 @@ actor {
 
                 Debug.print("hex invoice : " # invoiceIdHexString);
 
-                let invoiceIdString = await bytes32ToString(invoiceIdHexString);
+                let invoiceIdString = await utils.bytes32ToString(invoiceIdHexString);
                 switch (invoiceIdString) {
                   case (null) {
                     Debug.print("invoiceId is null");
@@ -466,11 +287,6 @@ actor {
                   };
                 };
 
-                // Check if event/invoice is paid
-                // if it is not paid then pay it ?   ---> Connection to lightning netwrk node alby_testnet.mo payInvoice send as input the macaroon string
-
-                // call function
-                //
                 Debug.print("finalAddress: " # finalAddress);
 
                 let newEvent : Event = {
@@ -493,146 +309,4 @@ actor {
     Debug.print("Finished processing logs.");
     return events;
   };
-
-  private func getFieldAsString(fields : [JSONField], key : Text) : async Text {
-    Debug.print("Searching for key: " # key);
-    let field = Array.find(
-      fields,
-      func((k : Text, v : JSON.JSON)) : Bool {
-        Debug.print("Checking key: " # k);
-        k == key;
-      },
-    );
-    switch (field) {
-      case (?(_, value)) {
-        Debug.print("Found value: " # JSON.show(value));
-        JSON.show(value);
-      };
-      case _ {
-        Debug.print("Field not found");
-        "Unknown";
-      };
-    };
-  };
-
-  private func bytes32ToString(hexString : Text) : async ?Text {
-    Debug.print("Entering bytes32ToString function");
-
-    switch (RLP.decode(hexString)) {
-      case (#ok bytes) {
-        let bytes32Value : Blob = Blob.fromArray(bytes);
-        return Text.decodeUtf8(bytes32Value);
-      };
-      case (#err err) {
-        Debug.print("Hex decoding error: " # err);
-        return null;
-      };
-    };
-  };
-
-  private func hexToNat(hex : Text) : async Nat {
-    let result = RLP.decode(hex);
-    switch (result) {
-      case (#ok bytes) {
-        var value : Nat = 0;
-        let length = bytes.size();
-        for (i in Iter.range(0, length - 1)) {
-          let byte = bytes[i];
-          value := value * 16 + Nat8.toNat(byte);
-        };
-        return value;
-      };
-      case (#err err) {
-        // handle error case here, for simplicity returning 0
-        return 0;
-      };
-    };
-  };
-
-  private func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
-
-    if (indexStart == 0 and indexEnd >= value.size()) {
-      return value;
-    } else if (indexStart >= value.size()) {
-      return "";
-    };
-
-    var indexEndValid = indexEnd;
-    if (indexEnd > value.size()) {
-      indexEndValid := value.size();
-    };
-
-    var result : Text = "";
-    var iter = Iter.toArray<Char>(Text.toIter(value));
-    for (index in Iter.range(indexStart, indexEndValid - 1)) {
-      result := result # Char.toText(iter[index]);
-    };
-
-    return result;
-  };
-  private func hexStringToNat64(hexString : Text) : Nat64 {
-
-    Debug.print("Input hexString: " # hexString);
-
-    Debug.print("Size  hexString: " # Nat.toText(hexString.size()));
-
-    let hexStringArray = Iter.toArray(Text.toIter(hexString));
-    let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
-      subText(hexString, 3, hexString.size() -1);
-    } else {
-      hexString;
-    };
-
-    Debug.print("Clean hexString: " # cleanHexString);
-
-    var result : Nat64 = 0;
-    var power : Nat64 = 1;
-
-    let charsArray = Iter.toArray(cleanHexString.chars());
-    let arraySize = charsArray.size();
-
-    for (i in Iter.range(0, arraySize - 1)) {
-      let char = charsArray[arraySize - i - 1];
-      let digitValue = switch (char) {
-        case ('0') { 0 };
-        case ('1') { 1 };
-        case ('2') { 2 };
-        case ('3') { 3 };
-        case ('4') { 4 };
-        case ('5') { 5 };
-        case ('6') { 6 };
-        case ('7') { 7 };
-        case ('8') { 8 };
-        case ('9') { 9 };
-        case ('a') { 10 };
-        case ('b') { 11 };
-        case ('c') { 12 };
-        case ('d') { 13 };
-        case ('e') { 14 };
-        case ('f') { 15 };
-        case (_) { 0 }; // Default case, you might want to handle this differently
-      };
-      result += Nat64.fromNat(digitValue) * power;
-      power *= 16;
-    };
-
-    Debug.print("Result: " # Nat64.toText(result));
-
-    result;
-  };
-
-  private func publicKeyToAddress(publicKey : [Nat8]) : Text {
-    let p = switch (PublicKey.parse_compressed(publicKey)) {
-      case (#err(e)) {
-        return "";
-      };
-      case (#ok(p)) {
-        let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
-        let address : Text = TU.right(keccak256_hex, 24);
-
-        return address;
-      };
-    };
-  }
-
 };

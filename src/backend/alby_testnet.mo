@@ -10,39 +10,30 @@ import Nat "mo:base-0.7.3/Nat";
 import Iter "mo:base-0.7.3/Iter";
 import Char "mo:base-0.7.3/Char";
 import Buffer "mo:base/Buffer";
-
 import PublicKey "mo:libsecp256k1/PublicKey";
-
 import Signature "mo:libsecp256k1/Signature";
-
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
-
 import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
-
 import JSON "mo:json/JSON";
 import RLP "mo:rlp/hex/lib";
 import Context "mo:evm-tx/Context";
 import Result "mo:base/Result";
-
 import Rlp "mo:rlp";
-
 import RlpUtils "mo:evm-tx/utils/RlpUtils";
-
 import RlpTypes "mo:rlp/types";
-
-// Import the custom types we have in Types.mo
 import Types "Types";
+import utils "utils";
+import Principal "mo:base/Principal";
 
 // Actor
 actor {
   // Declare IC management canister
   let ic : Types.IC = actor ("aaaaa-aa");
   type JSONField = (Text, JSON.JSON);
-  let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
   // Set the base URL of your LND REST API: https://github.com/getAlby/lightning-browser-extension/wiki/Test-setup
   let lndBaseUrl : Text = "https://lnd1.regtest.getalby.com";
@@ -61,33 +52,36 @@ actor {
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = url;
-      headers = requestHeaders;
-      method = #get;
-      body = null;
-      max_response_bytes = null;
-      transform = null;
-    };
+    let decodedText = await utils.httpRequest(null, url, ?requestHeaders, "get");
 
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
+    // // Prepare the HTTP request
+    // let httpRequest : Types.HttpRequestArgs = {
+    //   url = url;
+    //   headers = requestHeaders;
+    //   method = #get;
+    //   body = null;
+    //   max_response_bytes = null;
+    //   transform = null;
+    // };
 
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    // // Add cycles to pay for the HTTP request
+    // Cycles.add(17_000_000_000);
 
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) { "No value returned" };
-      case (?y) { y };
-    };
+    // // Make the HTTP request and wait for the response
+    // let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
-    // Return the decoded response body
+    // // Decode the response body into readable text
+    // let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    // let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+    //   case (null) { "No value returned" };
+    //   case (?y) { y };
+    // };
+
+    // // Return the decoded response body
     decodedText;
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice/index.html
+
   public func generateInvoice(amount : Nat) : async Text {
 
     // Setup URL and request headers
@@ -99,45 +93,54 @@ actor {
     ];
 
     let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"Test ICP\" }";
-    let request_body_as_Blob : Blob = Text.encodeUtf8(request_body_json);
-    let request_body_as_nat8 : [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
 
-    // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = url;
-      headers = requestHeaders;
-      method = #post;
-      body = ?request_body_as_nat8;
-      max_response_bytes = null;
-      transform = null;
-    };
+    let decodedText = await utils.httpRequest(?request_body_json, url, ?requestHeaders, "post");
 
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
+    // let request_body_as_Blob : Blob = Text.encodeUtf8(request_body_json);
+    // let request_body_as_nat8 : [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
 
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    // // Prepare the HTTP request
+    // let httpRequest : Types.HttpRequestArgs = {
+    //   url = url;
+    //   headers = requestHeaders;
+    //   method = #post;
+    //   body = ?request_body_as_nat8;
+    //   max_response_bytes = null;
+    //   transform = null;
+    // };
 
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) { "No value returned" };
-      case (?y) { y };
-    };
+    // // Add cycles to pay for the HTTP request
+    // Cycles.add(17_000_000_000);
 
-    // Return the decoded response body
-    decodedText
-    // Once payment is done, we trigger release of rbtc from rsk
+    // // Make the HTTP request and wait for the response
+    // let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+
+    // // Decode the response body into readable text
+    // let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    // let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+    //   case (null) { "No value returned" };
+    //   case (?y) { y };
+    // };
+
+    decodedText;
+
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/send-payment
-  public func payInvoice(invoice : Text) : async Text {
+
+  // TODO :
+  // This function will only be callable by the rsk_testnet_mo function `readRSKSmartContractEvents` that  will decide
+  // which invoices SHOULD  be paid (by calling this function with the corresponding invoiceId)
+  // Check how to do access control e.g. This canister function will be only called by the rsk canister other function
+  // Right now it will be maintained as public for testing.
+  public shared (msg) func payInvoice(invoice : Text) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
     let keyName = "dfx_test_key";
-    let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+    let address = utils.publicKeyToAddress(publicKey); // Remove '0x' prefix
 
     if (address == "") {
       Debug.print("Could not get address!");
@@ -145,30 +148,10 @@ actor {
     } else {
       Debug.print("Address: 0x" # address);
     };
+
     let ecCtx = Context.allocECMultContext(null);
-
-    // let transaction = {
-    //   nonce = hexStringToNat64("0x00");
-    //   gasPrice = hexStringToNat64("0x00");
-    //   gasLimit = hexStringToNat64("0x00");
-    //   to = "0x0000000000000000000000000000000000000000";
-    //   value = 0;
-    //   data = "0x00";
-    //   chainId = hexStringToNat64("0x1f");
-    //   v = "0x00";
-    //   r = "0x00";
-    //   s = "0x00";
-    // };
-
-    // let request_body_json : Text = "{ \"payment_request\" : \"" # invoice # "\" }";
-
-
-
     let keccak256_hex = HU.keccak(TU.encodeUtf8(invoice), 256);
-
-
     let message = AU.toText(HU.keccak(TU.encodeUtf8(invoice), 256));
-
 
     Debug.print("Message: " # message);
 
@@ -185,100 +168,22 @@ actor {
 
         Debug.print("signature:" #AU.toText(serializedSignature));
 
+        let request_icp_bridge_macaroon : Text = "{ \"payment_request\" : \"" # invoice # "\" }";
 
-            let request_icp_bridge_macaroon: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
+        let requestHeaders = [
+          { name = "Content-Type"; value = "application/json" },
+          { name = "Accept"; value = "application/json" },
+          { name = "signature"; value = AU.toText(serializedSignature) },
+        ];
 
-            let response_icp_bridge_macaroon = httpRequest(request_icp_bridge_macaroon, AU.toText(serializedSignature));
+        let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest, ?requestHeaders, "post");
 
-
+        return response_icp_bridge_macaroon;
       };
     };
 
-    // Building transactionData
-
-    // Setup URL and request headers
-    // let url: Text = serviceRest;
-    // let requestHeaders = [
-    //   { name = "Content-Type"; value = "application/json" },
-    //   { name = "Accept"; value = "application/json" },
-    //   { name = "signature"; value = Nat.toText(Blob.toArray(signature).size()) }
-    // ];
-
-    // let request_body_json: Text = "{ \"payment_request\" : \"" # invoice # "\" }";
-    // let request_body_as_Blob: Blob = Text.encodeUtf8(request_body_json);
-    // let request_body_as_nat8: [Nat8] = Blob.toArray(request_body_as_Blob); // e.g [34, 34,12, 0]
-
-    // // Prepare the HTTP request
-    // let httpRequest: Types.HttpRequestArgs = {
-    //   url = url;
-    //   headers = requestHeaders;
-    //   method = #post;
-    //   body = ?request_body_as_nat8;
-    //   max_response_bytes = null;
-    //   transform = null;
-    // };
-
-    // // Add cycles to pay for the HTTP request
-    // Cycles.add(17_000_000_000);
-
-    // // Make the HTTP request and wait for the response
-    // let httpResponse: Types.HttpResponsePayload = await ic.http_request(httpRequest);
-
-    // // Decode the response body into readable text
-    // let responseBody: Blob = Blob.fromArray(httpResponse.body);
-    // let decodedText: Text = switch (Text.decodeUtf8(responseBody)) {
-    //   case (null) { "No value returned" };
-    //   case (?y) { y };
-    // };
-
-    // // Return the decoded response body
-    // decodedText
-
-    return "";
   };
 
-  private func httpRequest(jsonRpcPayload : Text, signature : Text) : async Text {
-
-    let ic : Types.IC = actor ("aaaaa-aa");
-
-    let payloadAsBlob : Blob = Text.encodeUtf8(jsonRpcPayload);
-    let payloadAsNat8 : [Nat8] = Blob.toArray(payloadAsBlob);
-
-    let requestHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-      { name = "signature"; value = signature },
-    ];
-
-    // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = serviceRest;
-      headers = requestHeaders;
-      method = #post;
-      body = ?payloadAsNat8;
-      max_response_bytes = null;
-      transform = null;
-    };
-
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
-
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
-
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) "No value returned";
-      case (?y) y;
-    };
-
-    Debug.print(jsonRpcPayload # decodedText);
-
-    return decodedText;
-
-  };
   // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
   public func checkInvoice(payment_hash : Text) : async Text {
 
@@ -289,225 +194,43 @@ actor {
       { name = "Accept"; value = "application/json" },
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
-    Debug.print(url);
+
+
+    let decodedText = await utils.httpRequest(null,url, ?requestHeaders, "get" );
     // Prepare the HTTP request
-    let httpRequest : Types.HttpRequestArgs = {
-      url = url;
-      headers = requestHeaders;
-      method = #get;
-      body = null;
-      max_response_bytes = null;
-      transform = null;
-    };
+    // let httpRequest : Types.HttpRequestArgs = {
+    //   url = url;
+    //   headers = requestHeaders;
+    //   method = #get;
+    //   body = null;
+    //   max_response_bytes = null;
+    //   transform = null;
+    // };
 
-    // Add cycles to pay for the HTTP request
-    Cycles.add(17_000_000_000);
+    // // Add cycles to pay for the HTTP request
+    // Cycles.add(17_000_000_000);
 
-    // Make the HTTP request and wait for the response
-    let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+    // // Make the HTTP request and wait for the response
+    // let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
-    // Decode the response body into readable text
-    let responseBody : Blob = Blob.fromArray(httpResponse.body);
-    let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-      case (null) { "No value returned" };
-      case (?y) { y };
-    };
+    // // Decode the response body into readable text
+    // let responseBody : Blob = Blob.fromArray(httpResponse.body);
+    // let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+    //   case (null) { "No value returned" };
+    //   case (?y) { y };
+    // };
 
-    // Return the decoded response body
     decodedText;
   };
 
-  public func getEvmAddr() : async Text {
+  public shared (msg) func getEvmAddr() : async Text {
     let keyName = "dfx_test_key";
-    let derivationPath = [Blob.fromArray([0x00, 0x00]), Blob.fromArray([0x00, 0x01])]; // Example derivation path
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let address = publicKeyToAddress(publicKey); // Remove '0x' prefix
+    let address = utils.publicKeyToAddress(publicKey);
     return address;
   };
 
-  private func publicKeyToAddress(publicKey : [Nat8]) : Text {
-    let p = switch (PublicKey.parse_compressed(publicKey)) {
-      case (#err(e)) {
-        return "";
-      };
-      case (#ok(p)) {
-        let keccak256_hex = AU.toText(HU.keccak(AU.right(p.serialize(), 1), 256));
-        let address : Text = TU.right(keccak256_hex, 24);
-
-        return address;
-      };
-    };
-  };
-
-  private func getValue(parsedGasPrice : ?JSON.JSON) : async Text {
-    switch (parsedGasPrice) {
-      case (null) {
-        Debug.print("JSON parsing failed");
-        return "";
-      };
-      case (?v) switch (v) {
-        case (#Object(gasPriceFields)) {
-          let gasPrice = await getFieldAsString(gasPriceFields, "result");
-          return gasPrice;
-        };
-        case _ {
-          Debug.print("Unexpected JSON structure");
-          return "";
-        };
-      };
-    };
-
-  };
-  private func getFieldAsString(fields : [JSONField], key : Text) : async Text {
-    Debug.print("Searching for key: " # key);
-    let field = Array.find(
-      fields,
-      func((k : Text, v : JSON.JSON)) : Bool {
-        Debug.print("Checking key: " # k);
-        k == key;
-      },
-    );
-    switch (field) {
-      case (?(_, value)) {
-        Debug.print("Found value: " # JSON.show(value));
-        JSON.show(value);
-      };
-      case _ {
-        Debug.print("Field not found");
-        "Unknown";
-      };
-    };
-  };
-
-  private func bytes32ToString(hexString : Text) : async ?Text {
-    Debug.print("Entering bytes32ToString function");
-
-    switch (RLP.decode(hexString)) {
-      case (#ok bytes) {
-        let bytes32Value : Blob = Blob.fromArray(bytes);
-        return Text.decodeUtf8(bytes32Value);
-      };
-      case (#err err) {
-        Debug.print("Hex decoding error: " # err);
-        return null;
-      };
-    };
-  };
-
-  private func hexToNat(hex : Text) : async Nat {
-    let result = RLP.decode(hex);
-    switch (result) {
-      case (#ok bytes) {
-        var value : Nat = 0;
-        let length = bytes.size();
-        for (i in Iter.range(0, length - 1)) {
-          let byte = bytes[i];
-          value := value * 16 + Nat8.toNat(byte);
-        };
-        return value;
-      };
-      case (#err err) {
-        // handle error case here, for simplicity returning 0
-        return 0;
-      };
-    };
-  };
-  private func hexStringToNat64(hexString : Text) : Nat64 {
-
-    Debug.print("Input hexString: " # hexString);
-
-    Debug.print("Size  hexString: " # Nat.toText(hexString.size()));
-
-    let hexStringArray = Iter.toArray(Text.toIter(hexString));
-    let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
-      subText(hexString, 3, hexString.size() -1);
-    } else {
-      hexString;
-    };
-
-    Debug.print("Clean hexString: " # cleanHexString);
-
-    var result : Nat64 = 0;
-    var power : Nat64 = 1;
-
-    let charsArray = Iter.toArray(cleanHexString.chars());
-    let arraySize = charsArray.size();
-
-    for (i in Iter.range(0, arraySize - 1)) {
-      let char = charsArray[arraySize - i - 1];
-      let digitValue = switch (char) {
-        case ('0') { 0 };
-        case ('1') { 1 };
-        case ('2') { 2 };
-        case ('3') { 3 };
-        case ('4') { 4 };
-        case ('5') { 5 };
-        case ('6') { 6 };
-        case ('7') { 7 };
-        case ('8') { 8 };
-        case ('9') { 9 };
-        case ('a') { 10 };
-        case ('b') { 11 };
-        case ('c') { 12 };
-        case ('d') { 13 };
-        case ('e') { 14 };
-        case ('f') { 15 };
-        case (_) { 0 }; // Default case, you might want to handle this differently
-      };
-      result += Nat64.fromNat(digitValue) * power;
-      power *= 16;
-    };
-
-    Debug.print("Result: " # Nat64.toText(result));
-
-    result;
-  };
-  private func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
-
-    if (indexStart == 0 and indexEnd >= value.size()) {
-      return value;
-    } else if (indexStart >= value.size()) {
-      return "";
-    };
-
-    var indexEndValid = indexEnd;
-    if (indexEnd > value.size()) {
-      indexEndValid := value.size();
-    };
-
-    var result : Text = "";
-    var iter = Iter.toArray<Char>(Text.toIter(value));
-    for (index in Iter.range(indexStart, indexEndValid - 1)) {
-      result := result # Char.toText(iter[index]);
-    };
-
-    return result;
-  };
-
-  // private func processSignature(signature : [Nat8]) : async Result.Result<Text, Text> {
-  //   if (signature.size() != 65) {
-  //     return #err("Invalid signature size");
-  //   };
-
-  //   let r = AU.slice(signature, 0, 32);
-  //   let s = AU.slice(signature, 32, 32);
-  //   let v = signature[64];
-
-  //   // Convert r and s to hex strings using AU.toText
-  //   let rHex = AU.toText(r);
-  //   let sHex = AU.toText(s);
-
-  //   // Convert v to hex string
-  //   let vHex = Int.toText(v, 16);
-
-  //   // Concatenate the hex strings to form the complete signature hex string
-  //   let signatureHex = rHex # sHex # vHex;
-
-  //   // Optionally, you can hash the signature using keccak256
-  //   let signatureHash = HU.keccak(AU.fromText(signatureHex), 256);
-  //   let signatureHashHex = AU.toText(signatureHash);
-
-  //   return #ok(signatureHashHex);
-  // };
 };
