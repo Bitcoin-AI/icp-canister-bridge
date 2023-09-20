@@ -82,7 +82,7 @@ actor {
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, rskNodeUrl, null, "post");
     let parsedGasValue = JSON.parse(responseGas);
-    let gas = await utils.getValue(parsedGasPrice, "result");
+    let gas = await utils.getValue(parsedGasValue, "result");
 
     //Getting nonce
 
@@ -90,7 +90,7 @@ actor {
     let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post");
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
-    let nonce = await utils.getValue(parsedGasPrice, "result");
+    let nonce = await utils.getValue(parsedNonce, "result");
 
     let chainId = utils.hexStringToNat64("0x1f");
 
