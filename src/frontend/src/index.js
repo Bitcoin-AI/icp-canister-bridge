@@ -1,12 +1,13 @@
 import * as React from "react";
 import { render } from "react-dom";
-import { alby_testnet } from "../../declarations/alby_testnet";
+import { main } from "../../declarations/main";
 
 const MyHello = () => {
   const [message, setMessage] = React.useState('');
   const [amount, setAmount] = React.useState('');
 
   const [r_hash, setPaymentHash] = React.useState('');
+  const [evm_address, setEvmAddr] = React.useState('');
 
   const [invoicePay, setInvoicePay] = React.useState('');
   /*
@@ -19,15 +20,16 @@ const MyHello = () => {
 
   const getInvoice = async () => {
     try{
-      const resp = await alby_testnet.generateInvoice(Number(amount));
+      const resp = await main.generateInvoice(Number(amount),evm_address);
       setMessage(resp);
       if(typeof window.webln !== 'undefined') {
         await window.webln.enable();
         const invoice = JSON.parse(resp).payment_request;
         const result = await window.webln.sendPayment(invoice);
         const r_hash = JSON.parse(resp).r_hash.replace(/\+/g, '-').replace(/\//g, '_')
-        const invoiceCheckResp = await alby_testnet.checkInvoice(r_hash);
-        console.log(invoiceCheckResp)
+        const invoiceCheckResp = await main.checkInvoice(r_hash);
+        console.log(invoiceCheckResp);
+        setMessage(invoiceCheckResp);
       }
     } catch(err){
       setMessage(err.message)
@@ -40,11 +42,11 @@ const MyHello = () => {
         await window.webln.enable();
         const invoice = await webln.makeInvoice({
           amount: amount,
-          defaultMemo: "Test ICP by webln"
+          defaultMemo: evm_address
         });
-        resp = await alby_testnet.payInvoice(invoice.paymentRequest);
+        resp = await main.payInvoice(invoice.paymentRequest);
       } else {
-        resp = await alby_testnet.payInvoice(invoicePay);
+        resp = await main.payInvoice(invoicePay);
       }
       setMessage(resp);
     }catch(err){
@@ -53,7 +55,7 @@ const MyHello = () => {
   }
   const checkInvoice = async () => {
     try{
-      const resp = await alby_testnet.checkInvoice(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
+      const resp = await main.checkInvoice(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
       setMessage(resp);
     }catch(err){
       setMessage(err.message)
@@ -81,19 +83,34 @@ const MyHello = () => {
       </div>
       <div style={{ margin: "30px" }}>
           <p>Ask service to pay invoice generate by you</p>
+          <label>Amount</label>
           <input
             id="invoice_pay"
             value={invoicePay}
             onChange={(ev) => setInvoicePay(ev.target.value)}
           ></input>
+          <label>EVM Address</label>
+          <input
+            id="invoice_pay_memo"
+            value={evm_address}
+            onChange={(ev) => setEvmAddr(ev.target.value)}
+          ></input>
           <button onClick={payInvoice}>Send Invoice!</button>
       </div>
       <div style={{ margin: "30px" }}>
           <p>Ask service to generate invoice to swap to rsk</p>
+          <label>Amount</label>
+
           <input
             id="amount"
             value={amount}
             onChange={(ev) => setAmount(ev.target.value)}
+          ></input>
+          <label>EVM Address</label>
+          <input
+            id="addr"
+            value={evm_address}
+            onChange={(ev) => setEvmAddr(ev.target.value)}
           ></input>
           <button onClick={getInvoice}>Get Invoice!</button>
       </div>

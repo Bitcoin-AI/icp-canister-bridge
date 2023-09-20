@@ -8,6 +8,10 @@
       "main": "src/backend/rsk_testnet.mo",
       "type": "motoko"
     },
+    "main":{
+      "main": "src/backend/main.mo",
+      "type": "motoko"
+    },
     "frontend": {
       "dependencies": [
         "alby_testnet"
