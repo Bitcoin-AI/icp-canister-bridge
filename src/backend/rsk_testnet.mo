@@ -45,7 +45,7 @@ actor {
   // which user should be be paid in RSK, by adding balance in the Smart Contract
   // Check how to do access control e.g. This canister function can only called by the alby canister 
   // Right now it will be maintained as public for testing.
-  public shared (msg) func swapToLightningNetwork(address: Text) : async Text {
+  public shared (msg) func swapFromLightningNetwork(address: Text) : async Text {
 
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
