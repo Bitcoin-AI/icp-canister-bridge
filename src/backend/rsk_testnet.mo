@@ -45,16 +45,16 @@ actor {
   // which user should be be paid in RSK, by adding balance in the Smart Contract
   // Check how to do access control e.g. This canister function can only called by the alby canister 
   // Right now it will be maintained as public for testing.
-  public shared (msg) func swapToLightningNetwork() : async Text {
+  public shared (msg) func swapToLightningNetwork(address: Text) : async Text {
 
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let address = utils.publicKeyToAddress(publicKey);
+    let signerAddress = utils.publicKeyToAddress(publicKey);
 
-    if (address == "") {
+    if (signerAddress == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
@@ -86,7 +86,7 @@ actor {
 
     //Getting nonce
 
-    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # address # "\", \"latest\"] }";
+    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
     let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post");
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
