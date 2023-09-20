@@ -216,4 +216,23 @@ module {
         };
     };
 
+    public func getValue(json : ?JSON.JSON, value: Text) : async Text {
+        switch (json) {
+            case (null) {
+                Debug.print("JSON parsing failed");
+                return "";
+            };
+            case (?v) switch (v) {
+                case (#Object(gasPriceFields)) {
+                    let gasPrice = await getFieldAsString(gasPriceFields, value);
+                    return gasPrice;
+                };
+                case _ {
+                    Debug.print("Unexpected JSON structure");
+                    return "";
+                };
+            };
+        };
+    };
+
 };

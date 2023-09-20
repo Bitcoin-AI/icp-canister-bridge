@@ -76,13 +76,13 @@ actor {
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
     let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rskNodeUrl, null, "post");
     let parsedGasPrice = JSON.parse(responseGasPrice);
-    let gasPrice = await getValue(parsedGasPrice);
+    let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
     //Estimating gas
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, rskNodeUrl, null, "post");
     let parsedGasValue = JSON.parse(responseGas);
-    let gas = await getValue(parsedGasValue);
+    let gas = await utils.getValue(parsedGasPrice, "result");
 
     //Getting nonce
 
@@ -90,7 +90,7 @@ actor {
     let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post");
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
-    let nonce = await getValue(parsedNonce);
+    let nonce = await utils.getValue(parsedGasPrice, "result");
 
     let chainId = utils.hexStringToNat64("0x1f");
 
@@ -140,24 +140,6 @@ actor {
 
   };
 
-  private func getValue(parsedGasPrice : ?JSON.JSON) : async Text {
-    switch (parsedGasPrice) {
-      case (null) {
-        Debug.print("JSON parsing failed");
-        return "";
-      };
-      case (?v) switch (v) {
-        case (#Object(gasPriceFields)) {
-          let gasPrice = await utils.getFieldAsString(gasPriceFields, "result");
-          return gasPrice;
-        };
-        case _ {
-          Debug.print("Unexpected JSON structure");
-          return "";
-        };
-      };
-    };
-  };
 
   // TODO:
 
