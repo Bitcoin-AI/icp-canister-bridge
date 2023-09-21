@@ -1,11 +1,11 @@
 {
   "canisters": {
-    "alby_testnet": {
-      "main": "src/backend/alby_testnet.mo",
-      "type": "motoko"
-    },
     "main":{
       "main": "src/backend/main.mo",
+      "type": "motoko"
+    },
+    "main_backup":{
+      "main": "src/backend/main_backup.mo",
       "type": "motoko"
     },
     "frontend": {
