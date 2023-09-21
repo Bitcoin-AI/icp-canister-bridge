@@ -10,7 +10,7 @@
     },
     "frontend": {
       "dependencies": [
-        "alby_testnet"
+        "main_backup"
       ],
       "frontend": {
         "entrypoint": "src/frontend/src/index.html"
