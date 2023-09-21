@@ -14,7 +14,6 @@ public shared(msg) func swapFromLightningNetwork(address: Text):  async Text{
 
     await RSK_testnet_mo.swapFromLightningNetwork(derivationPath,keyName, address );
 
-    return "";
 
 }  ;
 
