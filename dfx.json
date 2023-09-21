@@ -4,10 +4,6 @@
       "main": "src/backend/alby_testnet.mo",
       "type": "motoko"
     },
-    "rsk_testnet":{
-      "main": "src/backend/rsk_testnet.mo",
-      "type": "motoko"
-    },
     "main":{
       "main": "src/backend/main.mo",
       "type": "motoko"

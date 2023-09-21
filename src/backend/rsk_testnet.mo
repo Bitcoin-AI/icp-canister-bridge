@@ -27,8 +27,7 @@ import Transaction "mo:evm-tx/Transaction";
 import PublicKey "mo:libsecp256k1/PublicKey";
 import utils "utils";
 
-actor {
-
+module {
   type Event = {
     address : Text;
   };
@@ -45,11 +44,10 @@ actor {
   // which user should be be paid in RSK, by adding balance in the Smart Contract
   // Check how to do access control e.g. This canister function can only called by the alby canister 
   // Right now it will be maintained as public for testing.
-  public shared (msg) func swapFromLightningNetwork(address: Text) : async Text {
+  public func swapFromLightningNetwork(derivationPath:[Blob],  keyName:Text, address: Text) : async Text {
 
-    let keyName = "dfx_test_key";
-    let principalId = msg.caller;
-    let derivationPath = [Principal.toBlob(principalId)];
+ 
+
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let signerAddress = utils.publicKeyToAddress(publicKey);
@@ -60,6 +58,7 @@ actor {
     } else {
       Debug.print("Address: 0x" # address);
     };
+
 
     // Building transactionData
 
