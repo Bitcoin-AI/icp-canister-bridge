@@ -6,6 +6,12 @@ import Principal "mo:base/Principal";
 actor {
 
 
+  type Event = {
+    address : Text;
+  };
+
+
+// From Lightning network to RSK blockchain
 public shared(msg) func swapFromLightningNetwork(address: Text):  async Text{
   
     let keyName = "dfx_test_key";
@@ -16,6 +22,24 @@ public shared(msg) func swapFromLightningNetwork(address: Text):  async Text{
 
 
 }  ;
+
+
+
+//From RSK Blockchain to LightningNetwork
+public shared(msg) func payInvoicesAccordingToEvents() : async [Event]{
+
+
+    await RSK_testnet_mo.readRSKSmartContractEvents();
+
+ 
+    /// lista de eventos = await RSK_testnet_mo.readRSKSmartContractEvents();  [invociesId, status]
+
+
+    // for a ALBY_testnet.payInvoices (derivationPath, keyName, invoiceId )
+    // 
+
+    // response 
+}
 
 
 
