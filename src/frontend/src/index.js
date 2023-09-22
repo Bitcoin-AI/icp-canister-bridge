@@ -1,6 +1,6 @@
 import * as React from "react";
 import { render } from "react-dom";
-import { main } from "../../declarations/main_backup";
+import { main_backup as main } from "../../declarations/main_backup";
 
 const MyHello = () => {
   const [message, setMessage] = React.useState('');
