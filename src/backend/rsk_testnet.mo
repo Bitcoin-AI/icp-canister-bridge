@@ -30,6 +30,7 @@ import utils "utils";
 module {
   type Event = {
     address : Text;
+    amount: Nat;
   };
 
   type JSONField = (Text, JSON.JSON);
@@ -38,15 +39,12 @@ module {
 
   let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
-
   // TODO :
   // This function will only be callable by the alby_mo function `checkInvoices` that  will decide
   // which user should be be paid in RSK, by adding balance in the Smart Contract
-  // Check how to do access control e.g. This canister function can only called by the alby canister 
+  // Check how to do access control e.g. This canister function can only called by the alby canister
   // Right now it will be maintained as public for testing.
-  public func swapFromLightningNetwork(derivationPath:[Blob],  keyName:Text, address: Text) : async Text {
-
- 
+  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
@@ -58,7 +56,6 @@ module {
     } else {
       Debug.print("Address: 0x" # address);
     };
-
 
     // Building transactionData
 
@@ -127,7 +124,6 @@ module {
         Debug.print("Sending tx: " # sendTxPayload);
         let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, rskNodeUrl, null, "post");
         Debug.print("Tx response: " # sendTxResponse);
-
         return sendTxResponse;
 
       };
@@ -138,7 +134,6 @@ module {
     };
 
   };
-
 
   // TODO:
 
@@ -275,6 +270,8 @@ module {
                     case (null) { "" }; // or some other default value
                     case (?validString) { validString };
                   };
+                  amount = amount; // Add the amount field here
+
                 };
                 events := Array.append(events, [newEvent]);
 

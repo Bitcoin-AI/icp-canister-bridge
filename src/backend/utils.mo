@@ -131,7 +131,6 @@ module {
     };
 
     public func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
-
         if (indexStart == 0 and indexEnd >= value.size()) {
             return value;
         } else if (indexStart >= value.size()) {
@@ -151,6 +150,7 @@ module {
 
         return result;
     };
+    
     public func hexStringToNat64(hexString : Text) : Nat64 {
 
         Debug.print("Input hexString: " # hexString);
@@ -216,7 +216,7 @@ module {
         };
     };
 
-    public func getValue(json : ?JSON.JSON, value: Text) : async Text {
+    public func getValue(json : ?JSON.JSON, value : Text) : async Text {
         switch (json) {
             case (null) {
                 Debug.print("JSON parsing failed");
