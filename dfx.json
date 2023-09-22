@@ -4,13 +4,9 @@
       "main": "src/backend/main.mo",
       "type": "motoko"
     },
-    "main_backup":{
-      "main": "src/backend/main_backup.mo",
-      "type": "motoko"
-    },
     "frontend": {
       "dependencies": [
-        "main_backup"
+        "main"
       ],
       "frontend": {
         "entrypoint": "src/frontend/src/index.html"

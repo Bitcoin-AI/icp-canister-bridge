@@ -40,19 +40,18 @@ import RlpTypes "mo:rlp/types";
 import Types "Types";
 import utils "utils";
 
-// Actor
-actor {
+// Module
+module {
   // Declare IC management canister
-  let ic : Types.IC = actor ("aaaaa-aa");
   type JSONField = (Text, JSON.JSON);
   let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
 
   // Set the base URL of your LND REST API: https://github.com/getAlby/lightning-browser-extension/wiki/Test-setup
   let lndBaseUrl : Text = "https://lnd1.regtest.getalby.com";
   let serviceRest : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/";
+  // Ideally the macaroon would give only access to read invoices states and specific for the service
   let macaroon : Text = "0201036c6e6402f801030a10b3bf6906c1937139ac0684ac4417139d1201301a160a0761646472657373120472656164120577726974651a130a04696e666f120472656164120577726974651a170a08696e766f69636573120472656164120577726974651a210a086d616361726f6f6e120867656e6572617465120472656164120577726974651a160a076d657373616765120472656164120577726974651a170a086f6666636861696e120472656164120577726974651a160a076f6e636861696e120472656164120577726974651a140a057065657273120472656164120577726974651a180a067369676e6572120867656e657261746512047265616400000620a3f810170ad9340a63074b6dded31ed83a7140fd26c7758856111583b7725b2b";
 
-  let paidInvoices = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
   // This method sends a GET request to retrieve information from a Lightning node
   // https://lightning.engineering/api-docs/api/lnd/lightning/get-info
@@ -93,12 +92,9 @@ actor {
   // which invoices SHOULD  be paid (by calling this function with the corresponding invoiceId)
   // Check how to do access control e.g. This canister function will be only called by the rsk canister other function
   // Right now it will be maintained as public for testing.
-  public shared (msg) func payInvoice(invoice : Text) : async Text {
+  public func payInvoice(invoice : Text,derivationPath:[Blob],  keyName:Text) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
-    let keyName = "dfx_test_key";
-    let principalId = msg.caller;
-    let derivationPath = [Principal.toBlob(principalId)];
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let address = utils.publicKeyToAddress(publicKey); // Remove '0x' prefix
@@ -160,42 +156,13 @@ actor {
 
       let responseText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get");
       Debug.print(responseText);
-      let parsedResponse = JSON.parse(responseText);
-      // Check if eth_address matches memo and payment is settled
-      let result = await utils.getValue(parsedResponse,"result");
-      let evm_addr = await utils.getValue(JSON.parse(result),"memo");
-      let isSettled = await utils.getValue(JSON.parse(result),"settled");
-      let invoice = await utils.getValue(JSON.parse(result),"payment_request");
-
-      let isPaid = paidInvoices.get(invoice);
-
-      if(isSettled == "false"){
-        return "Invoice not settled, pay invoice and try again";
-      };
-      let isPaidBoolean : Bool =
-        switch(isPaid) {
-          case (null) { false };
-          case (?true) { true };
-          case (?false) { false };
-        };
-      if(isPaidBoolean){
-        return "Invoice is already paid and rsk transaction processed";
-      };
-
-
-      // Perform swap from Lightning Network to Ethereum
-      //await swapFromLightningNetwork(evm_addr);
-      // Invoice not found, mark it as paid in the paidInvoices map
-      paidInvoices.put(invoice, true);
       // Return the decoded response body
       return responseText;
 
   };
 
-  public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "dfx_test_key";
-    let principalId = msg.caller;
-    let derivationPath = [Principal.toBlob(principalId)];
+  public func getEvmAddr(derivationPath:[Blob],  keyName:Text) : async Text {
+
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let address = utils.publicKeyToAddress(publicKey);

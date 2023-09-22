@@ -1,6 +1,6 @@
 import * as React from "react";
 import { render } from "react-dom";
-import { main_backup as main } from "../../declarations/main_backup";
+import { main } from "../../declarations/main";
 
 const MyHello = () => {
   const [message, setMessage] = React.useState('');
@@ -20,14 +20,14 @@ const MyHello = () => {
 
   const getInvoice = async () => {
     try{
-      const resp = await main.generateInvoice(Number(amount),evm_address);
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount),evm_address);
       setMessage(resp);
       if(typeof window.webln !== 'undefined') {
         await window.webln.enable();
         const invoice = JSON.parse(resp).payment_request;
         const result = await window.webln.sendPayment(invoice);
         const r_hash = JSON.parse(resp).r_hash.replace(/\+/g, '-').replace(/\//g, '_')
-        const invoiceCheckResp = await main.checkInvoice(r_hash);
+        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hash);
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
       }
@@ -55,7 +55,7 @@ const MyHello = () => {
   }
   const checkInvoice = async () => {
     try{
-      const resp = await main.checkInvoice(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
+      const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
       setMessage(resp);
     }catch(err){
       setMessage(err.message)
