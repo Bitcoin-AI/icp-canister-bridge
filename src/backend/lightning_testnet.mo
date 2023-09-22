@@ -52,7 +52,6 @@ module {
   // Ideally the macaroon would give only access to read invoices states and specific for the service
   let macaroon : Text = "0201036c6e6402f801030a10b3bf6906c1937139ac0684ac4417139d1201301a160a0761646472657373120472656164120577726974651a130a04696e666f120472656164120577726974651a170a08696e766f69636573120472656164120577726974651a210a086d616361726f6f6e120867656e6572617465120472656164120577726974651a160a076d657373616765120472656164120577726974651a170a086f6666636861696e120472656164120577726974651a160a076f6e636861696e120472656164120577726974651a140a057065657273120472656164120577726974651a180a067369676e6572120867656e657261746512047265616400000620a3f810170ad9340a63074b6dded31ed83a7140fd26c7758856111583b7725b2b";
 
-
   // This method sends a GET request to retrieve information from a Lightning node
   // https://lightning.engineering/api-docs/api/lnd/lightning/get-info
   public func getLightningInfo() : async Text {
@@ -65,12 +64,12 @@ module {
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    let decodedText: Text = await utils.httpRequest(null,url,?requestHeaders,"get");
+    let decodedText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get");
     // Return the decoded response body
     decodedText;
   };
   // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice/index.html
-  public func generateInvoice(amount : Nat,evm_addr: Text) : async Text {
+  public func generateInvoice(amount : Nat, evm_addr : Text) : async Text {
 
     // Setup URL and request headers
     let url : Text = lndBaseUrl # "/v1/invoices";
@@ -81,7 +80,7 @@ module {
     ];
 
     let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"" # evm_addr # "\"  }";
-    let decodedText: Text = await utils.httpRequest(?request_body_json,url,?requestHeaders,"post");
+    let decodedText : Text = await utils.httpRequest(?request_body_json, url, ?requestHeaders, "post");
 
     // Return the decoded response body
     decodedText
@@ -92,7 +91,7 @@ module {
   // which invoices SHOULD  be paid (by calling this function with the corresponding invoiceId)
   // Check how to do access control e.g. This canister function will be only called by the rsk canister other function
   // Right now it will be maintained as public for testing.
-  public func payInvoice(invoice : Text,derivationPath:[Blob],  keyName:Text) : async Text {
+  public func payInvoice(invoice : Text, derivationPath : [Blob], keyName : Text) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
@@ -140,26 +139,25 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
-  public func checkInvoice(payment_hash: Text): async Text {
+  public func checkInvoice(payment_hash : Text) : async Text {
 
-      // Setup URL and request headers
-      let url: Text = lndBaseUrl # "/v2/invoices/subscribe/" # payment_hash;
-      let requestHeaders = [
-          { name = "Content-Type"; value = "application/json" },
-          { name = "Accept"; value = "application/json" },
-          { name = "Grpc-Metadata-macaroon"; value = macaroon },
-      ];
-      Debug.print(url);
+    // Setup URL and request headers
+    let url : Text = lndBaseUrl # "/v2/invoices/subscribe/" # payment_hash;
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "Grpc-Metadata-macaroon"; value = macaroon },
+    ];
+    Debug.print(url);
 
-
-      let responseText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get");
-      Debug.print(responseText);
-      // Return the decoded response body
-      return responseText;
+    let responseText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get");
+    Debug.print(responseText);
+    // Return the decoded response body
+    return responseText;
 
   };
 
-  public func getEvmAddr(derivationPath:[Blob],  keyName:Text) : async Text {
+  public func getEvmAddr(derivationPath : [Blob], keyName : Text) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 

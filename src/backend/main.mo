@@ -19,12 +19,26 @@ actor {
   };
 
   let paidInvoicestoRSK = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
-
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
+  let paymentHashToRequest = HashMap.HashMap<Text, Text>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text) : async Text {
     let invoiceResponse = await lightning_testnet.generateInvoice(amount, address);
+    return invoiceResponse;
+  };
+
+  //From RSK Blockchain to LightningNetwork
+  public func generateInvoiceToSwapToLN(amount : Nat) : async Text {
+    let invoiceResponse = await lightning_testnet.generateInvoice(amount, "toLN");
+
+    //  Generate mapping
+
+    let paymentHash = await utils.getValue(JSON.parse(invoiceResponse), "r_hash");
+    let paymentRequest = await utils.getValue(JSON.parse(invoiceResponse), "payment_request");
+
+    paymentHashToRequest.put(paymentHash, paymentRequest);
+
     return invoiceResponse;
   };
 
@@ -35,7 +49,7 @@ actor {
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash);
     let parsedResponse = JSON.parse(paymentCheckResponse);
-    // Check if payment is settled and get evm_address)
+    // Check if payment is settled and get evm_address
     let result = await utils.getValue(parsedResponse, "result");
     let evm_addr = await utils.getValue(JSON.parse(result), "memo");
     let isSettled = await utils.getValue(JSON.parse(result), "settled");
@@ -88,7 +102,6 @@ actor {
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-
     let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents();
 
     // Using Array.tabulate to iterate over the events
@@ -103,8 +116,7 @@ actor {
             paidInvoicestoLN.put(address, (false, amount));
           };
           case (?(isPaid, existingAmount)) {
-            // Invoice ID already exists in the map, you can update it if needed
-            // For example, to update the amount:
+            //Do nothing
           };
         };
         return event;
@@ -127,48 +139,62 @@ actor {
     // Process each unpaid invoice
     let entries = unpaidInvoices.entries();
     for ((invoiceId, (isPaid, amount)) in entries) {
-      Debug.print("Amount: " # Nat.toText(amount));
-      Debug.print("InvoiceId: " # invoiceId);
+      Debug.print("InvoiceId Retrieved from list of events: " # invoiceId # " with Amount " # Nat.toText(amount));
 
       // Check if invoice has correct amount
+      try {
 
-      let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "result");
-      let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
+        let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "result");
 
-      Debug.print("amountCheckedOpt: " # invoiceId);
+        let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
 
-      switch (amountCheckedOpt) {
-        case (null) {
-          paidInvoicestoLN.put(invoiceId, (true, amount));
-          Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
-        };
-        case (?amountChecked) {
-          if (amountChecked != amount) {
-            // Update the HashMap to set status = paid if the amount is incorrect
+        Debug.print("amountCheckedOpt: " # invoiceId);
+
+        switch (amountCheckedOpt) {
+          case (null) {
             paidInvoicestoLN.put(invoiceId, (true, amount));
-            Debug.print("Amount mismatch. Marking as paid to skip.");
-          } else {
-            // Proceed to pay the invoice
-            let paymentResult = await lightning_testnet.payInvoice(invoiceId, derivationPath, keyName);
-            let paymentResultJson = JSON.parse(paymentResult);
-            let errorField = await utils.getValue(paymentResultJson, "error");
-            let resultField = await utils.getValue(paymentResultJson, "result");
-            let statusField = await utils.getValue(JSON.parse(resultField), "status");
-
-            if (errorField == "" and statusField == "SUCCEEDED") {
-              Debug.print("Payment Result: Successful");
-              // Update the HashMap to set status = paid
+            Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
+          };
+          case (?amountChecked) {
+            if (amountChecked != amount) {
+              // Update the HashMap to set status = paid if the amount is incorrect
               paidInvoicestoLN.put(invoiceId, (true, amount));
+              Debug.print("Amount mismatch. Marking as paid to skip.");
             } else {
-              Debug.print("Payment Result: Failed");
-              // we can try again later if it was in process 
-            };
+              // Proceed to pay the invoice
+              // Get the payment Request if needed?
+              let paymentRequestOpt = paymentHashToRequest.get(invoiceId);
+              switch (paymentRequestOpt) {
+                case (null) {
+                  Debug.print("Payment Hash not found in the HashMap");
+                  //Skiping
+                  paidInvoicestoLN.put(invoiceId, (true, amount));
+                };
+                case (?paymentRequest) {
+                  let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName);
+                  let paymentResultJson = JSON.parse(paymentResult);
+                  let errorField = await utils.getValue(paymentResultJson, "error");
+                  let resultField = await utils.getValue(paymentResultJson, "result");
+                  let statusField = await utils.getValue(JSON.parse(resultField), "status");
 
+                  if (errorField == "" and statusField == "SUCCEEDED") {
+                    Debug.print("Payment Result: Successful");
+                    // Update the HashMap to set status = paid
+                    paidInvoicestoLN.put(invoiceId, (true, amount));
+                  } else {
+                    Debug.print("Payment Result: Failed");
+                    // we can try again later if it was in process
+                  };
+                };
+              };
+            };
           };
         };
+      } catch (e) {
+        Debug.print("Caught an exception: ");
+        // Update the HashMap to set status = paid and move to the next one
+        paidInvoicestoLN.put(invoiceId, (true, amount));
       };
     };
-
   };
-
 };
