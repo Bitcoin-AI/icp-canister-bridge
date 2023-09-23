@@ -30,7 +30,7 @@ import utils "utils";
 module {
   type Event = {
     address : Text;
-    amount: Nat;
+    amount : Nat;
   };
 
   type JSONField = (Text, JSON.JSON);
@@ -252,26 +252,9 @@ module {
 
                 Debug.print("hex invoice : " # invoiceIdHexString);
 
-                let invoiceIdString = await utils.bytes32ToString(invoiceIdHexString);
-                switch (invoiceIdString) {
-                  case (null) {
-                    Debug.print("invoiceId is null");
-                  };
-                  case (?invoiceIdString) {
-                    Debug.print("amount: " # Nat.toText(amount));
-                    Debug.print("invoiceId: " # invoiceIdString);
-                  };
-                };
-
-                Debug.print("finalAddress: " # finalAddress);
-
                 let newEvent : Event = {
-                  address = switch (invoiceIdString) {
-                    case (null) { "" }; // or some other default value
-                    case (?validString) { validString };
-                  };
+                  address = invoiceIdHexString; // Directly use the hex string as the address
                   amount = amount; // Add the amount field here
-
                 };
                 events := Array.append(events, [newEvent]);
 

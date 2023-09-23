@@ -8,6 +8,10 @@ import Nat "mo:base/Nat";
 import JSON "mo:json/JSON";
 import Text "mo:base-0.7.3/Text";
 import Debug "mo:base-0.7.3/Debug";
+import AU "mo:evm-tx/utils/ArrayUtils";
+import TU "mo:evm-tx/utils/TextUtils";
+
+import HU "mo:evm-tx/utils/HashUtils";
 
 actor {
 
@@ -20,7 +24,7 @@ actor {
 
   let paidInvoicestoRSK = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
-  let paymentHashToRequest = HashMap.HashMap<Text, Text>(10, Text.equal, Text.hash);
+  let paymentHashToRequest = HashMap.HashMap<Text, (Text, Text)>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text) : async Text {
@@ -32,14 +36,20 @@ actor {
   public func generateInvoiceToSwapToLN(amount : Nat) : async Text {
     let invoiceResponse = await lightning_testnet.generateInvoice(amount, "toLN");
 
-    //  Generate mapping
-
-    let paymentHash = await utils.getValue(JSON.parse(invoiceResponse), "r_hash");
+    // Extract the paymentRequest and paymentHash from the invoiceResponse
     let paymentRequest = await utils.getValue(JSON.parse(invoiceResponse), "payment_request");
+    let paymentHash = await utils.getValue(JSON.parse(invoiceResponse), "r_hash");
 
-    paymentHashToRequest.put(paymentHash, paymentRequest);
+    let paymentRequestClean = utils.subText(paymentRequest,1, paymentRequest.size()-1);
+    let paymentHashClean = utils.subText(paymentHash, 1, paymentHash.size()-1);
 
-    return invoiceResponse;
+    // Generate the keccak256 hash of the paymentRequest
+    let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(paymentRequest), 256));
+
+    // Store both paymentRequest and paymentHash in the HashMap
+    paymentHashToRequest.put(keccak256_hex, (paymentRequestClean, paymentHashClean));
+
+    return "Hash: " # keccak256_hex # " Invoice Response: " # invoiceResponse;
   };
 
   public shared (msg) func swapFromLightningNetwork(payment_hash : Text) : async Text {
@@ -139,38 +149,34 @@ actor {
     // Process each unpaid invoice
     let entries = unpaidInvoices.entries();
     for ((invoiceId, (isPaid, amount)) in entries) {
-      Debug.print("InvoiceId Retrieved from list of events: " # invoiceId # " with Amount " # Nat.toText(amount));
-
-      // Check if invoice has correct amount
       try {
+        // Retrieve paymentRequest and paymentHash from the HashMap
+        let paymentInfoOpt = paymentHashToRequest.get(invoiceId);
 
-        let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "result");
-
-        let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
-
-        Debug.print("amountCheckedOpt: " # invoiceId);
-
-        switch (amountCheckedOpt) {
+        switch (paymentInfoOpt) {
           case (null) {
-            paidInvoicestoLN.put(invoiceId, (true, amount));
-            Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
+            Debug.print("InvoiceId not found in the HashMap");
+            // Skip to the next iteration
           };
-          case (?amountChecked) {
-            if (amountChecked != amount) {
-              // Update the HashMap to set status = paid if the amount is incorrect
-              paidInvoicestoLN.put(invoiceId, (true, amount));
-              Debug.print("Amount mismatch. Marking as paid to skip.");
-            } else {
-              // Proceed to pay the invoice
-              // Get the payment Request if needed?
-              let paymentRequestOpt = paymentHashToRequest.get(invoiceId);
-              switch (paymentRequestOpt) {
-                case (null) {
-                  Debug.print("Payment Hash not found in the HashMap");
-                  //Skiping
+          case (?(paymentRequest, paymentHash)) {
+            // Now you have paymentRequest and paymentHash
+
+            let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(paymentHash)), "result");
+
+            let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
+
+            switch (amountCheckedOpt) {
+              case (null) {
+                paidInvoicestoLN.put(invoiceId, (true, amount));
+                Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
+              };
+              case (?amountChecked) {
+                if (amountChecked != amount) {
+                  // Update the HashMap to set status = paid if the amount is incorrect
                   paidInvoicestoLN.put(invoiceId, (true, amount));
-                };
-                case (?paymentRequest) {
+                  Debug.print("Amount mismatch. Marking as paid to skip.");
+                } else {
+                  // Proceed to pay the invoice
                   let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName);
                   let paymentResultJson = JSON.parse(paymentResult);
                   let errorField = await utils.getValue(paymentResultJson, "error");
@@ -183,7 +189,7 @@ actor {
                     paidInvoicestoLN.put(invoiceId, (true, amount));
                   } else {
                     Debug.print("Payment Result: Failed");
-                    // we can try again later if it was in process
+                    // We can try again later if it was in process
                   };
                 };
               };
@@ -196,5 +202,6 @@ actor {
         paidInvoicestoLN.put(invoiceId, (true, amount));
       };
     };
+
   };
 };
