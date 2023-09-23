@@ -32,8 +32,8 @@ actor {
     return invoiceResponse;
   };
 
-  //From RSK Blockchain to LightningNetwork
-  public func generateInvoiceToSwapToLN(amount : Nat) : async Text {
+  //From LightningNetwork to RSK Blockchain
+  public func generateInvoiceToSwapFromLN(amount : Nat) : async Text {
     let invoiceResponse = await lightning_testnet.generateInvoice(amount, "toLN");
 
     // Extract the paymentRequest and paymentHash from the invoiceResponse
@@ -160,8 +160,14 @@ actor {
           };
           case (?(paymentRequest, paymentHash)) {
             // Now you have paymentRequest and paymentHash
-
-            let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(paymentHash)), "result");
+            // Replace all occurrences of '/' with '_' and '+' with '-'
+            let base64EncodedPaymentHash = Text.map(paymentHash, func(c) {
+              if (c == '/') '_'
+              else if(c == '+') '-'
+              else c
+            });
+            Debug.print(base64EncodedPaymentHash);
+            let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(base64EncodedPaymentHash)), "result");
 
             let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
 

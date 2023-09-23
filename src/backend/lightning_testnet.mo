@@ -133,6 +133,7 @@ module {
         ];
 
         let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest, ?requestHeaders, "post");
+        return response_icp_bridge_macaroon;
       };
     };
 
