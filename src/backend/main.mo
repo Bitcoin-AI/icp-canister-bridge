@@ -65,7 +65,7 @@ actor {
     let isSettled = await utils.getValue(JSON.parse(result), "settled");
     let invoice = await utils.getValue(JSON.parse(result), "payment_request");
 
-    if (isSettled == "false") {
+    if (isSettled == false) {
       return "Invoice not settled, pay invoice and try again";
     };
 

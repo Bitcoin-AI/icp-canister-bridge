@@ -143,7 +143,7 @@ module {
   public func checkInvoice(payment_hash : Text) : async Text {
 
     // Setup URL and request headers
-    let url : Text = lndBaseUrl # "/v2/invoices/subscribe/" # payment_hash;
+    let url : Text = lndBaseUrl # "/v2/invoices/lookup?payment_hash=" # payment_hash;
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
