@@ -5,6 +5,7 @@ import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
+import Error "mo:base/Error";
 import JSON "mo:json/JSON";
 import Text "mo:base-0.7.3/Text";
 import Debug "mo:base-0.7.3/Debug";
@@ -32,8 +33,8 @@ actor {
     return invoiceResponse;
   };
 
-  //From LightningNetwork to RSK Blockchain
-  public func generateInvoiceToSwapFromLN(amount : Nat) : async Text {
+  //From RSK blockchain to Lightning Network
+  public func generateInvoiceToSwapToLN(amount : Nat) : async Text {
     let invoiceResponse = await lightning_testnet.generateInvoice(amount, "toLN");
 
     // Extract the paymentRequest and paymentHash from the invoiceResponse
@@ -202,10 +203,8 @@ actor {
             };
           };
         };
-      } catch (e) {
-        Debug.print("Caught an exception: ");
-        // Update the HashMap to set status = paid and move to the next one
-        paidInvoicestoLN.put(invoiceId, (true, amount));
+      }  catch(e: Error.Error) {
+            Debug.print("Caught exception: " # Error.message(e));
       };
     };
 
