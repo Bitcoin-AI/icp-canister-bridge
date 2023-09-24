@@ -41,8 +41,8 @@ actor {
     let paymentRequest = await utils.getValue(JSON.parse(invoiceResponse), "payment_request");
     let paymentHash = await utils.getValue(JSON.parse(invoiceResponse), "r_hash");
 
-    let paymentRequestClean = utils.subText(paymentRequest,1, paymentRequest.size()-1);
-    let paymentHashClean = utils.subText(paymentHash, 1, paymentHash.size()-1);
+    let paymentRequestClean = utils.subText(paymentRequest, 1, paymentRequest.size() -1);
+    let paymentHashClean = utils.subText(paymentHash, 1, paymentHash.size() -1);
 
     // Generate the keccak256 hash of the paymentRequest
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(paymentRequest), 256));
@@ -150,6 +150,9 @@ actor {
     // Process each unpaid invoice
     let entries = unpaidInvoices.entries();
     for ((invoiceId, (isPaid, amount)) in entries) {
+
+      Debug.print("Checking invoice" # invoiceId # "with amount: " # Nat.toText(amount));
+
       try {
         // Retrieve paymentRequest and paymentHash from the HashMap
         let paymentInfoOpt = paymentHashToRequest.get(invoiceId);
@@ -162,15 +165,22 @@ actor {
           case (?(paymentRequest, paymentHash)) {
             // Now you have paymentRequest and paymentHash
             // Replace all occurrences of '/' with '_' and '+' with '-'
-            let base64EncodedPaymentHash = Text.map(paymentHash, func(c) {
-              if (c == '/') '_'
-              else if(c == '+') '-'
-              else c
-            });
+            let base64EncodedPaymentHash = Text.map(
+              paymentHash,
+              func(c) {
+                if (c == '/') '_' else if (c == '+') '-' else c;
+              },
+            );
             Debug.print(base64EncodedPaymentHash);
-            let result = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(base64EncodedPaymentHash)), "result");
+            let amountString = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(base64EncodedPaymentHash)), "value");
 
-            let amountCheckedOpt : ?Nat = Nat.fromText(await utils.getValue(JSON.parse(result), "value"));
+            let cleanAmountString = utils.subText(amountString, 1, amountString.size() -1);
+
+            Debug.print("Amount from blockchain " # Nat.toText(amount));
+
+            Debug.print("Amount from invoice " # cleanAmountString # "0000000000");
+
+            let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
 
             switch (amountCheckedOpt) {
               case (null) {
@@ -185,6 +195,8 @@ actor {
                 } else {
                   // Proceed to pay the invoice
                   let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName);
+                  Debug.print("Payment result: " #paymentResult);
+
                   let paymentResultJson = JSON.parse(paymentResult);
                   let errorField = await utils.getValue(paymentResultJson, "error");
                   let resultField = await utils.getValue(paymentResultJson, "result");
@@ -203,8 +215,8 @@ actor {
             };
           };
         };
-      }  catch(e: Error.Error) {
-            Debug.print("Caught exception: " # Error.message(e));
+      } catch (e : Error.Error) {
+        Debug.print("Caught exception: " # Error.message(e));
       };
     };
 
