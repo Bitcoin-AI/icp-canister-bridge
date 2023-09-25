@@ -149,7 +149,7 @@ module {
     let ic : Types.IC = actor ("aaaaa-aa");
 
     // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
-    let topics : [Text] = ["0x2fe70d4bbeafbc963084344fa9d6159351d9a2323787c90fba21fdc1909dc596"];
+    let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7","0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
 
     let blockNumber : Text = "0x409492"; // We will filter after the contract creation
 
