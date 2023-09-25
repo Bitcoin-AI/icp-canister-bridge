@@ -79,7 +79,7 @@ module {
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    let request_body_json : Text = "{ \"value\" : 100,\"memo\" : \"" # evm_addr # "\"  }";
+    let request_body_json : Text = "{ \"value\" : \"" # Nat.toText(amount) # "\",\"memo\" : \"" # evm_addr # "\"  }";
     let decodedText : Text = await utils.httpRequest(?request_body_json, url, ?requestHeaders, "post");
 
     // Return the decoded response body

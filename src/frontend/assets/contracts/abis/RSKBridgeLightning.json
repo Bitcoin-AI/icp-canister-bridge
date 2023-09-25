@@ -35,9 +35,9 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes32",
+        "internalType": "string",
         "name": "invoiceId",
-        "type": "bytes32"
+        "type": "string"
       }
     ],
     "name": "SwapToLightningNetwork",
@@ -95,9 +95,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "bytes32",
+        "internalType": "string",
         "name": "invoiceId",
-        "type": "bytes32"
+        "type": "string"
       }
     ],
     "name": "swapToLightningNetwork",

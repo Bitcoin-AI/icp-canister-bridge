@@ -37,7 +37,7 @@ module {
 
   let rskNodeUrl : Text = "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/";
 
-  let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
+  let contractAddress : Text = "0x034b8ae121ab786a5262cb2082540b81eb2e340f";
 
   // TODO :
   // This function will only be callable by the alby_mo function `checkInvoices` that  will decide

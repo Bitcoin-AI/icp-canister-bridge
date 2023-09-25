@@ -81,7 +81,19 @@ const MyHello = () => {
         const decoded = bolt11.decode(invoice.paymentRequest);
         const paymentHash = decoded.tagsObject.payment_hash;
         const base64PaymentHash = base64UrlEncode(paymentHash);
-        alert(base64PaymentHash)
+        alert(base64PaymentHash);
+        //let result = await utils.getValue(parsedResponse, "result");
+        //const invoiceId = ethers.encodeBytes32String(base64PaymentHash);
+
+        // Send the transaction
+        const signer = await provider.getSigner();
+
+        const bridgeWithSigner = bridge.connect(signer);
+        const tx = await bridgeWithSigner.swapToLightningNetwork(amount*10**10, base64PaymentHash, { value: amount*10**10 });
+        console.log("Transaction sent:", tx.hash);
+        setMessage(`Tx sent: ${tx.hash}`);
+        // Wait for the transaction to be mined
+        await tx.wait();
         // Do eth tx and then call main.payInvoicesAccordingToEvents();
         resp = await main.payInvoicesAccordingToEvents();
       } else {
@@ -91,7 +103,7 @@ const MyHello = () => {
     }catch(err){
       setMessage(err.message)
     }
-  }
+  };
   const checkInvoice = async () => {
     try{
       const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));

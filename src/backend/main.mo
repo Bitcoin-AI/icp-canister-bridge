@@ -45,13 +45,13 @@ actor {
     let invoice = await utils.getValue(parsedResponse, "payment_request");
 
     let amountSatoshi = await utils.getValue(parsedResponse, "value");
-
-    let amount : Nat = switch (Nat.fromText(amountSatoshi # "0000000000")) {
+    Debug.print(amountSatoshi);
+    let amount : Nat = switch (Nat.fromText(utils.subText(amountSatoshi, 1, amountSatoshi.size() - 1) # "0000000000")) {
 
       case (null) { 0 };
       case (?value) { value };
     };
-
+    Debug.print(Nat.toText(amount));
     let falseString : Text = Bool.toText(false);
 
     if (isSettled == falseString) {
