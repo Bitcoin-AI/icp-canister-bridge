@@ -1,8 +1,13 @@
 import * as React from "react";
 import { render } from "react-dom";
 import bolt11  from 'bolt11';
-console.log(bolt11)
+import {ethers} from 'ethers';
 import { main } from "../../declarations/main";
+
+import useWeb3Modal from "./hooks/useWeb3Modal";
+
+import addresses from "../assets/contracts/addresses";
+import abis from "../assets/contracts/abis";
 
 const MyHello = () => {
   const [message, setMessage] = React.useState('');
@@ -12,6 +17,18 @@ const MyHello = () => {
   const [evm_address, setEvmAddr] = React.useState('');
 
   const [invoicePay, setInvoicePay] = React.useState('');
+
+
+  const {
+    netId,
+    coinbase,
+    provider,
+    loadWeb3Modal,
+    connecting
+  } =  useWeb3Modal();
+
+  const [bridge,setBridge] = React.useState();
+
   /*
   async function doGreet() {
     const greeting = await custom_greeting_backend.greet(name);
@@ -19,6 +36,15 @@ const MyHello = () => {
   }
 
   */
+
+
+  React.useEffect(() => {
+    if(netId === 31 && provider){
+      const newBridge = new ethers.Contract(addresses.bridge.testnet,abis.bridge,provider);
+      setBridge(newBridge);
+    }
+  },[netId,provider])
+
   const base64UrlEncode = (input) => {
     let base64 = Buffer.from(input, 'hex').toString('base64');
     let base64Url = base64.replace(/\+/g, '-').replace(/\//g, '_');
@@ -27,7 +53,7 @@ const MyHello = () => {
 
   const getInvoice = async () => {
     try{
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount),evm_address);
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount),evm_address.replace("0x",""));
       setMessage(resp);
       if(typeof window.webln !== 'undefined') {
         await window.webln.enable();
@@ -74,6 +100,19 @@ const MyHello = () => {
       setMessage(err.message)
     }
   }
+
+
+
+  const claimRBTC = React.useCallback(async() => {
+    if(provider && bridge){
+      const signer = await provider.getSigner();
+
+      const bridgeWithSigner = bridge.connect(signer);
+      const tx = await bridgeWithSigner.claimRBTC();
+      setMessage(`RBTC claimed: ${tx.hash}`);
+      await tx.wait();
+    }
+  },[provider,bridge]);
 
   return (
     <div style={{ "fontSize": "30px" }}>
@@ -126,6 +165,14 @@ const MyHello = () => {
             onChange={(ev) => setEvmAddr(ev.target.value)}
           ></input>
           <button onClick={getInvoice}>Get Invoice!</button>
+      </div>
+      <div style={{ margin: "30px" }}>
+        <h3>Claim RBTC</h3>
+        {
+          !coinbase ?
+          <button onClick={loadWeb3Modal}>Connect Wallet</button> :
+          bridge && <button onClick={claimRBTC}>Claim RBTC</button>
+        }
       </div>
       <div>
         <span style={{ color: "blue" }}>{message}</span>

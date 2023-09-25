@@ -3,6 +3,7 @@ import lightning_testnet "./lightning_testnet";
 import utils "utils";
 import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
+import Bool "mo:base/Bool";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
 import Error "mo:base/Error";
@@ -40,12 +41,13 @@ actor {
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     // Check if payment is settled and get evm_address
-    let result = await utils.getValue(parsedResponse, "result");
-    let evm_addr = await utils.getValue(JSON.parse(result), "memo");
-    let isSettled = await utils.getValue(JSON.parse(result), "settled");
-    let invoice = await utils.getValue(JSON.parse(result), "payment_request");
+    //let result = await utils.getValue(parsedResponse, "result");
+    let evm_addr = await utils.getValue(parsedResponse, "memo");
+    let isSettled = await utils.getValue(parsedResponse, "settled");
+    let invoice = await utils.getValue(parsedResponse, "payment_request");
+    let falseString: Text =  Bool.toText(false);
 
-    if (isSettled == "false") {
+    if (isSettled == falseString) {
       return "Invoice not settled, pay invoice and try again";
     };
 
@@ -62,7 +64,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to Ethereum
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, evm_addr);
+    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1));
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 

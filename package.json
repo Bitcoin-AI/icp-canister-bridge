@@ -24,7 +24,8 @@
     "ethers": "^6.7.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "web3modal": "^1.9.12"
   },
   "devDependencies": {
     "assert": "2.0.0",
