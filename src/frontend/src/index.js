@@ -1,5 +1,7 @@
 import * as React from "react";
 import { render } from "react-dom";
+import bolt11  from 'bolt11';
+console.log(bolt11)
 import { main } from "../../declarations/main";
 
 const MyHello = () => {
@@ -17,6 +19,11 @@ const MyHello = () => {
   }
 
   */
+  const base64UrlEncode = (input) => {
+    let base64 = Buffer.from(input, 'hex').toString('base64');
+    let base64Url = base64.replace(/\+/g, '-').replace(/\//g, '_');
+    return base64Url;
+  };
 
   const getInvoice = async () => {
     try{
@@ -44,9 +51,15 @@ const MyHello = () => {
           amount: amount,
           defaultMemo: evm_address
         });
-        resp = await main.payInvoice(invoice.paymentRequest);
+        // Decode invoice
+        const decoded = bolt11.decode(invoice.paymentRequest);
+        const paymentHash = decoded.tagsObject.payment_hash;
+        const base64PaymentHash = base64UrlEncode(paymentHash);
+        alert(base64PaymentHash)
+        // Do eth tx and then call main.payInvoicesAccordingToEvents();
+        resp = await main.payInvoicesAccordingToEvents();
       } else {
-        resp = await main.payInvoice(invoicePay);
+        //resp = await main.payInvoicesAccordingToEvents(invoicePay);
       }
       setMessage(resp);
     }catch(err){
@@ -86,8 +99,8 @@ const MyHello = () => {
           <label>Amount</label>
           <input
             id="invoice_pay"
-            value={invoicePay}
-            onChange={(ev) => setInvoicePay(ev.target.value)}
+            value={amount}
+            onChange={(ev) => setAmount(ev.target.value)}
           ></input>
           <label>EVM Address</label>
           <input
