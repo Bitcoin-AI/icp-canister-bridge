@@ -44,17 +44,21 @@ module {
   // which user should be be paid in RSK, by adding balance in the Smart Contract
   // Check how to do access control e.g. This canister function can only called by the alby canister
   // Right now it will be maintained as public for testing.
-  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text) : async Text {
+  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let signerAddress = utils.publicKeyToAddress(publicKey);
 
+    Debug.print("Recipient address: 0x" # address);
+
+    Debug.print("Amount in wei to send" # Nat.toText(amount));
+
     if (signerAddress == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
-      Debug.print("Address: 0x" # address);
+      Debug.print("Canister Address: 0x" # address);
     };
 
     // Building transactionData
@@ -63,7 +67,7 @@ module {
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
     let method_id = TU.left(keccak256_hex, 7);
     let address_64 = TU.fill(address, '0', 64);
-    let amount_hex = AU.toText(AU.fromNat256(1000));
+    let amount_hex = AU.toText(AU.fromNat256(amount));
     let amount_64 = TU.fill(amount_hex, '0', 64);
 
     let data = "0x" # method_id # address_64 # amount_64;

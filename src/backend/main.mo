@@ -40,12 +40,19 @@ actor {
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash);
     let parsedResponse = JSON.parse(paymentCheckResponse);
-    // Check if payment is settled and get evm_address
-    //let result = await utils.getValue(parsedResponse, "result");
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
     let invoice = await utils.getValue(parsedResponse, "payment_request");
-    let falseString: Text =  Bool.toText(false);
+
+    let amountSatoshi = await utils.getValue(parsedResponse, "value");
+
+    let amount : Nat = switch (Nat.fromText(amountSatoshi # "0000000000")) {
+
+      case (null) { 0 };
+      case (?value) { value };
+    };
+
+    let falseString : Text = Bool.toText(false);
 
     if (isSettled == falseString) {
       return "Invoice not settled, pay invoice and try again";
@@ -64,7 +71,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to Ethereum
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1));
+    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -134,17 +141,7 @@ actor {
       Debug.print("Checking invoice" # invoiceId # "with amount: " # Nat.toText(amount));
 
       try {
-        // Now you have paymentRequest and paymentHash
-        // Replace all occurrences of '/' with '_' and '+' with '-'
-        // let base64EncodedPaymentHash = Text.map(
-        //   paymentHash,
-        //   func(c) {
-        //     if (c == '/') '_' else if (c == '+') '-' else c;
-        //   },
-        // );
-        // Debug.print(base64EncodedPaymentHash);
 
-        // Invoice Id is the r_hash in the blockchain
         let amountString = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "value");
 
         let paymentRequest = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "payment_request");
