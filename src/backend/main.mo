@@ -5,6 +5,8 @@ import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
+import Bool "mo:base/Bool";
+
 import Error "mo:base/Error";
 import JSON "mo:json/JSON";
 import Text "mo:base-0.7.3/Text";
@@ -65,8 +67,9 @@ actor {
     let evm_addr = await utils.getValue(JSON.parse(result), "memo");
     let isSettled = await utils.getValue(JSON.parse(result), "settled");
     let invoice = await utils.getValue(JSON.parse(result), "payment_request");
+    let falseString: Text =  Bool.toText(false);
 
-    if (isSettled == false) {
+    if (isSettled == falseString) {
       return "Invoice not settled, pay invoice and try again";
     };
 
