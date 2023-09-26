@@ -149,7 +149,7 @@ module {
     let ic : Types.IC = actor ("aaaaa-aa");
 
     // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
-    let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7","0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
+    let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7", "0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
 
     let blockNumber : Text = "0x409492"; // We will filter after the contract creation
 
@@ -248,19 +248,39 @@ module {
                 let dataBytes = AU.fromText(data);
                 Debug.print("dataBytes length: " # Nat.toText(Iter.size(Array.vals(dataBytes))));
 
-                let amountBytes = AU.slice(dataBytes, 0, 32); // Changed start index to 0 and length to 32
-                let invoiceIdBytes = AU.slice(dataBytes, 32, 32); // Changed start index to 32 and length to 32
+                Debug.print("Amount Bytes: " # AU.toText(AU.slice(dataBytes, 32, 8)));
+
+                let amountBytes = AU.slice(dataBytes, 0, 32);
+
+                Debug.print("Amount Bytes: " # AU.toText(amountBytes));
 
                 let amount = AU.toNat256(amountBytes);
-                let invoiceIdHexString = AU.toText(invoiceIdBytes);
+
+                let invoiceIdHexBytes = AU.slice(dataBytes, 80, dataBytes.size() - 80);
+                // Extract the invoiceId bytes starting at byte 80 for 44 bytes
+                let invoiceIdHexString = AU.toText(invoiceIdHexBytes);
+
+                let invoiceIdBytes = AU.fromText(invoiceIdHexString);
+                let invoiceId = await utils.bytes32ToString(invoiceIdHexString);
+                switch (invoiceId) {
+                  case (null) {
+                    Debug.print("Failed to decode invoiceId");
+                  };
+                  case (?invoiceIdString) {
+
+                    let invoiceTrim = Text.replace(invoiceIdString, #char ',', "");
+
+                    let newEvent : Event = {
+                      address = invoiceTrim; // Directly use the hex string as the address
+                      amount = amount; // Add the amount field here
+                    };
+                    events := Array.append(events, [newEvent]);
+                  };
+                };
+                Debug.print("Amount: " # Nat.toText(amount));
+                // Debug.print("Invoice ID (Base64): " # invoiceIdBase64);
 
                 Debug.print("hex invoice : " # invoiceIdHexString);
-
-                let newEvent : Event = {
-                  address = invoiceIdHexString; // Directly use the hex string as the address
-                  amount = amount; // Add the amount field here
-                };
-                events := Array.append(events, [newEvent]);
 
               };
               case _ { Debug.print("Unexpected JSON structure") };
