@@ -87,6 +87,11 @@ actor {
     return sendTxResponse;
   };
 
+  public func decodePayReq(payment_request: Text): async Text{
+    let response = await lightning_testnet.decodePayReq(payment_request);
+    return response;
+  };
+
   public shared (msg) func getEvmAddr() : async Text {
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
@@ -94,6 +99,8 @@ actor {
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
     return address;
   };
+
+
 
   //From RSK Blockchain to LightningNetwork
   public shared (msg) func payInvoicesAccordingToEvents() : async () {
@@ -141,10 +148,14 @@ actor {
       Debug.print("Checking invoice" # invoiceId # "with amount: " # Nat.toText(amount));
 
       try {
+        let treatedRequest = Text.replace(invoiceId, #char 'E', "");
+        let paymentRequest = utils.trim(treatedRequest);
+        let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest);
 
-        let amountString = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "value");
+        let payReqResponse = JSON.parse(decodedPayReq);
 
-        let paymentRequest = await utils.getValue(JSON.parse(await lightning_testnet.checkInvoice(invoiceId)), "payment_request");
+        let amountString = await utils.getValue(payReqResponse, "num_satoshis");
+
 
         let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
 

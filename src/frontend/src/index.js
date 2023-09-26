@@ -89,7 +89,7 @@ const MyHello = () => {
         const signer = await provider.getSigner();
 
         const bridgeWithSigner = bridge.connect(signer);
-        const tx = await bridgeWithSigner.swapToLightningNetwork(amount*10**10, base64PaymentHash, { value: amount*10**10 });
+        const tx = await bridgeWithSigner.swapToLightningNetwork(amount*10**10, invoice.paymentRequest, { value: amount*10**10 });
         console.log("Transaction sent:", tx.hash);
         setMessage(`Tx sent: ${tx.hash}`);
         // Wait for the transaction to be mined

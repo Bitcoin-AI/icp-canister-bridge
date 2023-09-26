@@ -158,6 +158,25 @@ module {
 
   };
 
+  // https://lightning.engineering/api-docs/api/lnd/router/track-payment-v2
+  public func decodePayReq(payment_request : Text) : async Text {
+
+    // Setup URL and request headers
+    let url : Text = lndBaseUrl # "/v1/payreq/" # payment_request;
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "Grpc-Metadata-macaroon"; value = macaroon },
+    ];
+    Debug.print(url);
+
+    let responseText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get");
+    Debug.print(responseText);
+    // Return the decoded response body
+    return responseText;
+
+  };
+
   public func getEvmAddr(derivationPath : [Blob], keyName : Text) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
