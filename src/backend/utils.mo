@@ -15,6 +15,7 @@ import PublicKey "mo:libsecp256k1/PublicKey";
 import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
+import Nat32 "mo:base/Nat32";
 
 module {
 
@@ -131,26 +132,72 @@ module {
     };
 
     public func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
+        Debug.print("Input value: " # value);
+        Debug.print("indexStart: " # Nat.toText(indexStart));
+        Debug.print("indexEnd: " # Nat.toText(indexEnd));
+
         if (indexStart == 0 and indexEnd >= value.size()) {
+            Debug.print("Returning original value as indexStart is 0 and indexEnd is greater than or equal to value size.");
             return value;
         } else if (indexStart >= value.size()) {
+            Debug.print("Returning empty string as indexStart is greater than or equal to value size.");
             return "";
         };
 
         var indexEndValid = indexEnd;
         if (indexEnd > value.size()) {
+            Debug.print("Adjusting indexEnd as it's greater than value size.");
             indexEndValid := value.size();
         };
+        Debug.print("indexEndValid: " # Nat.toText(indexEndValid));
 
         var result : Text = "";
-        var iter = Iter.toArray<Char>(Text.toIter(value));
+        let iter = Iter.toArray<Char>(Text.toIter(value));
         for (index in Iter.range(indexStart, indexEndValid - 1)) {
+            Debug.print("Adding character: " # Char.toText(iter[index]));
             result := result # Char.toText(iter[index]);
         };
 
+        Debug.print("Final result: " # result);
         return result;
     };
-    
+
+    public func trim(value : Text) : Text {
+        Debug.print("Trimming input: " # value);
+
+        let iter = Iter.toArray<Char>(Text.toIter(value));
+        var startIndex = 0;
+        var endIndex = iter.size() - 1;
+
+        // Check if the input is empty
+        if (iter.size() == 0) {
+            Debug.print("Input is empty. Returning empty string.");
+            return "";
+        };
+
+        // Helper function to check if a character is non-printable
+        let isNonPrintable = func(ch : Char) : Bool {
+            let code = Char.toNat32(ch);
+            return (code < 32) or (code >= 127 and code <= 159);
+        };
+
+        var result : Text = "";
+        for (index in Iter.range(startIndex, endIndex)) {
+            let currentChar = iter[index];
+            if (Char.toText(currentChar) == "") {
+                Debug.print("Detected truly empty character at position " # Nat.toText(index));
+            } else if (isNonPrintable(currentChar)) {
+                Debug.print("Detected non-printable character (code: " # Nat32.toText(Char.toNat32(currentChar)) # ") at position " # Nat.toText(index));
+            } else {
+                Debug.print("Adding character from position " # Nat.toText(index) # ": " # Char.toText(currentChar));
+                result := result # Char.toText(currentChar);
+            };
+        };
+
+        Debug.print("Final trimmed result: " # result);
+        return result;
+    };
+
     public func hexStringToNat64(hexString : Text) : Nat64 {
 
         Debug.print("Input hexString: " # hexString);
