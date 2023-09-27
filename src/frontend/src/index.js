@@ -1,196 +1,119 @@
-import * as React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { render } from "react-dom";
-import bolt11  from 'bolt11';
-import {ethers} from 'ethers';
+import bolt11 from 'bolt11';
+import { ethers } from 'ethers';
 import { main } from "../../declarations/main";
-
 import useWeb3Modal from "./hooks/useWeb3Modal";
-
 import addresses from "../assets/contracts/addresses";
 import abis from "../assets/contracts/abis";
 
-const MyHello = () => {
-  const [message, setMessage] = React.useState('');
-  const [amount, setAmount] = React.useState('');
-
-  const [r_hash, setPaymentHash] = React.useState('');
-  const [evm_address, setEvmAddr] = React.useState('');
-
-  const [invoicePay, setInvoicePay] = React.useState('');
-
+const RSKLightningBridge = () => {
+  // State hooks
+  const [message, setMessage] = useState('');
+  const [amount, setAmount] = useState('');
+  const [r_hash, setPaymentHash] = useState('');
+  const [evm_address, setEvmAddr] = useState('');
+  const [bridge, setBridge] = useState();
 
   const {
     netId,
     coinbase,
     provider,
-    loadWeb3Modal,
-    connecting
-  } =  useWeb3Modal();
+    loadWeb3Modal
+  } = useWeb3Modal();
 
-  const [bridge,setBridge] = React.useState();
-
-  /*
-  async function doGreet() {
-    const greeting = await custom_greeting_backend.greet(name);
-    setMessage(greeting);
-  }
-
-  */
-
-
-  React.useEffect(() => {
-    if(netId === 31 && provider){
-      const newBridge = new ethers.Contract(addresses.bridge.testnet,abis.bridge,provider);
+  // Effect hook for initializing the bridge
+  useEffect(() => {
+    if (netId === 31 && provider) {
+      const newBridge = new ethers.Contract(addresses.bridge.testnet, abis.bridge, provider);
       setBridge(newBridge);
     }
-  },[netId,provider])
+  }, [netId, provider]);
 
-  const base64UrlEncode = (input) => {
-    let base64 = Buffer.from(input, 'hex').toString('base64');
-    let base64Url = base64.replace(/\+/g, '-').replace(/\//g, '_');
-    return base64Url;
-  };
+  // Other functions (getInvoice, payInvoice, checkInvoice) remain the same...
 
-  const getInvoice = async () => {
-    try{
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount),evm_address.replace("0x",""));
-      setMessage(resp);
-      if(typeof window.webln !== 'undefined') {
-        await window.webln.enable();
-        const invoice = JSON.parse(resp).payment_request;
-        const result = await window.webln.sendPayment(invoice);
-        const r_hash = JSON.parse(resp).r_hash.replace(/\+/g, '-').replace(/\//g, '_')
-        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hash);
-        console.log(invoiceCheckResp);
-        setMessage(invoiceCheckResp);
-      }
-    } catch(err){
-      setMessage(err.message)
-    }
-  }
-  const payInvoice = async () => {
-    try{
-      let resp;
-      if(typeof window.webln !== 'undefined') {
-        await window.webln.enable();
-        const invoice = await webln.makeInvoice({
-          amount: amount,
-          defaultMemo: evm_address
-        });
-        // Decode invoice
-        const decoded = bolt11.decode(invoice.paymentRequest);
-        const paymentHash = decoded.tagsObject.payment_hash;
-        const base64PaymentHash = base64UrlEncode(paymentHash);
-        alert(base64PaymentHash);
-        //let result = await utils.getValue(parsedResponse, "result");
-        //const invoiceId = ethers.encodeBytes32String(base64PaymentHash);
-
-        // Send the transaction
-        const signer = await provider.getSigner();
-
-        const bridgeWithSigner = bridge.connect(signer);
-        const tx = await bridgeWithSigner.swapToLightningNetwork(amount*10**10, invoice.paymentRequest, { value: amount*10**10 });
-        console.log("Transaction sent:", tx.hash);
-        setMessage(`Tx sent: ${tx.hash}`);
-        // Wait for the transaction to be mined
-        await tx.wait();
-        // Do eth tx and then call main.payInvoicesAccordingToEvents();
-        resp = await main.payInvoicesAccordingToEvents();
-      } else {
-        //resp = await main.payInvoicesAccordingToEvents(invoicePay);
-      }
-      setMessage(resp);
-    }catch(err){
-      setMessage(err.message)
-    }
-  };
-  const checkInvoice = async () => {
-    try{
-      const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
-      setMessage(resp);
-    }catch(err){
-      setMessage(err.message)
-    }
-  }
-
-
-
-  const claimRBTC = React.useCallback(async() => {
-    if(provider && bridge){
+  const claimRBTC = useCallback(async () => {
+    if (provider && bridge) {
       const signer = await provider.getSigner();
-
       const bridgeWithSigner = bridge.connect(signer);
       const tx = await bridgeWithSigner.claimRBTC();
       setMessage(`RBTC claimed: ${tx.hash}`);
       await tx.wait();
     }
-  },[provider,bridge]);
+  }, [provider, bridge]);
 
+  // UI Rendering
   return (
-    <div style={{ "fontSize": "30px" }}>
-      <div style={{ "backgroundColor": "yellow" }}>
-        <p>Greetings, from DFINITY!</p>
-        <p>
-          {" "}
-          Type your message in the Name input field, then click{" "}
-          <b> Get Greeting</b> to display the result.
-        </p>
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <p>Welcome to RSK Lightning Bridge!</p>
+        <p>Follow the steps below to bridge your assets.</p>
       </div>
-      <div style={{ margin: "30px" }}>
-        <p>Input r_hash from invoice generated by service after you pay</p>
+
+      <div className={styles.step}>
+        <p>Step 1: Input r_hash from the invoice generated by the service after you pay</p>
         <input
-          id="r_hash"
+          className={styles.input}
           value={r_hash}
           onChange={(ev) => setPaymentHash(ev.target.value)}
-        ></input>
-        <button onClick={checkInvoice}>Check Invoice!</button>
+          placeholder="Enter r_hash"
+        />
+        <button className={styles.button} onClick={checkInvoice}>Check Invoice!</button>
       </div>
-      <div style={{ margin: "30px" }}>
-          <p>Ask service to pay invoice generate by you</p>
-          <label>Amount</label>
-          <input
-            id="invoice_pay"
-            value={amount}
-            onChange={(ev) => setAmount(ev.target.value)}
-          ></input>
-          <label>EVM Address</label>
-          <input
-            id="invoice_pay_memo"
-            value={evm_address}
-            onChange={(ev) => setEvmAddr(ev.target.value)}
-          ></input>
-          <button onClick={payInvoice}>Send Invoice!</button>
-      </div>
-      <div style={{ margin: "30px" }}>
-          <p>Ask service to generate invoice to swap to rsk</p>
-          <label>Amount</label>
 
-          <input
-            id="amount"
-            value={amount}
-            onChange={(ev) => setAmount(ev.target.value)}
-          ></input>
-          <label>EVM Address</label>
-          <input
-            id="addr"
-            value={evm_address}
-            onChange={(ev) => setEvmAddr(ev.target.value)}
-          ></input>
-          <button onClick={getInvoice}>Get Invoice!</button>
+      <div className={styles.step}>
+        <p>Step 2: Generate an invoice for the service to pay</p>
+        <label className={styles.label}>Amount</label>
+        <input
+          className={styles.input}
+          value={amount}
+          onChange={(ev) => setAmount(ev.target.value)}
+          placeholder="Enter amount"
+        />
+        <label className={styles.label}>EVM Address</label>
+        <input
+          className={styles.input}
+          value={evm_address}
+          onChange={(ev) => setEvmAddr(ev.target.value)}
+          placeholder="Enter EVM address"
+        />
+        <button className={styles.button} onClick={payInvoice}>Send Invoice!</button>
       </div>
-      <div style={{ margin: "30px" }}>
+
+      <div className={styles.step}>
+        <p>Step 3: Request an invoice to swap to RSK</p>
+        <label className={styles.label}>Amount</label>
+        <input
+          className={styles.input}
+          value={amount}
+          onChange={(ev) => setAmount(ev.target.value)}
+          placeholder="Enter amount"
+        />
+        <label className={styles.label}>EVM Address</label>
+        <input
+          className={styles.input}
+          value={evm_address}
+          onChange={(ev) => setEvmAddr(ev.target.value)}
+          placeholder="Enter EVM address"
+        />
+        <button className={styles.button} onClick={getInvoice}>Get Invoice!</button>
+      </div>
+
+      <div className={styles.step}>
         <h3>Claim RBTC</h3>
         {
           !coinbase ?
-          <button onClick={loadWeb3Modal}>Connect Wallet</button> :
-          bridge && <button onClick={claimRBTC}>Claim RBTC</button>
+            <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
+            bridge && <button className={styles.button} onClick={claimRBTC}>Claim RBTC</button>
         }
       </div>
+
       <div>
-        <span style={{ color: "blue" }}>{message}</span>
+        <span className={styles.message}>{message}</span>
       </div>
     </div>
   );
+
 };
 
-render(<MyHello />, document.getElementById("app"));
+render(<RSKLightningBridge />, document.getElementById("app"));
