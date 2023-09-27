@@ -23,6 +23,7 @@
     "bolt11": "^1.4.1",
     "css-loader": "^6.8.1",
     "ethers": "^6.7.1",
+    "nostr-tools": "^1.16.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "request": "^2.88.2",

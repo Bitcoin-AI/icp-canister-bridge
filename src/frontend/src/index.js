@@ -4,6 +4,7 @@ import bolt11 from 'bolt11';
 import { ethers } from 'ethers';
 import { main } from "../../declarations/main";
 import useWeb3Modal from "./hooks/useWeb3Modal";
+import useNostr from "./hooks/useNostr";
 import addresses from "../assets/contracts/addresses";
 import abis from "../assets/contracts/abis";
 import styles from './RSKLightningBridge.module.css';  // Import the CSS module
@@ -26,6 +27,11 @@ const RSKLightningBridge = () => {
     provider,
     loadWeb3Modal
   } = useWeb3Modal();
+
+  const {
+    events,
+    npub
+  } = useNostr();
 
   // Effect hook for initializing the bridge
   useEffect(() => {
@@ -122,7 +128,7 @@ const RSKLightningBridge = () => {
   // UI Rendering
 
 
-    const renderRSKToLight = () => (
+  const renderRSKToLight = () => (
     <div>
       {/* Content for RSK to Lightning */}
 
@@ -193,6 +199,24 @@ const RSKLightningBridge = () => {
     </div>
   );
 
+  const renderNostrEvents = () => (
+    <div>
+      {/* Content for nostr messages */}
+      <h3>Invoices paid by service</h3>
+      <p><a href={`https://iris.to/${npub}`} target="_blank">See at iris.to</a></p>
+      {
+        events.map(e => {
+
+          return(
+            <div key={e.id} className={styles.step} style={{overflowX: "auto"}}>
+              <div>{new Date(e.created_at*1000).toString()}</div>
+              <div>{e.content}</div>
+            </div>
+          )
+        })
+      }
+    </div>
+  );
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -214,9 +238,15 @@ const RSKLightningBridge = () => {
         >
           Lightning to RSK
         </button>
+        <button
+          className={activeTab === 'nostrEvents' ? styles.activeTab : ''}
+          onClick={() => setActiveTab('nostrEvents')}
+        >
+          Nostr Events
+        </button>
       </div>
 
-      {activeTab === 'rskToLight' ? renderRSKToLight() : renderLightToRSK()}
+      {activeTab === 'rskToLight' ? renderRSKToLight() : activeTab === 'lightToRSK' ? renderLightToRSK() : renderNostrEvents()}
 
 
       <div>
