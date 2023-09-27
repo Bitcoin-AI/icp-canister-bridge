@@ -6,6 +6,8 @@ import { main } from "../../declarations/main";
 import useWeb3Modal from "./hooks/useWeb3Modal";
 import addresses from "../assets/contracts/addresses";
 import abis from "../assets/contracts/abis";
+import styles from './RSKLightningBridge.module.css';  // Import the CSS module
+
 
 const RSKLightningBridge = () => {
   // State hooks
