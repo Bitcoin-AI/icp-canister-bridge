@@ -39,11 +39,6 @@ module {
 
   let contractAddress : Text = "0x034b8ae121ab786a5262cb2082540b81eb2e340f";
 
-  // TODO :
-  // This function will only be callable by the alby_mo function `checkInvoices` that  will decide
-  // which user should be be paid in RSK, by adding balance in the Smart Contract
-  // Check how to do access control e.g. This canister function can only called by the alby canister
-  // Right now it will be maintained as public for testing.
   public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
@@ -139,11 +134,6 @@ module {
 
   };
 
-  // TODO:
-
-  //Check how to run this function periodically and save the status of the invoices, if they have been paid in Lightning network or not
-  //If they have not been paid this function should call the alby_testnet.mo `payInvoice` with the corresponding invocieId
-
   public func readRSKSmartContractEvents() : async [Event] {
 
     let ic : Types.IC = actor ("aaaaa-aa");
@@ -153,15 +143,12 @@ module {
 
     let blockNumber : Text = "0x409492"; // We will filter after the contract creation
 
-    // Prepare the JSON-RPC request payload
     let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
 
     let decodedText = await utils.httpRequest(?jsonRpcPayload, rskNodeUrl, null, "post");
 
-    // Use a helper function to handle the rest of the logic
     let events = await handleLogs(decodedText);
 
-    // Return the decoded response body (or any other relevant information)
     return events;
   };
 
@@ -219,7 +206,7 @@ module {
   };
 
   private func processLog(logText : Text) : async [Event] {
-    Debug.print("Input logText: " # logText); // Print the input logText to verify its structure
+    Debug.print("Input logText: " # logText);
 
     var events : [Event] = [];
 
@@ -233,35 +220,26 @@ module {
         case (#Array(logArray)) {
 
           for (log in logArray.vals()) {
-            Debug.print("Processing log: " # JSON.show(log)); // Print each log entry before parsing
+            Debug.print("Processing log: " # JSON.show(log));
 
             switch (log) {
               case (#Object(logFields)) {
                 let finalAddress = await utils.getFieldAsString(logFields, "address");
-
                 let data0x = await utils.getFieldAsString(logFields, "data");
-
                 let data = utils.subText(data0x, 3, data0x.size() -1);
 
                 Debug.print("data: " # data);
 
                 let dataBytes = AU.fromText(data);
-                Debug.print("dataBytes length: " # Nat.toText(Iter.size(Array.vals(dataBytes))));
-
-                Debug.print("Amount Bytes: " # AU.toText(AU.slice(dataBytes, 32, 8)));
-
                 let amountBytes = AU.slice(dataBytes, 0, 32);
 
-                Debug.print("Amount Bytes: " # AU.toText(amountBytes));
-
                 let amount = AU.toNat256(amountBytes);
-
                 let invoiceIdHexBytes = AU.slice(dataBytes, 80, dataBytes.size() - 80);
-                // Extract the invoiceId bytes starting at byte 80 for 44 bytes
-                let invoiceIdHexString = AU.toText(invoiceIdHexBytes);
 
+                let invoiceIdHexString = AU.toText(invoiceIdHexBytes);
                 let invoiceIdBytes = AU.fromText(invoiceIdHexString);
                 let invoiceId = await utils.bytes32ToString(invoiceIdHexString);
+
                 switch (invoiceId) {
                   case (null) {
                     Debug.print("Failed to decode invoiceId");
@@ -271,16 +249,12 @@ module {
                     let invoiceTrim = Text.replace(invoiceIdString, #char ',', "");
 
                     let newEvent : Event = {
-                      address = invoiceTrim; // Directly use the hex string as the address
-                      amount = amount; // Add the amount field here
+                      address = invoiceTrim;
+                      amount = amount;
                     };
                     events := Array.append(events, [newEvent]);
                   };
                 };
-                Debug.print("Amount: " # Nat.toText(amount));
-                // Debug.print("Invoice ID (Base64): " # invoiceIdBase64);
-
-                Debug.print("hex invoice : " # invoiceIdHexString);
 
               };
               case _ { Debug.print("Unexpected JSON structure") };
@@ -290,8 +264,6 @@ module {
         case _ { Debug.print("Parsed JSON is not an array") };
       };
     };
-
-    Debug.print("Finished processing logs.");
     return events;
   };
 };
