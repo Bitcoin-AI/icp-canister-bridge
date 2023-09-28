@@ -20,6 +20,9 @@ const RSKLightningBridge = () => {
   const [activeTab, setActiveTab] = useState('rskToLight');
   const [rskBalance, setUserBalance] = useState();
   const [bridge, setBridge] = useState();
+  const [userInvoice,setUserInvoice] = useState();
+  const [nodeInfo,setNodeInfo] = useState();
+  const [processing,setProcessing] = useState();
 
   const {
     netId,
@@ -53,32 +56,38 @@ const RSKLightningBridge = () => {
   };
 
   const getInvoice = async () => {
+    setProcessing(true);
     try {
       setMessage("Getting invoice from service");
       const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address.replace("0x", ""));
       setMessage(resp);
+      const invoice = JSON.parse(resp).payment_request;
+      const base64PaymentHash = JSON.parse(resp).r_hash;
+      setPaymentHash(base64PaymentHash);
+      const r_hashUrl = base64PaymentHash.replace(/\+/g, '-').replace(/\//g, '_');
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
-        if (!lightningNodeInfo) {
-          fetchLightiningInfo()
-        }
-        const invoice = JSON.parse(resp).payment_request;
-        setPaymentHash(JSON.parse(resp).r_hash);
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
-        const r_hash = JSON.parse(resp).r_hash.replace(/\+/g, '-').replace(/\//g, '_');
         setMessage("Invoice payed, wait for service update address's balance in smart contract");
-        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hash);
+        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hashUrl);
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
+      } else {
+        setMessage(`Pay invoice: ${invoice} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
       }
+      setProcessing(false);
     } catch (err) {
-      setMessage(err.message)
+      setMessage(`${err.message}`);
     }
+    setProcessing(false);
+
   }
   const sendInvoiceAndRBTC = async () => {
+    setProcessing(true);
     try {
       let resp;
+      let paymentRequest;
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
         setMessage("Preparing invoice");
@@ -87,44 +96,53 @@ const RSKLightningBridge = () => {
           defaultMemo: memo
         });
         setMessage(`Invoice: ${invoice.paymentRequest}`);
-        // Send the transaction
-        const signer = await provider.getSigner();
-
-        const bridgeWithSigner = bridge.connect(signer);
-        setMessage(`Storing invoice in smart contract`);
-        const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, invoice.paymentRequest, { value: amount * 10 ** 10 });
-        console.log("Transaction sent:", tx.hash);
-        setMessage(`Tx sent: ${tx.hash}`);
-        // Wait for the transaction to be mined
-        await tx.wait();
-        setMessage(`Tx confirmed: ${tx.hash} calling service to pay invoice`);
-        // Do eth tx and then call main.payInvoicesAccordingToEvents();
-        resp = await main.payInvoicesAccordingToEvents();
+        paymentRequest = invoice.paymentRequest
       } else {
-        //resp = await main.payInvoicesAccordingToEvents(invoicePay);
+        paymentRequest = userInvoice;
       }
+      // Send the transaction
+      const signer = await provider.getSigner();
+
+      const bridgeWithSigner = bridge.connect(signer);
+      setMessage(`Storing invoice in smart contract`);
+      const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
+      console.log("Transaction sent:", tx.hash);
+      setMessage(`Tx sent: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>}`);
+      // Wait for the transaction to be mined
+      await tx.wait();
+      setMessage(`Tx confirmed: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>} calling service to pay invoice`);
+      // Do eth tx and then call main.payInvoicesAccordingToEvents();
+      resp = await main.payInvoicesAccordingToEvents();
       setMessage(resp);
     } catch (err) {
-      setMessage(err.message)
+      setMessage(err.message);
     }
+    setProcessing(false);
   };
   const checkInvoice = async () => {
+    setProcessing(true);
     try {
+      setMessage("Processing evm transaction ...")
       const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
-      setMessage(resp);
+      const parsed = JSON.parse(resp);
+      setMessage(`Tx sent: ${<a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>}. Wait confirmation and claim RBTC`);
     } catch (err) {
-      setMessage(err.message)
+      setMessage(`${err.message}`)
     }
+    setProcessing(false);
   }
 
   const claimRBTC = useCallback(async () => {
     if (provider && bridge) {
+      setProcessing(true);
+
       setMessage("Confirm transaction to claim");
       const signer = await provider.getSigner();
       const bridgeWithSigner = bridge.connect(signer);
       const tx = await bridgeWithSigner.claimRBTC();
-      setMessage(`RBTC claimed: ${tx.hash}`);
+      setMessage(`RBTC claimed: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>}`);
       await tx.wait();
+      setProcessing(false)
     }
   }, [provider, bridge]);
 
@@ -136,25 +154,41 @@ const RSKLightningBridge = () => {
       {/* Content for RSK to Lightning */}
 
       <div className={styles.step}>
-        <p>Step 1: Create an invoice that will be paid by the Bridge, (you will be prompted to confirm the transaction sending RBTC on RSK)</p>
-        <label className={styles.label}>Amount (satoshi)</label>
-        <input
-          className={styles.input}
-          value={amount}
-          onChange={(ev) => setAmount(ev.target.value)}
-          placeholder="Enter amount"
-        />
-        <label className={styles.label}>Description</label>
-        <input
-          className={styles.input}
-          value={memo}
-          onChange={(ev) => setMemo(ev.target.value)}
-          placeholder="Enter Description (optional)"
-        />
+        <p>Create an invoice that will be paid by the Bridge (you will be prompted to confirm the transaction sending RBTC on RSK)</p>
+        {
+          typeof(window.webln) !== 'undefined' ?
+          <>
+          <label className={styles.label}>Amount (satoshi)</label>
+          <input
+            className={styles.input}
+            value={amount}
+            onChange={(ev) => setAmount(ev.target.value)}
+            placeholder="Enter amount"
+          />
+          <label className={styles.label}>Description</label>
+          <input
+            className={styles.input}
+            value={memo}
+            onChange={(ev) => setMemo(ev.target.value)}
+            placeholder="Enter Description (optional)"
+          />
+          </> :
+          <>
+          <label className={styles.label}>Invoice</label>
+          <input
+            className={styles.input}
+            value={userInvoice}
+            onChange={(ev) => setUserInvoice(ev.target.value)}
+            placeholder="Enter Invoice"
+          />
+          </>
+        }
         {
           !coinbase ?
             <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-            <button className={styles.button} onClick={sendInvoiceAndRBTC}>Send Invoice!</button>
+            !processing ?
+            <button className={styles.button} onClick={sendInvoiceAndRBTC} >Send Invoice!</button> :
+            <button className={styles.button} onClick={sendInvoiceAndRBTC} >Send Invoice!</button>
         }
       </div>
     </div>
@@ -179,24 +213,36 @@ const RSKLightningBridge = () => {
           onChange={(ev) => setEvmAddr(ev.target.value)}
           placeholder="Enter EVM address"
         />
-        <button className={styles.button} onClick={getInvoice}>Get Invoice!</button>
+        {
+        !processing ?
+        <button className={styles.button} onClick={getInvoice}>Get Invoice!</button> :
+        <button className={styles.button} onClick={getInvoice} disabled>Wait current process</button>
+        }
+
       </div>
       <div className={styles.step}>
-        <p>Step 2: Input r_hash from the invoice generated by the service after you pay it</p>
+        <p>Step 2 {typeof(window.webln) !== 'undefined' && '(Optional)'}: Input r_hash from the invoice generated by the service after you pay it</p>
         <input
           className={styles.input}
           value={r_hash}
           onChange={(ev) => setPaymentHash(ev.target.value)}
           placeholder="Enter r_hash"
         />
-        <button className={styles.button} onClick={checkInvoice}>Check Invoice!</button>
+        {
+          !processing ?
+          <button className={styles.button} onClick={checkInvoice}>Check Invoice!</button>:
+          <button className={styles.button} onClick={checkInvoice} disabled>Wait current process</button>
+
+        }
       </div>
       <div className={styles.step}>
         <h3>Claim RBTC If you have been already bridged to RSK</h3>
         {
           !coinbase ?
             <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-            bridge && <button className={styles.button} onClick={claimRBTC}>Claim RBTC</button>
+            !processing && bridge ?
+             <button className={styles.button} onClick={claimRBTC}>Claim RBTC</button> :
+             <button className={styles.button} onClick={claimRBTC} disabled>Wait current process</button>
         }
       </div>
     </div>
@@ -242,13 +288,42 @@ const RSKLightningBridge = () => {
     return () => clearInterval(intervalId); // Clear interval on component unmount
   }, [fetchUserBalance]);
 
+
+  const fetchNodeInfo = async () => {
+    try{
+      await window.webln.enable();
+      const newInfo = await window.webln.getInfo();
+      const newBalance = await window.webln.getBalance();
+      setNodeInfo({
+        node: newInfo.node,
+        balance: newBalance.balance
+      })
+    } catch(err){
+      console.log(err)
+    }
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <p>Welcome to RSK Lightning Bridge!</p>
         <p>Follow the steps below to bridge your assets.</p>
       </div>
+      {
+        typeof(window.webln) !== 'undefined' &&
 
+          <div className={styles.balance}>
+            <button className={styles.button} onClick={fetchNodeInfo}>Fetch Node Info</button>
+            {
+              nodeInfo &&
+              <>
+              <p>Alias {nodeInfo.node.alias}</p>
+              <p>Pubkey {nodeInfo.node.pubkey}</p>
+              <p>Balance: {nodeInfo.balance} sats</p>
+              </>
+            }
+          </div>
+      }
       {
         coinbase && bridge &&
         <div className={styles.balance}>
@@ -259,19 +334,28 @@ const RSKLightningBridge = () => {
       <div className={styles.tabs}>
         <button
           className={activeTab === 'rskToLight' ? styles.activeTab : ''}
-          onClick={() => setActiveTab('rskToLight')}
+          onClick={() => {
+            setActiveTab('rskToLight');
+            setMessage();
+          }}
         >
           RSK to Lightning
         </button>
         <button
           className={activeTab === 'lightToRSK' ? styles.activeTab : ''}
-          onClick={() => setActiveTab('lightToRSK')}
+          onClick={() => {
+            setActiveTab('lightToRSK');
+            setMessage();
+          }}
         >
           Lightning to RSK
         </button>
         <button
           className={activeTab === 'nostrEvents' ? styles.activeTab : ''}
-          onClick={() => setActiveTab('nostrEvents')}
+          onClick={() => {
+            setActiveTab('nostrEvents');
+            setMessage();
+          }}
         >
           Nostr Events
         </button>
@@ -280,7 +364,7 @@ const RSKLightningBridge = () => {
       {activeTab === 'rskToLight' ? renderRSKToLight() : activeTab === 'lightToRSK' ? renderLightToRSK() : renderNostrEvents()}
 
 
-      <div>
+      <div style={{overflowX: "auto"}}>
         <span className={styles.message}>{message}</span>
       </div>
     </div>
