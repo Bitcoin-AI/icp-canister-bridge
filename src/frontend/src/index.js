@@ -136,7 +136,7 @@ const RSKLightningBridge = () => {
       {/* Content for RSK to Lightning */}
 
       <div className={styles.step}>
-        <p>Step 1: Create an invoice that will be paid by the Bridge</p>
+        <p>Step 1: Create an invoice that will be paid by the Bridge, (you will be prompted to confirm the transaction sending RBTC on RSK)</p>
         <label className={styles.label}>Amount (satoshi)</label>
         <input
           className={styles.input}
