@@ -70,3 +70,9 @@
     background-color: #4CAF50;
     color: white;
   }
+
+  .balance {
+    margin: 20px 0;
+    font-size: 18px;
+    color: green;
+  }

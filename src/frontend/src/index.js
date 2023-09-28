@@ -18,9 +18,9 @@ const RSKLightningBridge = () => {
   const [evm_address, setEvmAddr] = useState('');
   const [memo, setMemo] = useState('');
   const [activeTab, setActiveTab] = useState('rskToLight');
-
+  const [rskBalance,setUserBalance] = useState();
   const [bridge, setBridge] = useState();
-
+  
   const {
     netId,
     coinbase,
@@ -59,6 +59,9 @@ const RSKLightningBridge = () => {
      setMessage(resp);
      if(typeof window.webln !== 'undefined') {
        await window.webln.enable();
+       if(!lightningNodeInfo){
+         fetchLightiningInfo()
+       }
        const invoice = JSON.parse(resp).payment_request;
        setPaymentHash(JSON.parse(resp).r_hash);
        setMessage("Pay invoice");
@@ -217,6 +220,28 @@ const RSKLightningBridge = () => {
       }
     </div>
   );
+
+
+  const fetchUserBalance = useCallback(async () => {
+    if (coinbase && bridge) {
+      try {
+        const balance = await bridge.userBalances(coinbase);
+        setUserBalance(balance.toString());
+      } catch (error) {
+        console.error("Error fetching user balance:", error);
+      }
+    }
+  }, [coinbase, bridge]);
+
+  useEffect(() => {
+    fetchUserBalance(); // Fetch balance immediately when component mounts or coinbase/bridge changes
+
+    const intervalId = setInterval(fetchUserBalance, 30000); // Fetch balance every 30 seconds
+
+
+    return () => clearInterval(intervalId); // Clear interval on component unmount
+  }, [fetchUserBalance]);
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -224,7 +249,13 @@ const RSKLightningBridge = () => {
         <p>Follow the steps below to bridge your assets.</p>
       </div>
 
-
+      {
+        coinbase && bridge &&
+        <div className={styles.balance}>
+          <p>EVM connected as {coinbase}</p>
+          <p>Your RSK Balance: {userBalance}</p>
+        </div>
+      }
       <div className={styles.tabs}>
         <button
           className={activeTab === 'rskToLight' ? styles.activeTab : ''}
