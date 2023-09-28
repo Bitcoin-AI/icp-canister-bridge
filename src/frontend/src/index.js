@@ -328,7 +328,7 @@ const RSKLightningBridge = () => {
         coinbase && bridge &&
         <div className={styles.balance}>
           <p>EVM connected as {coinbase}</p>
-          <p>Your RSK Balance: {userBalance}</p>
+          <p>Your RSK Balance: {rskBalance}</p>
         </div>
       }
       <div className={styles.tabs}>
