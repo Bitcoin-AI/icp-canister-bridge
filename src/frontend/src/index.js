@@ -59,7 +59,7 @@ const RSKLightningBridge = () => {
     setProcessing(true);
     try {
       setMessage("Getting invoice from service");
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address.replace("0x", ""));
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address.replace("0x", ""),new Date().getTime().toString());
       setMessage(resp);
       const invoice = JSON.parse(resp).payment_request;
       const base64PaymentHash = JSON.parse(resp).r_hash;
@@ -70,7 +70,7 @@ const RSKLightningBridge = () => {
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice payed, wait for service update address's balance in smart contract");
-        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hashUrl);
+        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
       } else {
@@ -107,12 +107,12 @@ const RSKLightningBridge = () => {
       setMessage(`Storing invoice in smart contract`);
       const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
       console.log("Transaction sent:", tx.hash);
-      setMessage(`Tx sent: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>}`);
+      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
       // Wait for the transaction to be mined
       await tx.wait();
-      setMessage(`Tx confirmed: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>} calling service to pay invoice`);
+      setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a> calling service to pay invoice</>);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
-      resp = await main.payInvoicesAccordingToEvents();
+      resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       setMessage(resp);
     } catch (err) {
       setMessage(err.message);
@@ -123,9 +123,9 @@ const RSKLightningBridge = () => {
     setProcessing(true);
     try {
       setMessage("Processing evm transaction ...")
-      const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'));
+      const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
       const parsed = JSON.parse(resp);
-      setMessage(`Tx sent: ${<a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>}. Wait confirmation and claim RBTC`);
+      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>. Wait confirmation and claim RBTC</>);
     } catch (err) {
       setMessage(`${err.message}`)
     }
@@ -140,7 +140,7 @@ const RSKLightningBridge = () => {
       const signer = await provider.getSigner();
       const bridgeWithSigner = bridge.connect(signer);
       const tx = await bridgeWithSigner.claimRBTC();
-      setMessage(`RBTC claimed: ${<a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>}`);
+      setMessage(<>RBTC claimed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
       await tx.wait();
       setProcessing(false)
     }
