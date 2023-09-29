@@ -33,12 +33,12 @@ actor {
     return invoiceResponse;
   };
 
-  public shared (msg) func swapFromLightningNetwork(payment_hash : Text) : async Text {
+  public shared (msg) func swapFromLightningNetwork(payment_hash : Text,timestamp:Text) : async Text {
 
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash);
+    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash,timestamp);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
@@ -87,8 +87,8 @@ actor {
     return sendTxResponse;
   };
 
-  public func decodePayReq(payment_request: Text): async Text{
-    let response = await lightning_testnet.decodePayReq(payment_request);
+  public func decodePayReq(payment_request: Text,timestamp: Text): async Text{
+    let response = await lightning_testnet.decodePayReq(payment_request,timestamp);
     return response;
   };
 
@@ -103,7 +103,7 @@ actor {
 
 
   //From RSK Blockchain to LightningNetwork
-  public shared (msg) func payInvoicesAccordingToEvents() : async () {
+  public shared (msg) func payInvoicesAccordingToEvents(timestamp: Text) : async () {
 
     let keyName = "dfx_test_key";
     let principalId = msg.caller;
@@ -150,7 +150,7 @@ actor {
       try {
         let treatedRequest = Text.replace(invoiceId, #char 'E', "");
         let paymentRequest = utils.trim(treatedRequest);
-        let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest);
+        let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest,timestamp);
         let payReqResponse = JSON.parse(decodedPayReq);
         let amountString = await utils.getValue(payReqResponse, "num_satoshis");
         let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
@@ -168,7 +168,7 @@ actor {
               Debug.print("Amount mismatch. Marking as paid to skip.");
             } else {
               // Proceed to pay the invoice
-              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName);
+              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName,timestamp);
               Debug.print("Payment result: " # paymentResult);
 
               let paymentResultJson = JSON.parse(paymentResult);

@@ -78,15 +78,16 @@ module {
     decodedText;
   };
 
-  public func payInvoice(invoice : Text, derivationPath : [Blob], keyName : Text) : async Text {
+  public func payInvoice(invoice : Text, derivationPath : [Blob], keyName : Text,timestamp: Text) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let address = utils.publicKeyToAddress(publicKey);
 
-    let idempotencyKey = invoice;
+    let uniqueString = invoice # timestamp;
 
+    let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
     if (address == "") {
       Debug.print("Could not get address!");
       return "";
@@ -131,7 +132,11 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
-  public func checkInvoice(payment_hash : Text) : async Text {
+  public func checkInvoice(payment_hash : Text,timestamp : Text) : async Text {
+
+    let uniqueString =  payment_hash # timestamp;
+
+    let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
 
     // Setup URL and request headers
     let url : Text = lndBaseUrl # "/v2/invoices/lookup?payment_hash=" # payment_hash;
@@ -139,6 +144,7 @@ module {
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
+      { name = "Idempotency-Key"; value = idempotencyKey },
     ];
     Debug.print(url);
 
@@ -150,13 +156,20 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/router/track-payment-v2
-  public func decodePayReq(payment_request : Text) : async Text {
+  public func decodePayReq(payment_request : Text,timestamp: Text) : async Text {
+
+    let uniqueString =  payment_request # timestamp;
+
+    let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
+
 
     let url : Text = lndBaseUrl # "/v1/payreq/" # payment_request;
+
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
+      { name = "Idempotency-Key"; value = idempotencyKey },
     ];
     Debug.print(url);
 
