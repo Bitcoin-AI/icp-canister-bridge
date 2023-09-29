@@ -39,7 +39,7 @@ module {
 
   let contractAddress : Text = "0x034b8ae121ab786a5262cb2082540b81eb2e340f";
 
-  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
@@ -69,20 +69,20 @@ module {
 
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rskNodeUrl, null, "post",transform);
+    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rskNodeUrl, null, "post", transform);
     let parsedGasPrice = JSON.parse(responseGasPrice);
     let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
     //Estimating gas
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
-    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, rskNodeUrl, null, "post",transform);
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, rskNodeUrl, null, "post", transform);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
 
     //Getting nonce
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post",transform);
+    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rskNodeUrl, null, "post", transform);
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await utils.getValue(parsedNonce, "result");
@@ -121,7 +121,13 @@ module {
 
         let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
         Debug.print("Sending tx: " # sendTxPayload);
-        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, rskNodeUrl, null, "post", transform);
+
+        let requestHeaders = [
+          { name = "Content-Type"; value = "application/json" },
+          { name = "Accept"; value = "application/json" },
+          { name = "Idempotency-Key"; value = AU.toText(value.1) },
+        ];
+        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/payBlockchainTx", ?requestHeaders, "post", transform);
         Debug.print("Tx response: " # sendTxResponse);
         return sendTxResponse;
 
@@ -134,7 +140,7 @@ module {
 
   };
 
-  public func readRSKSmartContractEvents(transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
+  public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
 
     let ic : Types.IC = actor ("aaaaa-aa");
 
@@ -145,7 +151,7 @@ module {
 
     let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
 
-    let decodedText = await utils.httpRequest(?jsonRpcPayload, rskNodeUrl, null, "post" ,transform);
+    let decodedText = await utils.httpRequest(?jsonRpcPayload, rskNodeUrl, null, "post", transform);
 
     let events = await handleLogs(decodedText);
 
