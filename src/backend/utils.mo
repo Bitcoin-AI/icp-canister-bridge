@@ -22,11 +22,14 @@ module {
 
     type JSONField = (Text, JSON.JSON);
 
+
+
     public func httpRequest(
         jsonRpcPayload : ?Text,
         url : Text,
         headers : ?[{ name : Text; value : Text }],
         method : Text,
+        transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload
     ) : async Text {
         let ic : Types.IC = actor ("aaaaa-aa");
         var retryCount : Nat = 0;
@@ -55,19 +58,23 @@ module {
             case _ { #post };
         };
 
+        let transform_context : Types.TransformContext = {
+            function = transform;
+            context = Blob.fromArray([]);
+        };
+
         let httpRequest : Types.HttpRequestArgs = {
             url = url;
             headers = actualHeaders;
             method = httpMethod;
             body = payloadAsNat8;
             max_response_bytes = null;
-            transform = null;
+            transform = ?transform_context;
         };
 
         while (retryCount < maxRetries and shouldRetry) {
             try {
                 Cycles.add(17_000_000_000 + (5_000_000_000 * retryCount)); // Added extra cycles based on the retry count
-
 
                 let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
@@ -199,15 +206,12 @@ module {
 
     public func hexStringToNat64(hexString : Text) : Nat64 {
 
-
-
         let hexStringArray = Iter.toArray(Text.toIter(hexString));
         let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
             subText(hexString, 3, hexString.size() -1);
         } else {
             hexString;
         };
-
 
         var result : Nat64 = 0;
         var power : Nat64 = 1;
@@ -239,7 +243,6 @@ module {
             result += Nat64.fromNat(digitValue) * power;
             power *= 16;
         };
-
 
         result;
     };

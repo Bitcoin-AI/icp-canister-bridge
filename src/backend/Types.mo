@@ -24,10 +24,21 @@ module Types {
         #head;
     };
 
+    public type CanisterHttpResponsePayload = {
+        status : Nat;
+        headers : [HttpHeader];
+        body : [Nat8];
+    };
+
     public type HttpResponsePayload = {
         status : Nat;
         headers : [HttpHeader];
         body : [Nat8];
+    };
+
+    public type TransformContext = {
+        function : shared query TransformArgs -> async HttpResponsePayload;
+        context : Blob;
     };
 
     //2. HTTPS outcalls have an optional "transform" key. These two types help describe it.
