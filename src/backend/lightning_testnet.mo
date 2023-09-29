@@ -57,13 +57,19 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice/index.html
-  public func generateInvoice(amount : Nat, evm_addr : Text) : async Text {
-
+  public func generateInvoice(amount : Nat, evm_addr : Text, timestamp : Text) : async Text {
     let url : Text = lndBaseUrl # "/v1/invoices";
+
+    // Combine amount, evm_addr, and timestamp to create a unique idempotency key
+    let uniqueString = Nat.toText(amount) # evm_addr # timestamp;
+
+    let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
+
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
+      { name = "Idempotency-Key"; value = idempotencyKey },
     ];
 
     let request_body_json : Text = "{ \"value\" : \"" # Nat.toText(amount) # "\",\"memo\" : \"" # evm_addr # "\"  }";
@@ -78,6 +84,8 @@ module {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let address = utils.publicKeyToAddress(publicKey);
+
+    let idempotencyKey = invoice;
 
     if (address == "") {
       Debug.print("Could not get address!");
@@ -111,6 +119,8 @@ module {
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "signature"; value = AU.toText(serializedSignature) },
+          { name = "Idempotency-Key"; value = idempotencyKey },
+
         ];
 
         let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest, ?requestHeaders, "post");

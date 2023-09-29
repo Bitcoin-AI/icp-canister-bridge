@@ -28,8 +28,8 @@ actor {
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
-  public func generateInvoiceToSwapToRsk(amount : Nat, address : Text) : async Text {
-    let invoiceResponse = await lightning_testnet.generateInvoice(amount, address);
+  public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time:Text) : async Text {
+    let invoiceResponse = await lightning_testnet.generateInvoice(amount, address, time);
     return invoiceResponse;
   };
 
@@ -151,14 +151,9 @@ actor {
         let treatedRequest = Text.replace(invoiceId, #char 'E', "");
         let paymentRequest = utils.trim(treatedRequest);
         let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest);
-
         let payReqResponse = JSON.parse(decodedPayReq);
-
         let amountString = await utils.getValue(payReqResponse, "num_satoshis");
-
-
         let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-
         let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
 
         switch (amountCheckedOpt) {
