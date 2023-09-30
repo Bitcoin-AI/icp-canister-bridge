@@ -123,7 +123,7 @@ module {
 
         ];
 
-        let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest, ?requestHeaders, "post", transform);
+        let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest # "/payInvoice", ?requestHeaders, "post", transform);
         return response_icp_bridge_macaroon;
       };
     };
