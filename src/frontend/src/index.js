@@ -113,8 +113,8 @@ const RSKLightningBridge = () => {
       setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a> calling service to pay invoice</>);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      setMessage("Service processing lightning payments");
-      setInterval(() => {
+      setMessage("Service processing lightning payment");
+      setTimeout(() => {
         setMessage()
       },5000);
     } catch (err) {
