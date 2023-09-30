@@ -123,28 +123,39 @@ actor {
     return address;
   };
 
+
+
+  
+  public shared (msg) func getEvents() : async [Event] {
+
+
+    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
+
+    return events;
+
+  };
+
   //From RSK Blockchain to LightningNetwork
-  public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async () {
+ public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async Text {
+    var result: Text = "No actions taken";
 
     let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
 
-    // Using Array.tabulate to iterate over the events
     ignore Array.tabulate<Event>(
       Array.size(events),
       func(index : Nat) : Event {
         let event = events[index];
         let { address; amount } = event;
         switch (paidInvoicestoLN.get(address)) {
-          case (null) {
-            // Invoice ID not found in the map, add it
-            paidInvoicestoLN.put(address, (false, amount));
-          };
-          case (?(isPaid, existingAmount)) {
-            //Do nothing
-          };
+            case (null) {
+                paidInvoicestoLN.put(address, (false, amount));
+            };
+            case (?(isPaid, existingAmount)) {
+                //Do nothing
+            };
         };
         return event;
       },
@@ -163,55 +174,47 @@ actor {
       },
     );
 
-    // Process each unpaid invoice
     let entries = unpaidInvoices.entries();
     for ((invoiceId, (isPaid, amount)) in entries) {
-      Debug.print("Checking invoice" # invoiceId # "with amount: " # Nat.toText(amount));
+        try {
+            let treatedRequest = Text.replace(invoiceId, #char 'E', "");
+            let paymentRequest = utils.trim(treatedRequest);
+            let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
+            let payReqResponse = JSON.parse(decodedPayReq);
+            let amountString = await utils.getValue(payReqResponse, "num_satoshis");
+            let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+            let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
 
-      try {
-        let treatedRequest = Text.replace(invoiceId, #char 'E', "");
-        let paymentRequest = utils.trim(treatedRequest);
-        let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
-        let payReqResponse = JSON.parse(decodedPayReq);
-        let amountString = await utils.getValue(payReqResponse, "num_satoshis");
-        let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-        let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
+            switch (amountCheckedOpt) {
+                case (null) {
+                    paidInvoicestoLN.put(invoiceId, (true, amount));
+                    result := "Failed to convert amountChecked to Nat. Skipping invoice.";
+                };
+                case (?amountChecked) {
+                    if (amountChecked != amount) {
+                        paidInvoicestoLN.put(invoiceId, (true, amount));
+                        result := "Amount mismatch. Marking as paid to skip.";
+                    } else {
+                        let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
+                        let paymentResultJson = JSON.parse(paymentResult);
+                        let errorField = await utils.getValue(paymentResultJson, "error");
+                        let resultField = await utils.getValue(paymentResultJson, "result");
+                        let statusField = await utils.getValue(JSON.parse(resultField), "status");
 
-        switch (amountCheckedOpt) {
-          case (null) {
-            paidInvoicestoLN.put(invoiceId, (true, amount));
-            Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
-          };
-          case (?amountChecked) {
-            if (amountChecked != amount) {
-              // Update the HashMap to set status = paid if the amount is incorrect
-              paidInvoicestoLN.put(invoiceId, (true, amount));
-              Debug.print("Amount mismatch. Marking as paid to skip.");
-            } else {
-              // Proceed to pay the invoice
-              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
-              Debug.print("Payment result: " # paymentResult);
-
-              let paymentResultJson = JSON.parse(paymentResult);
-              let errorField = await utils.getValue(paymentResultJson, "error");
-              let resultField = await utils.getValue(paymentResultJson, "result");
-              let statusField = await utils.getValue(JSON.parse(resultField), "status");
-
-              if (errorField == "" and statusField == "SUCCEEDED") {
-                Debug.print("Payment Result: Successful");
-                // Update the HashMap to set status = paid
-                paidInvoicestoLN.put(invoiceId, (true, amount));
-              } else {
-                Debug.print("Payment Result: Failed");
-                // We can try again later if it was in process
-              };
+                        if (errorField == "" and statusField == "SUCCEEDED") {
+                            paidInvoicestoLN.put(invoiceId, (true, amount));
+                            result := "Payment Result: Successful";
+                        } else {
+                            result := "Payment Result: Failed";
+                        };
+                    };
+                };
             };
-          };
+        } catch (e : Error.Error) {
+            result := "Caught exception: " # Error.message(e);
         };
-      } catch (e : Error.Error) {
-        Debug.print("Caught exception: " # Error.message(e));
-      };
     };
 
-  };
+    return result;
+};
 };
