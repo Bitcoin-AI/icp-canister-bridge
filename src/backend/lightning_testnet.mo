@@ -33,7 +33,7 @@ import utils "utils";
 // Module
 module {
   type JSONField = (Text, JSON.JSON);
-  let contractAddress : Text = "0x740Df81588112B12Df0af3674094A42812B2c7Ad";
+  let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
   // Set the base URL of your LND REST API: https://github.com/getAlby/lightning-browser-extension/wiki/Test-setup
   let lndBaseUrl : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";

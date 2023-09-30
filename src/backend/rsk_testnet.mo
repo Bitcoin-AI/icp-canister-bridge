@@ -37,7 +37,7 @@ module {
 
   let rskNodeUrl : Text = "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/";
 
-  let contractAddress : Text = "0x740Df81588112B12Df0af3674094A42812B2c7Ad";
+  let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
   public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
