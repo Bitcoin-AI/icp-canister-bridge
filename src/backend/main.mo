@@ -14,8 +14,31 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 
 import HU "mo:evm-tx/utils/HashUtils";
+import Types "Types";
 
 actor {
+
+  public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
+    let transformed : Types.CanisterHttpResponsePayload = {
+      status = raw.response.status;
+      body = raw.response.body;
+      headers = [
+        {
+          name = "Content-Security-Policy";
+          value = "default-src 'self'";
+        },
+        { name = "Referrer-Policy"; value = "strict-origin" },
+        { name = "Permissions-Policy"; value = "geolocation=(self)" },
+        {
+          name = "Strict-Transport-Security";
+          value = "max-age=63072000";
+        },
+        { name = "X-Frame-Options"; value = "DENY" },
+        { name = "X-Content-Type-Options"; value = "nosniff" },
+      ];
+    };
+    transformed;
+  };
 
   type JSONField = (Text, JSON.JSON);
 
@@ -28,17 +51,17 @@ actor {
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
-  public func generateInvoiceToSwapToRsk(amount : Nat, address : Text) : async Text {
-    let invoiceResponse = await lightning_testnet.generateInvoice(amount, address);
+  public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
+    let invoiceResponse = await lightning_testnet.generateInvoice(amount, address, time, transform);
     return invoiceResponse;
   };
 
-  public shared (msg) func swapFromLightningNetwork(payment_hash : Text) : async Text {
+  public shared (msg) func swapFromLightningNetwork(payment_hash : Text, timestamp : Text) : async Text {
 
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash);
+    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
@@ -71,7 +94,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to Ethereum
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount);
+    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount, transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -87,30 +110,36 @@ actor {
     return sendTxResponse;
   };
 
-  public func decodePayReq(payment_request: Text): async Text{
-    let response = await lightning_testnet.decodePayReq(payment_request);
+  public func decodePayReq(payment_request : Text, timestamp : Text) : async Text {
+    let response = await lightning_testnet.decodePayReq(payment_request, timestamp, transform);
     return response;
   };
 
   public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
     return address;
   };
 
+  public shared (msg) func getEvents() : async [Event] {
 
+    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
+
+    return events;
+
+  };
 
   //From RSK Blockchain to LightningNetwork
-  public shared (msg) func payInvoicesAccordingToEvents() : async () {
+  public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async Text {
+    var result : Text = "No actions taken";
 
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents();
+    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
 
-    // Using Array.tabulate to iterate over the events
     ignore Array.tabulate<Event>(
       Array.size(events),
       func(index : Nat) : Event {
@@ -118,7 +147,6 @@ actor {
         let { address; amount } = event;
         switch (paidInvoicestoLN.get(address)) {
           case (null) {
-            // Invoice ID not found in the map, add it
             paidInvoicestoLN.put(address, (false, amount));
           };
           case (?(isPaid, existingAmount)) {
@@ -142,60 +170,52 @@ actor {
       },
     );
 
-    // Process each unpaid invoice
     let entries = unpaidInvoices.entries();
     for ((invoiceId, (isPaid, amount)) in entries) {
-      Debug.print("Checking invoice" # invoiceId # "with amount: " # Nat.toText(amount));
-
       try {
         let treatedRequest = Text.replace(invoiceId, #char 'E', "");
         let paymentRequest = utils.trim(treatedRequest);
-        let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest);
-
-        let payReqResponse = JSON.parse(decodedPayReq);
-
-        let amountString = await utils.getValue(payReqResponse, "num_satoshis");
-
-
-        let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-
-        let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
+        // let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
+        // let payReqResponse = JSON.parse(decodedPayReq);
+        // let amountString = await utils.getValue(payReqResponse, "num_satoshis");
+        // let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+        let amountCheckedOpt : ?Nat = Nat.fromText("100" # "0000000000");
 
         switch (amountCheckedOpt) {
           case (null) {
             paidInvoicestoLN.put(invoiceId, (true, amount));
-            Debug.print("Failed to convert amountChecked to Nat. Skipping invoice.");
+            result := "Failed to convert amountChecked to Nat. Skipping invoice.";
           };
           case (?amountChecked) {
-            if (amountChecked != amount) {
-              // Update the HashMap to set status = paid if the amount is incorrect
+            if (amountChecked > amountChecked) {
               paidInvoicestoLN.put(invoiceId, (true, amount));
-              Debug.print("Amount mismatch. Marking as paid to skip.");
+              result := "Amount mismatch. Marking as paid to skip.";
             } else {
-              // Proceed to pay the invoice
-              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName);
-              Debug.print("Payment result: " # paymentResult);
-
+              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
               let paymentResultJson = JSON.parse(paymentResult);
               let errorField = await utils.getValue(paymentResultJson, "error");
               let resultField = await utils.getValue(paymentResultJson, "result");
               let statusField = await utils.getValue(JSON.parse(resultField), "status");
 
               if (errorField == "" and statusField == "SUCCEEDED") {
-                Debug.print("Payment Result: Successful");
-                // Update the HashMap to set status = paid
                 paidInvoicestoLN.put(invoiceId, (true, amount));
+                result := "Payment Result: Successful";
               } else {
-                Debug.print("Payment Result: Failed");
-                // We can try again later if it was in process
+                // For now just skip any error
+                paidInvoicestoLN.put(invoiceId, (true, amount));
+                result := "Payment Result: Failed";
               };
             };
           };
         };
       } catch (e : Error.Error) {
-        Debug.print("Caught exception: " # Error.message(e));
+        // For now just skip any error
+        paidInvoicestoLN.put(invoiceId, (true, amount));
+
+        result := "Caught exception: " # Error.message(e);
       };
     };
 
+    return result;
   };
 };

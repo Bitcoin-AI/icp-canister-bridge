@@ -16,64 +16,89 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
 import Nat32 "mo:base/Nat32";
+import Error "mo:base/Error";
 
 module {
 
     type JSONField = (Text, JSON.JSON);
 
-    public func httpRequest(jsonRpcPayload : ?Text, url : Text, headers : ?[{ name : Text; value : Text }], method : Text) : async Text {
+
+
+    public func httpRequest(
+        jsonRpcPayload : ?Text,
+        url : Text,
+        headers : ?[{ name : Text; value : Text }],
+        method : Text,
+        transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload
+    ) : async Text {
         let ic : Types.IC = actor ("aaaaa-aa");
+        var retryCount : Nat = 0;
+        let maxRetries : Nat = 6; // Changed to 6 retries
+        var shouldRetry : Bool = true;
 
         let payloadAsNat8 : ?[Nat8] = switch (jsonRpcPayload) {
             case (null) { null };
             case (?payload) { ?Blob.toArray(Text.encodeUtf8(payload)) };
         };
 
-        // Prepare the default headers
         let defaultHeaders = [{
             name = "Content-Type";
             value = "application/json";
         }];
 
-        // Use the provided headers or the default headers if none are provided
         let actualHeaders = switch (headers) {
             case (null) { defaultHeaders };
             case (?userHeaders) { userHeaders };
         };
 
-        // Determine the HTTP method to use
         let httpMethod = switch (method) {
             case ("post") { #post };
             case ("get") { #get };
             case ("head") { #head };
-            case _ { #post }; // default to POST if an unrecognized method is passed
+            case _ { #post };
         };
 
-        // Prepare the HTTP request
+        let transform_context : Types.TransformContext = {
+            function = transform;
+            context = Blob.fromArray([]);
+        };
+
         let httpRequest : Types.HttpRequestArgs = {
             url = url;
             headers = actualHeaders;
             method = httpMethod;
             body = payloadAsNat8;
             max_response_bytes = null;
-            transform = null;
+            transform = ?transform_context;
         };
 
-        // Add cycles to pay for the HTTP request
-        Cycles.add(17_000_000_000);
+        while (retryCount < maxRetries and shouldRetry) {
+            try {
+                Cycles.add(17_000_000_000 + (5_000_000_000 * retryCount)); // Added extra cycles based on the retry count
 
-        // Make the HTTP request and wait for the response
-        let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
+                let httpResponse : Types.HttpResponsePayload = await ic.http_request(httpRequest);
 
-        // Decode the response body into readable text
-        let responseBody : Blob = Blob.fromArray(httpResponse.body);
+                let responseBody : Blob = Blob.fromArray(httpResponse.body);
+                let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
+                    case (null) "No value returned";
+                    case (?y) y;
+                };
 
-        let decodedText : Text = switch (Text.decodeUtf8(responseBody)) {
-            case (null) "No value returned";
-            case (?y) y;
+                shouldRetry := false;
+                return decodedText;
+            } catch (e : Error.Error) {
+                let errorMessage : Text = Error.message(e);
+                if (Text.contains(errorMessage, #text "cycles are required")) {
+
+                    retryCount += 1;
+                } else {
+                    shouldRetry := false;
+                    return "Error: " # errorMessage;
+                };
+            };
         };
 
-        return decodedText;
+        return "Max retries reached. Unable to complete the request.";
     };
 
     public func getFieldAsString(fields : [JSONField], key : Text) : async Text {
@@ -81,17 +106,14 @@ module {
         let field = Array.find(
             fields,
             func((k : Text, v : JSON.JSON)) : Bool {
-                Debug.print("Checking key: " # k);
                 k == key;
             },
         );
         switch (field) {
             case (?(_, value)) {
-                Debug.print("Found value: " # JSON.show(value));
                 JSON.show(value);
             };
             case _ {
-                Debug.print("Field not found");
                 "Unknown";
             };
         };
@@ -132,38 +154,28 @@ module {
     };
 
     public func subText(value : Text, indexStart : Nat, indexEnd : Nat) : Text {
-        Debug.print("Input value: " # value);
-        Debug.print("indexStart: " # Nat.toText(indexStart));
-        Debug.print("indexEnd: " # Nat.toText(indexEnd));
 
         if (indexStart == 0 and indexEnd >= value.size()) {
-            Debug.print("Returning original value as indexStart is 0 and indexEnd is greater than or equal to value size.");
             return value;
         } else if (indexStart >= value.size()) {
-            Debug.print("Returning empty string as indexStart is greater than or equal to value size.");
             return "";
         };
 
         var indexEndValid = indexEnd;
         if (indexEnd > value.size()) {
-            Debug.print("Adjusting indexEnd as it's greater than value size.");
             indexEndValid := value.size();
         };
-        Debug.print("indexEndValid: " # Nat.toText(indexEndValid));
 
         var result : Text = "";
         let iter = Iter.toArray<Char>(Text.toIter(value));
         for (index in Iter.range(indexStart, indexEndValid - 1)) {
-            Debug.print("Adding character: " # Char.toText(iter[index]));
             result := result # Char.toText(iter[index]);
         };
 
-        Debug.print("Final result: " # result);
         return result;
     };
 
     public func trim(value : Text) : Text {
-        Debug.print("Trimming input: " # value);
 
         let iter = Iter.toArray<Char>(Text.toIter(value));
         var startIndex = 0;
@@ -184,25 +196,15 @@ module {
         var result : Text = "";
         for (index in Iter.range(startIndex, endIndex)) {
             let currentChar = iter[index];
-            if (Char.toText(currentChar) == "") {
-                Debug.print("Detected truly empty character at position " # Nat.toText(index));
-            } else if (isNonPrintable(currentChar)) {
-                Debug.print("Detected non-printable character (code: " # Nat32.toText(Char.toNat32(currentChar)) # ") at position " # Nat.toText(index));
-            } else {
-                Debug.print("Adding character from position " # Nat.toText(index) # ": " # Char.toText(currentChar));
+            if (Char.toText(currentChar) == "") {} else if (isNonPrintable(currentChar)) {} else {
                 result := result # Char.toText(currentChar);
             };
         };
 
-        Debug.print("Final trimmed result: " # result);
         return result;
     };
 
     public func hexStringToNat64(hexString : Text) : Nat64 {
-
-        Debug.print("Input hexString: " # hexString);
-
-        Debug.print("Size  hexString: " # Nat.toText(hexString.size()));
 
         let hexStringArray = Iter.toArray(Text.toIter(hexString));
         let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
@@ -210,8 +212,6 @@ module {
         } else {
             hexString;
         };
-
-        Debug.print("Clean hexString: " # cleanHexString);
 
         var result : Nat64 = 0;
         var power : Nat64 = 1;
@@ -244,8 +244,6 @@ module {
             power *= 16;
         };
 
-        Debug.print("Result: " # Nat64.toText(result));
-
         result;
     };
 
@@ -266,7 +264,6 @@ module {
     public func getValue(json : ?JSON.JSON, value : Text) : async Text {
         switch (json) {
             case (null) {
-                Debug.print("JSON parsing failed");
                 return "";
             };
             case (?v) switch (v) {
@@ -275,7 +272,6 @@ module {
                     return gasPrice;
                 };
                 case _ {
-                    Debug.print("Unexpected JSON structure");
                     return "";
                 };
             };

@@ -40,7 +40,19 @@ module.exports = {
   },
   module: {
     rules: [
-      { test: /\.(js|ts)x?$/, loader: "ts-loader" }
+      { test: /\.(js|ts)x?$/, loader: "ts-loader" },
+      { test: /\.css$/, use: ['style-loader','css-loader'] },
+      {
+        test: /\.s[ac]ss$/i,
+        use: [
+          // Creates `style` nodes from JS strings
+          "style-loader",
+          // Translates CSS into CommonJS
+          "css-loader",
+          // Compiles Sass to CSS
+          "sass-loader",
+        ],
+      },
     ]
   },
   // Depending in the language or framework you are using for
