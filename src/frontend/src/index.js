@@ -113,7 +113,10 @@ const RSKLightningBridge = () => {
       setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a> calling service to pay invoice</>);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      setMessage(resp);
+      setMessage("Service processing lightning payments");
+      setInterval(() => {
+        setMessage()
+      },5000);
     } catch (err) {
       setMessage(err.message);
     }
@@ -328,7 +331,7 @@ const RSKLightningBridge = () => {
         coinbase && bridge &&
         <div className={styles.balance}>
           <p>EVM connected as {coinbase}</p>
-          <p>Your RSK Balance: {rskBalance}</p>
+          <p>Your RSK Balance: {rskBalance/10**10} satoshis of rbtc</p>
         </div>
       }
       <div className={styles.tabs}>
