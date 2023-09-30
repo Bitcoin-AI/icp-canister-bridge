@@ -116,7 +116,7 @@ actor {
   };
 
   public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
@@ -126,7 +126,7 @@ actor {
   //From RSK Blockchain to LightningNetwork
   public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async () {
 
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);

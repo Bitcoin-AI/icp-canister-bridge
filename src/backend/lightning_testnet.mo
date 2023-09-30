@@ -33,7 +33,7 @@ import utils "utils";
 // Module
 module {
   type JSONField = (Text, JSON.JSON);
-  let contractAddress : Text = "0x953CD84Bb669b42FBEc83AD3227907023B5Fc4FF";
+  let contractAddress : Text = "0x740DF81588112B12Df0af3674094a42812B2C7ad";
 
   // Set the base URL of your LND REST API: https://github.com/getAlby/lightning-browser-extension/wiki/Test-setup
   let lndBaseUrl : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
@@ -42,7 +42,7 @@ module {
   let macaroon : Text = "0201036c6e6402f801030a10b3bf6906c1937139ac0684ac4417139d1201301a160a0761646472657373120472656164120577726974651a130a04696e666f120472656164120577726974651a170a08696e766f69636573120472656164120577726974651a210a086d616361726f6f6e120867656e6572617465120472656164120577726974651a160a076d657373616765120472656164120577726974651a170a086f6666636861696e120472656164120577726974651a160a076f6e636861696e120472656164120577726974651a140a057065657273120472656164120577726974651a180a067369676e6572120867656e657261746512047265616400000620a3f810170ad9340a63074b6dded31ed83a7140fd26c7758856111583b7725b2b";
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/get-info
-  public func getLightningInfo(transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func getLightningInfo(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     // Setup URL and request headers
     let url : Text = lndBaseUrl # "/v1/getinfo";
@@ -52,12 +52,12 @@ module {
       { name = "Grpc-Metadata-macaroon"; value = macaroon },
     ];
 
-    let decodedText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get",transform);
+    let decodedText : Text = await utils.httpRequest(null, url, ?requestHeaders, "get", transform);
     decodedText;
   };
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice/index.html
-  public func generateInvoice(amount : Nat, evm_addr : Text, timestamp : Text, transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func generateInvoice(amount : Nat, evm_addr : Text, timestamp : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let url : Text = lndBaseUrl # "/v1/invoices";
 
     // Combine amount, evm_addr, and timestamp to create a unique idempotency key
@@ -78,14 +78,14 @@ module {
     decodedText;
   };
 
-  public func payInvoice(invoice : Text, derivationPath : [Blob], keyName : Text,timestamp: Text, transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func payInvoice(invoice : Text, derivationPath : [Blob], keyName : Text, timestamp : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     // First we need to check if RSK transaction has been done in our contract. After that we will use that method to release the btc in lightning network
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let address = utils.publicKeyToAddress(publicKey);
 
-    let uniqueString = invoice # timestamp;
+    let uniqueString = invoice # timestamp # "pay_invoice";
 
     let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
     if (address == "") {
@@ -120,7 +120,6 @@ module {
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "signature"; value = AU.toText(serializedSignature) },
-          { name = "Idempotency-Key"; value = idempotencyKey },
 
         ];
 
@@ -132,9 +131,9 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/lightning/lookup-invoice
-  public func checkInvoice(payment_hash : Text,timestamp : Text, transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func checkInvoice(payment_hash : Text, timestamp : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
-    let uniqueString =  payment_hash # timestamp;
+    let uniqueString = payment_hash # timestamp # "checkInvoice";
 
     let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
 
@@ -156,12 +155,11 @@ module {
   };
 
   // https://lightning.engineering/api-docs/api/lnd/router/track-payment-v2
-  public func decodePayReq(payment_request : Text,timestamp: Text, transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func decodePayReq(payment_request : Text, timestamp : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
-    let uniqueString =  payment_request # timestamp;
+    let uniqueString = payment_request # timestamp # "decodePayReq";
 
     let idempotencyKey = AU.toText(HU.keccak(TU.encodeUtf8(uniqueString), 256));
-
 
     let url : Text = lndBaseUrl # "/v1/payreq/" # payment_request;
 

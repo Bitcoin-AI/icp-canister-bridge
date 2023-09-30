@@ -2,7 +2,7 @@
 // Goerli, Kovan, Rinkeby and Ropsten. Replace it with your smart contracts.
 const addresses = {
   bridge: {
-    testnet: "0x740Df81588112B12Df0af3674094A42812B2c7Ad"
+    testnet: "0x740DF81588112B12Df0af3674094a42812B2C7ad"
   }
 };
 
