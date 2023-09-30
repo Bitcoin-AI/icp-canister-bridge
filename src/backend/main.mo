@@ -58,7 +58,7 @@ actor {
 
   public shared (msg) func swapFromLightningNetwork(payment_hash : Text, timestamp : Text) : async Text {
 
-    let keyName = "dfx_test_key";
+    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
