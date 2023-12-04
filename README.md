@@ -1,60 +1,44 @@
-# send_http_get
+# ICP Canister Bridge Project
 
-Welcome to your new send_http_get project and to the internet computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
+## Introduction
+The ICP Canister Bridge is an innovative project that creates a bridge between the RSK Blockchain and Lightning Network using the Internet Computer Protocol (ICP) stack. It uses ECDSA API for secure and efficient transactions across Ethereum Virtual Machine (EVM) compatible chains and is designed to facilitate swapping of satoshis between the Lightning testnetwork and Rootstock testnetwork.
 
-To get started, you might want to explore the project directory structure and the default configuration file. Working with this project in your development environment will not affect any production deployment or identity tokens.
+## Key Features
+- **Integration with ECDSA API:** Ensures high security for transactions.
+- **Compatibility with EVM Chains:** Enables smooth transactions across different EVM chains.
+- **Potential Lightning Network Support:** Explores integration possibilities with Bitcoin's Lightning Network.
 
-To learn more before you start working with send_http_get, see the following documentation available online:
+## Technologies Used
+- **ICP for HTTP Requests:** Utilizes ICP for communicating with an Express.js API.
+- **RSK Smart Contract:** Manages invoices and user balances on the RSK network.
+- **ICP Canister:** Interacts with RSK and Lightning networks.
+- **Express.js API:** Handles requests from the canister.
+- **Motoko, Webln, Ethers.js:** These technologies are integral to the project's functionality.
 
-- [Quick Start](https://internetcomputer.org/docs/current/developer-docs/quickstart/hello10mins)
-- [SDK Developer Tools](https://internetcomputer.org/docs/current/developer-docs/build/install-upgrade-remove)
-- [Motoko Programming Language Guide](https://internetcomputer.org/docs/current/developer-docs/build/cdks/motoko-dfinity/motoko/)
-- [Motoko Language Quick Reference](https://internetcomputer.org/docs/current/references/motoko-ref/)
-- [JavaScript API Reference](https://erxue-5aaaa-aaaab-qaagq-cai.raw.icp0.io)
+## Getting Started
+1. **Installation:**
+   - Clone the repository: `git clone [repository URL]`.
+   - Install DFX, the development and deployment tool for the Internet Computer.
+   - Navigate to the project directory and initialize the project using `dfx init`.
+   - Install necessary dependencies as outlined in the project's `package.json`.
 
-If you want to start working on your project right away, you might want to try the following commands:
+2. **Configuration:**
+   - Configure `dfx.json` for your local and network settings.
+   - Set up environment variables for interacting with the ICP network and other services (e.g., API keys, network addresses).
+   - If interacting with EVM chains, configure the connection settings and smart contract addresses.
+   - Test the configuration by deploying a local version using `dfx deploy`.
 
-```bash
-cd send_http_get/
-dfx help
-dfx canister --help
-```
 
-## Running the project locally
+## How to Use
+- Detailed user guides are available in the repository for initiating and managing cross-chain transactions.
 
-If you want to test your project locally, you can use the following commands:
+## Contributing
+We encourage contributions to this project. Please adhere to the project's contribution guidelines for submitting code or suggestions.
 
-```bash
-# Starts the replica, running in the background
-dfx start --background
+## License
+This project is licensed under the [MIT License](LICENSE).
 
-# Deploys your canisters to the replica and generates your candid interface
-dfx deploy
-```
+## Support and Contact
+For questions, support, or feedback, please open an issue in the GitHub repository.
 
-Once the job completes, your application will be available at `http://localhost:4943?canisterId={asset_canister_id}`.
-
-If you have made changes to your backend canister, you can generate a new candid interface with
-
-```bash
-npm run generate
-```
-
-at any time. This is recommended before starting the frontend development server, and will be run automatically any time you run `dfx deploy`.
-
-If you are making frontend changes, you can start a development server with
-
-```bash
-npm start
-```
-
-Which will start a server at `http://localhost:8080`, proxying API requests to the replica at port 4943.
-
-### Note on frontend environment variables
-
-If you are hosting frontend code somewhere without using DFX, you may need to make one of the following adjustments to ensure your project does not fetch the root key in production:
-
-- set`DFX_NETWORK` to `ic` if you are using Webpack
-- use your own preferred method to replace `process.env.DFX_NETWORK` in the autogenerated declarations
-  - Setting `canisters -> {asset_canister_id} -> declarations -> env_override to a string` in `dfx.json` will replace `process.env.DFX_NETWORK` with the string in the autogenerated declarations
-- Write your own `createActor` constructor
+For a comprehensive understanding, visit the [ICP Canister Bridge GitHub Repository](https://github.com/Bitcoin-AI/icp-canister-bridge) and the [Devpost page](https://devpost.com/software/icp-canister-bridge).
