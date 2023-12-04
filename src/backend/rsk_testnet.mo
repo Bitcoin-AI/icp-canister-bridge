@@ -39,7 +39,7 @@ module {
 
   let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
-  public func swapFromLightningNetwork(derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapFromLightningNetwork(rpcUrl: Text,derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
@@ -69,20 +69,20 @@ module {
 
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rpcUrl, null, "post", transform);
     let parsedGasPrice = JSON.parse(responseGasPrice);
     let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
     //Estimating gas
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # contractAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
-    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload,rpcUrl, null, "post", transform);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
 
     //Getting nonce
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rpcUrl, null, "post", transform);
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await utils.getValue(parsedNonce, "result");
@@ -127,7 +127,7 @@ module {
           { name = "Accept"; value = "application/json" },
           { name = "Idempotency-Key"; value = AU.toText(value.1) },
         ];
-        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/payBlockchainTx", ?requestHeaders, "post", transform);
+        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, rpcUrl, ?requestHeaders, "post", transform);
         Debug.print("Tx response: " # sendTxResponse);
         return sendTxResponse;
 
@@ -230,7 +230,7 @@ module {
 
             switch (log) {
               case (#Object(logFields)) {
-                
+
                 let finalAddress = await utils.getFieldAsString(logFields, "address");
                 let data0x = await utils.getFieldAsString(logFields, "data");
                 let data = utils.subText(data0x, 3, data0x.size() -1);

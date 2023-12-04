@@ -24,6 +24,9 @@ const RSKLightningBridge = () => {
   const [nodeInfo,setNodeInfo] = useState();
   const [processing,setProcessing] = useState();
 
+  const [chains,setChains] = useState([]);
+  const [chain,setChain] = useState();
+
   const {
     netId,
     coinbase,
@@ -36,6 +39,13 @@ const RSKLightningBridge = () => {
     npub
   } = useNostr();
 
+
+  useEffect(() => {
+    fetch("https://chainid.network/chains.json").then(async response => {
+      setChains(await response.json());
+    });
+  }, []);
+
   // Effect hook for initializing the bridge
   useEffect(() => {
     if (netId === 31 && provider) {
@@ -43,6 +53,8 @@ const RSKLightningBridge = () => {
       setBridge(newBridge);
     }
   }, [netId, provider]);
+
+
   useEffect(() => {
     if (coinbase) {
       setEvmAddr(coinbase);
@@ -70,7 +82,7 @@ const RSKLightningBridge = () => {
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice payed, wait for service update address's balance in smart contract");
-        const invoiceCheckResp = await main.swapFromLightningNetwork(r_hashUrl,new Date().getTime().toString());
+        const invoiceCheckResp = await main.swapFromLightningNetwork(JSON.parse(chain).rpc,r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
       } else {
@@ -126,7 +138,7 @@ const RSKLightningBridge = () => {
     setProcessing(true);
     try {
       setMessage("Processing evm transaction ...")
-      const resp = await main.swapFromLightningNetwork(r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
+      const resp = await main.swapFromLightningNetwork(JSON.parse(chain).rpc,r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
       const parsed = JSON.parse(resp);
       setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>. Wait confirmation and claim RBTC</>);
     } catch (err) {
@@ -201,7 +213,7 @@ const RSKLightningBridge = () => {
     <div>
       {/* Content for Lightning to RSK */}
       <div className={styles.step}>
-        <p>Step 1: Request an invoice to swap to RSK</p>
+        <p>Step 1: Request an invoice to swap to EVM compatible chain</p>
         <label className={styles.label}>Amount (satoshi)</label>
         <input
           className={styles.input}
@@ -209,13 +221,41 @@ const RSKLightningBridge = () => {
           onChange={(ev) => setAmount(ev.target.value)}
           placeholder="Enter amount"
         />
-        <label className={styles.label}>RSK EVM Recipient Address</label>
+        <label className={styles.label}>EVM Recipient Address</label>
         <input
           className={styles.input}
           value={evm_address}
           onChange={(ev) => setEvmAddr(ev.target.value)}
           placeholder="Enter EVM address"
         />
+        <label className={styles.label}>Select Destiny Chain</label>
+        <select
+          className={styles.input}
+          type="select"
+          onChange={(ev) => setChain(ev.target.value)}
+        >
+        {
+          chains.map(item => {
+            return(<option value={JSON.stringify(
+              {
+                rpc: item.rpc.filter(rpcUrl => {
+                  if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
+                })[0],
+                chainId: item.chainId,
+                name: item.name
+              }
+            )}>{item.name}</option>)
+          })
+        }
+        </select>
+        {
+          chain &&
+          <>
+          <p>Bridging to {JSON.parse(chain).name}</p>
+          <p>RPC Url {JSON.parse(chain).rpc}</p>
+          </>
+
+        }
         {
         !processing ?
         <button className={styles.button} onClick={getInvoice}>Get Invoice!</button> :

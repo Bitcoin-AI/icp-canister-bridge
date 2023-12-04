@@ -56,7 +56,7 @@ actor {
     return invoiceResponse;
   };
 
-  public shared (msg) func swapFromLightningNetwork(payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapFromLightningNetwork(rpcUrl: Text,payment_hash : Text, timestamp : Text) : async Text {
 
     let keyName = "test_key_1";
     let principalId = msg.caller;
@@ -94,7 +94,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to Ethereum
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount, transform);
+    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(rpcUrl,derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount, transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
