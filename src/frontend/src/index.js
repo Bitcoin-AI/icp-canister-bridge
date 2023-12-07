@@ -73,6 +73,7 @@ const RSKLightningBridge = () => {
       setMessage("Getting invoice from service");
       const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address.replace("0x", ""),new Date().getTime().toString());
       setMessage(resp);
+      console.log(JSON.parse(resp))
       const invoice = JSON.parse(resp).payment_request;
       const base64PaymentHash = JSON.parse(resp).r_hash;
       setPaymentHash(base64PaymentHash);
@@ -81,7 +82,7 @@ const RSKLightningBridge = () => {
         await window.webln.enable();
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
-        setMessage("Invoice payed, wait for service update address's balance in smart contract");
+        setMessage("Invoice paid, wait for service update address's balance in smart contract");
         const invoiceCheckResp = await main.swapFromLightningNetwork(JSON.parse(chain).rpc,r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);

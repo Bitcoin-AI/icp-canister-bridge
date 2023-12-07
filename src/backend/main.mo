@@ -58,7 +58,7 @@ actor {
 
   public shared (msg) func swapFromLightningNetwork(rpcUrl: Text,payment_hash : Text, timestamp : Text) : async Text {
 
-    let keyName = "test_key_1";
+    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
@@ -116,7 +116,7 @@ actor {
   };
 
   public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "test_key_1";
+    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
@@ -135,7 +135,7 @@ actor {
   public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async Text {
     var result : Text = "No actions taken";
 
-    let keyName = "test_key_1";
+    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
