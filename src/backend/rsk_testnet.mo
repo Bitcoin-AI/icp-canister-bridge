@@ -37,12 +37,12 @@ module {
 
   //Create type called TransferEvent
 
-  type TransferEvent = {
-    sendingChain : Text;
-    recipientAddress : Text;
-    recipientChain : Text;
-    proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-  };
+  // type TransferEvent = {
+  //   sendingChain : Text;
+  //   recipientAddress : Text;
+  //   recipientChain : Text;
+  //   proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+  // };
 
   type JSONField = (Text, JSON.JSON);
 
@@ -50,7 +50,7 @@ module {
 
   // let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
-  public func swapFromLightningNetwork(transferEvent : TransferEvent, derivationPath : [Blob], keyName : Text, address : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text,  transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let recipientAddr = transferEvent.recipientAddress;
     let recipientChainId = transferEvent.recipientChain;
@@ -65,12 +65,11 @@ module {
     Debug.print("recipientChainId" # recipientChainId);
     Debug.print("sendingChainId" # sendingChainId);
 
-
     if (signerAddress == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
-      Debug.print("Canister Address: 0x" # address);
+      Debug.print("Canister Address: 0x" # signerAddress);
     };
 
     //We will check the transactionId on the sendingChain to see if he sent any money
@@ -86,17 +85,60 @@ module {
     let transactionAmount = await utils.getValue(parsedTransactionDetails, "amount");
 
     // Check if the recipient address and amount in the transaction match your criteria
-
     if (transactionProof == signerAddress) {
-
+      return await createAndSendTransaction(
+        derivationPath,
+        keyName,
+        signerAddress,
+        recipientAddr,
+        transactionAmount,
+        publicKey,
+        transform,
+      );
     } else {
       Debug.print("Transaction does not match the criteria");
       return "Not valid transaction";
     };
 
+  };
+
+  public func swapLN2EVM(derivationPath : [Blob], keyName : Text,  amount : Text, recipientAddr:Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    let signerAddress = utils.publicKeyToAddress(publicKey);
+
+    return await createAndSendTransaction(
+      derivationPath,
+      keyName,
+      signerAddress,
+      recipientAddr,
+      amount,
+      publicKey,
+      transform,
+    );
+
+  };
+
+  // public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
+
+  //   let ic : Types.IC = actor ("aaaaa-aa");
+
+  //   // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
+  //   let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7", "0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
+
+  //   let blockNumber : Text = "0x409492"; // We will filter after the contract creation
+
+  //   let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
+
+  //   let decodedText = await utils.httpRequest(?jsonRpcPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/getEvents", null, "post", transform);
+
+  //   let events = await handleLogs(decodedText);
+
+  //   return events;
+  // };
+
+  private func createAndSendTransaction(derivationPath : [Blob], keyName  : Text, signerAddress : Text, recipientAddr : Text, transactionAmount : Text, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
-
-
 
     // Now transactionAmount is a Nat and can be used in further calculations
 
@@ -183,24 +225,6 @@ module {
     };
 
   };
-
-  // public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
-
-  //   let ic : Types.IC = actor ("aaaaa-aa");
-
-  //   // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
-  //   let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7", "0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
-
-  //   let blockNumber : Text = "0x409492"; // We will filter after the contract creation
-
-  //   let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
-
-  //   let decodedText = await utils.httpRequest(?jsonRpcPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/getEvents", null, "post", transform);
-
-  //   let events = await handleLogs(decodedText);
-
-  //   return events;
-  // };
 
   private func encodeTopics(topics : [Text]) : Text {
     let joinedTopics = Array.foldLeft<Text, Text>(

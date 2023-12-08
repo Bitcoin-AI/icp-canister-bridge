@@ -57,7 +57,46 @@ actor {
     return invoiceResponse;
   };
 
-  public shared (msg) func swapToEVMChain(payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapEVM2EVM(transferEvent: Types.TransferEvent) : async Text {
+
+    let keyName = "test_key_1";
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+ 
+
+    let transactionId = transferEvent.proofTxId;
+
+    let isPaid = paidTransactions.get(transactionId);
+
+    let isPaidBoolean : Bool = switch (isPaid) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
+
+    if (isPaidBoolean) {
+      return "Transaction/ Invoice is already paid";
+    };
+
+    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
+    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent: Types.TransferEvent, derivationPath, keyName,  transform);
+
+    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
+
+    switch (isError) {
+      case ("") {
+        paidTransactions.put(transactionId, true);
+      };
+      case (errorValue) {
+        Debug.print("Could not pay invoice tx error: " # errorValue);
+      };
+    };
+
+    return sendTxResponse;
+  };
+
+
+    public shared (msg) func swapLN2EVM(payment_hash : Text, timestamp : Text) : async Text {
 
     let keyName = "test_key_1";
     let principalId = msg.caller;
@@ -95,7 +134,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount, transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), Nat.toText(amount), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -111,6 +150,9 @@ actor {
     return sendTxResponse;
   };
 
+
+
+
   public func decodePayReq(payment_request : Text, timestamp : Text) : async Text {
     let response = await lightning_testnet.decodePayReq(payment_request, timestamp, transform);
     return response;
@@ -124,16 +166,17 @@ actor {
     return address;
   };
 
-  public shared (msg) func getEvents() : async [Event] {
+  // public shared (msg) func getEvents() : async [Event] {
 
-    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
+  //   let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
 
-    return events;
+  //   return events;
 
-  };
+  // };
 
 
   // No longer used since we wont be using contracts
+
   //From RSK Blockchain to LightningNetwork
   // refactor this function to use fewer lines of code.
   // public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async Text {
