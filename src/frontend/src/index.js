@@ -83,7 +83,7 @@ const RSKLightningBridge = () => {
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice paid, wait for service update address's balance in smart contract");
-        const invoiceCheckResp = await main.swapFromLightningNetwork(JSON.parse(chain).rpc,r_hashUrl,new Date().getTime().toString());
+        const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
       } else {
@@ -139,7 +139,7 @@ const RSKLightningBridge = () => {
     setProcessing(true);
     try {
       setMessage("Processing evm transaction ...")
-      const resp = await main.swapFromLightningNetwork(JSON.parse(chain).rpc,r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
+      const resp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
       const parsed = JSON.parse(resp);
       setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>. Wait confirmation and claim RBTC</>);
     } catch (err) {
@@ -254,6 +254,7 @@ const RSKLightningBridge = () => {
           <>
           <p>Bridging to {JSON.parse(chain).name}</p>
           <p>RPC Url {JSON.parse(chain).rpc}</p>
+          <p>ChainId {JSON.parse(chain).chainId}</p>
           </>
 
         }
