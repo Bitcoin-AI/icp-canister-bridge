@@ -139,13 +139,17 @@ actor {
       };
       case (?invoiceId) {
         // invoiceId is not null and can be safely used
-        treatedRequest := Text.replace(invoiceId, #char 'E', "");
+        treatedRequest := invoiceId;
       };
     };
 
     try {
 
       let paymentRequest = utils.trim(treatedRequest);
+
+
+      // TODO:  check why this was not working before, or if it is working now 
+      
       // let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
       // let payReqResponse = JSON.parse(decodedPayReq);
       // let amountString = await utils.getValue(payReqResponse, "num_satoshis");
