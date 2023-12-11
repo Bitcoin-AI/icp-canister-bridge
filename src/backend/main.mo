@@ -194,7 +194,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId,derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), Nat.toText(amount), transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId,derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1),  transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 

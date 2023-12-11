@@ -224,6 +224,8 @@ module {
 
     let transactionAmount = await utils.getValue(parsedTransactionDetails, "amount");
 
+    let transactionNat =Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
     // Check if the recipient address and amount in the transaction match your criteria
     if (transactionProof == signerAddress) {
       return await createAndSendTransaction(
@@ -232,7 +234,7 @@ module {
         keyName,
         signerAddress,
         recipientAddr,
-        transactionAmount,
+        transactionNat,
         publicKey,
         transform,
       );
@@ -243,7 +245,7 @@ module {
 
   };
 
-  public func swapLN2EVM(hexChainId: Text,derivationPath : [Blob], keyName : Text,  amount : Text, recipientAddr:Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapLN2EVM(hexChainId: Text,derivationPath : [Blob], keyName : Text,  amount : Nat, recipientAddr:Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let signerAddress = utils.publicKeyToAddress(publicKey);
@@ -262,7 +264,7 @@ module {
   };
 
 
-  private func createAndSendTransaction(hexChainId: Text,derivationPath : [Blob], keyName  : Text, signerAddress : Text, recipientAddr : Text, transactionAmount : Text, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  private func createAndSendTransaction(hexChainId: Text,derivationPath : [Blob], keyName  : Text, signerAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
@@ -306,7 +308,7 @@ module {
       gasPrice = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
-      value = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+      value = transactionAmount;
       data = "0x00";
       chainId = chainId;
       v = "0x00";
