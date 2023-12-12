@@ -205,12 +205,30 @@ actor {
     return result;
   };
 
-  public shared (msg) func swapLN2EVM(payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapLN2EVM(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
     let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
+
+    let payment_hash = transferEvent.invoiceId;
+
+    var paymentHash : Text = "";
+
+    switch (payment_hash) {
+      case (null) {
+        // Handle the case where invoiceId is null
+        // You can assign a default value or handle it as per your logic
+        paymentHash := "";
+        return "No Invoice Id declared";
+      };
+      case (?invoiceId) {
+        // invoiceId is not null and can be safely used
+        paymentHash := invoiceId;
+      };
+    };
+
+    let paymentCheckResponse = await lightning_testnet.checkInvoice(paymentHash, timestamp, transform);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
@@ -243,7 +261,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, transferEvent , transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 

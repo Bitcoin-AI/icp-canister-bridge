@@ -93,6 +93,7 @@ module {
         keyName,
         signerAddress,
         recipientAddr,
+        recipientChainId,
         transactionNat,
         publicKey,
         transform,
@@ -104,16 +105,21 @@ module {
 
   };
 
-  public func swapLN2EVM(derivationPath : [Blob], keyName : Text,  amount : Nat, recipientAddr:Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapLN2EVM(derivationPath : [Blob], keyName : Text,  amount : Nat, transferEvent: Types.TransferEvent, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let signerAddress = utils.publicKeyToAddress(publicKey);
+
+    let recipientAddr = transferEvent.recipientAddress;
+    let chainId = transferEvent.recipientChain;
+
 
     return await createAndSendTransaction(
       derivationPath,
       keyName,
       signerAddress,
       recipientAddr,
+      chainId,
       amount,
       publicKey,
       transform,
@@ -139,7 +145,7 @@ module {
   //   return events;
   // };
 
-  private func createAndSendTransaction( derivationPath : [Blob], keyName : Text, signerAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  private func createAndSendTransaction( derivationPath : [Blob], keyName : Text, signerAddress : Text, recipientAddr : Text, recipientChainId: Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
@@ -175,7 +181,7 @@ module {
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await utils.getValue(parsedNonce, "result");
 
-    let chainId = utils.hexStringToNat64("0x1f");
+    let chainId = utils.hexStringToNat64(recipientChainId);
 
     // Transaction details
     let transaction = {
