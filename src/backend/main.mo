@@ -8,6 +8,7 @@ import Array "mo:base/Array";
 import Nat "mo:base/Nat";
 import Error "mo:base/Error";
 import Nat64 "mo:base/Nat64";
+import Blob "mo:base/Blob";
 import JSON "mo:json/JSON";
 import Text "mo:base-0.7.3/Text";
 import Debug "mo:base-0.7.3/Debug";
@@ -15,6 +16,7 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 
 import HU "mo:evm-tx/utils/HashUtils";
+import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import Types "Types";
 
 actor {
@@ -101,6 +103,10 @@ actor {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    let signerAddress = utils.publicKeyToAddress(publicKey);
+
     let transactionId = transferEvent.proofTxId;
 
     let isPaid = paidTransactions.get(transactionId);
@@ -126,6 +132,13 @@ actor {
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
+    if (transactionProof == signerAddress) {
+
+    } else {
+      Debug.print("Transaction does not match the criteria");
+      return "Not valid transaction";
+    };
+
     var result : Text = "";
 
     let invoiceIdOpt = transferEvent.invoiceId;
@@ -147,9 +160,8 @@ actor {
 
       let paymentRequest = utils.trim(treatedRequest);
 
+      // TODO:  check why this was not working before, or if it is working now
 
-      // TODO:  check why this was not working before, or if it is working now 
-      
       // let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
       // let payReqResponse = JSON.parse(decodedPayReq);
       // let amountString = await utils.getValue(payReqResponse, "num_satoshis");
@@ -231,7 +243,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1),  transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
