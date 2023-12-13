@@ -83,7 +83,6 @@ const RSKLightningBridge = () => {
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice paid, wait for service send evm transaction ...");
-        alert(ethers.toBeHex(JSON.parse(chain).chainId))
         const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
