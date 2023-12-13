@@ -21,6 +21,11 @@ import Types "Types";
 
 actor {
 
+  let keyName = "dfx_test_key"; // this is for local network
+
+      // let keyName = "test_key_1";    This is for IC network 
+
+
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
       status = raw.response.status;
@@ -62,7 +67,6 @@ actor {
 
   public shared (msg) func swapEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
 
-    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
@@ -99,7 +103,6 @@ actor {
 
   public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
-    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
@@ -121,14 +124,15 @@ actor {
       return "Transaction/ Invoice is already paid";
     };
 
-    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
+    
+    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\",  \"method\": \"eth_getTransactionByHash\" , \"params\": [\"" # transactionId # "\"] }";
     let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
 
     // Not sure if it is to here
     let transactionProof = await utils.getValue(parsedTransactionDetails, "to");
 
-    let transactionAmount = await utils.getValue(parsedTransactionDetails, "amount");
+    let transactionAmount = await utils.getValue(parsedTransactionDetails, "value");
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
@@ -207,7 +211,6 @@ actor {
 
   public shared (msg) func swapLN2EVM(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
-    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
@@ -261,7 +264,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, transferEvent , transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(derivationPath, keyName, amount, transferEvent, transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -283,7 +286,6 @@ actor {
   };
 
   public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "test_key_1";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
