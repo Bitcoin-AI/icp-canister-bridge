@@ -82,7 +82,8 @@ const RSKLightningBridge = () => {
         await window.webln.enable();
         setMessage("Pay invoice");
         const result = await window.webln.sendPayment(invoice);
-        setMessage("Invoice paid, wait for service update address's balance in smart contract");
+        setMessage("Invoice paid, wait for service send evm transaction ...");
+        alert(ethers.toBeHex(JSON.parse(chain).chainId))
         const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
         console.log(invoiceCheckResp);
         setMessage(invoiceCheckResp);
@@ -253,7 +254,6 @@ const RSKLightningBridge = () => {
           chain &&
           <>
           <p>Bridging to {JSON.parse(chain).name}</p>
-          <p>RPC Url {JSON.parse(chain).rpc}</p>
           <p>ChainId {JSON.parse(chain).chainId}</p>
           </>
 
