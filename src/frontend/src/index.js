@@ -101,6 +101,7 @@ const RSKLightningBridge = () => {
     try {
       let resp;
       let paymentRequest;
+      const canisterAddr = await main.getEvmAddr();
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
         setMessage("Preparing invoice");
@@ -118,14 +119,28 @@ const RSKLightningBridge = () => {
 
       const bridgeWithSigner = bridge.connect(signer);
       setMessage(`Storing invoice in smart contract`);
-      const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
+      //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
+      const tx = await igner.sendTransaction({
+          to: `0x${canisterAddr}`,
+          value: ethers.utils.parseEther(amount/10**10)
+      });
       console.log("Transaction sent:", tx.hash);
       setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
       // Wait for the transaction to be mined
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a> calling service to pay invoice</>);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
-      resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+      //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+      resp = await main.EVM2LN(
+        {
+          proofTxId: tx.hash,
+          invoiceId: paymentRequest,
+          sendingChain: null,
+          recipientChain: chainId,
+          recipientAddress: `0x${canisterAddr}`
+        },
+        new Date().getTime().toString()
+      );
       setMessage("Service processing lightning payment");
       setTimeout(() => {
         setMessage()
