@@ -72,9 +72,6 @@ module {
 
     //We will check the transactionId on the sendingChain to see if he sent any money
 
-
-
-
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
@@ -91,25 +88,20 @@ module {
 
     Debug.print("result" # result);
 
-
     let transactionProof = await utils.getValue(resultJson, "to");
 
     let transactionProofClean = utils.subText(transactionProof, 1, transactionProof.size() - 1);
 
-
     Debug.print("TO" # transactionProofClean);
-
 
     let transactionAmount = await utils.getValue(resultJson, "value");
 
-
     Debug.print("transactionAmount" # transactionAmount);
-
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
     // Check if the recipient address and amount in the transaction match your criteria
-    if (transactionProofClean == "0x"#signerAddress) {
+    if (transactionProofClean == "0x" #signerAddress) {
       return await createAndSendTransaction(
         derivationPath,
         keyName,
@@ -182,25 +174,37 @@ module {
 
     // let data = "0x" # method_id # address_64 # amount_64;
 
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = recipientChainId },
+    ];
+
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedGasPrice = JSON.parse(responseGasPrice);
     let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
+    Debug.print("gasPrice" # gasPrice);
+
     //Estimating gas
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # "0x00" # "\" }] }";
-    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
+
+    Debug.print("gas" # gas);
 
     //Getting nonce
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await utils.getValue(parsedNonce, "result");
+
+    Debug.print("nonce" # nonce);
 
     let chainId = utils.hexStringToNat64(recipientChainId);
 
@@ -241,6 +245,8 @@ module {
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "Idempotency-Key"; value = AU.toText(value.1) },
+          { name = "chain-id"; value = recipientChainId },
+
         ];
         let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/payBlockchainTx", ?requestHeaders, "post", transform);
         Debug.print("Tx response: " # sendTxResponse);

@@ -23,8 +23,7 @@ actor {
 
   let keyName = "dfx_test_key"; // this is for local network
 
-      // let keyName = "test_key_1";    This is for IC network 
-
+  // let keyName = "test_key_1";    This is for IC network
 
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
@@ -124,7 +123,6 @@ actor {
       return "Transaction/ Invoice is already paid";
     };
 
-    
     let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\",  \"method\": \"eth_getTransactionByHash\" , \"params\": [\"" # transactionId # "\"] }";
     let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
