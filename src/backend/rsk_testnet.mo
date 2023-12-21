@@ -35,18 +35,7 @@ module {
     amount : Nat;
   };
 
-  //Create type called TransferEvent
-
-  // type TransferEvent = {
-  //   sendingChain : Text;
-  //   recipientAddress : Text;
-  //   recipientChain : Text;
-  //   proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-  // };
-
   type JSONField = (Text, JSON.JSON);
-
-  // let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
   public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
@@ -158,6 +147,36 @@ module {
   //   return events;
   // };
 
+  private func checkEIP11559(chainId : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+
+    let gasPricePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
+
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = chainId },
+    ];
+
+    // Check for baseFeePerGas in the latest block
+    let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", true] }";
+    let responseGasPrice : Text = await utils.httpRequest(?blockPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let parsedBlock = JSON.parse(responseGasPrice);
+
+    // Check if 'baseFeePerGas' field is present
+    let baseFeePerGas = await utils.getValue(parsedBlock, "baseFeePerGas");
+
+    switch (baseFeePerGas) {
+      case ("") {
+        Debug.print("baseFeePerGas not found Not EIP1159");
+        return false;
+      };
+      case (baseFeePerGas) {
+        Debug.print("baseFeePerGas found EIP1159");
+        return true;
+      };
+    };
+  };
+
   private func createAndSendTransaction(derivationPath : [Blob], keyName : Text, signerAddress : Text, recipientAddr : Text, recipientChainId : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
@@ -174,11 +193,27 @@ module {
 
     // let data = "0x" # method_id # address_64 # amount_64;
 
+    let varEIP1159 = await checkEIP11559(recipientChainId, transform);
+
+    // if true .. etc
+
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "chain-id"; value = recipientChainId },
     ];
+
+    // Fetching maxPriorityFeePerGas for EIP-1559 transactions
+    let maxPriorityFeePerGas = if (varEIP1159) {
+      let priorityFeePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_maxPriorityFeePerGas\", \"params\": [] }";
+      let responsePriorityFee = await utils.httpRequest(?priorityFeePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+      let parsedPriorityFee = JSON.parse(responsePriorityFee);
+      await utils.getValue(parsedPriorityFee, "result");
+    } else {
+      "0x0"; // Default value for non-EIP-1559 chains
+    };
+
+    
 
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
@@ -208,15 +243,34 @@ module {
 
     let chainId = utils.hexStringToNat64(recipientChainId);
 
+    let emptyAccessList : [(Text, [Text])] = [];
+
     // Transaction details
-    let transaction = {
+    let transactionEIP1559 = {
+      // EIP-1559 transaction structure
+      nonce = utils.hexStringToNat64(nonce);
+      maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas); // You'll need to define how to calculate this
+      maxFeePerGas = utils.hexStringToNat64(gasPrice); // This should include the base fee + max priority fee
+      gasLimit = utils.hexStringToNat64(gas);
+      to = recipientAddr;
+      value = transactionAmount;
+      data = "0x00";
+      chainId = utils.hexStringToNat64(recipientChainId);
+      v = "0x00";
+      r = "0x00";
+      s = "0x00";
+      accessList = emptyAccessList; //No access list needed
+
+    };
+    let transactionLegacy = {
+      // Legacy transaction structure
       nonce = utils.hexStringToNat64(nonce);
       gasPrice = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
       value = transactionAmount;
       data = "0x00";
-      chainId = chainId;
+      chainId = utils.hexStringToNat64(recipientChainId);
       v = "0x00";
       r = "0x00";
       s = "0x00";
@@ -224,14 +278,30 @@ module {
 
     let ecCtx = Context.allocECMultContext(null);
 
-    let serializedTx = await* Transaction.signTx(
-      #Legacy(?transaction),
-      chainId,
-      keyName,
-      derivationPath,
-      publicKey,
-      ecCtx,
-      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
+    let serializedTx = await* (
+      if (varEIP1159) {
+        // If EIP1159 flag is true, use the EIP1159 variant
+        Transaction.signTx(
+          #EIP1559(?transactionEIP1559), // Ensure transaction has all EIP1159-specific fields
+          chainId,
+          keyName,
+          derivationPath,
+          publicKey,
+          ecCtx,
+          { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
+        );
+      } else {
+        // If EIP1159 flag is false, use the Legacy variant
+        Transaction.signTx(
+          #Legacy(?transactionLegacy), // Ensure transaction has all Legacy-specific fields
+          chainId,
+          keyName,
+          derivationPath,
+          publicKey,
+          ecCtx,
+          { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
+        );
+      }
     );
 
     switch (serializedTx) {
