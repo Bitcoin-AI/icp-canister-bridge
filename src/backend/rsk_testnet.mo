@@ -33,12 +33,6 @@ module {
     amount : Nat;
   };
 
-  type TransferEvent = {
-     sendingChain : Text;
-     recipientAddress : Text;
-     recipientChain : Text;
-     proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-  };
 
   type JSONField = (Text, JSON.JSON);
 
@@ -193,7 +187,7 @@ module {
     return events;
   };
 
-  public func swapEVM2EVM(hexChainId: Text,transferEvent : TransferEvent, derivationPath : [Blob], keyName : Text,  transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let recipientAddr = transferEvent.recipientAddress;
     let recipientChainId = transferEvent.recipientChain;
@@ -217,22 +211,38 @@ module {
 
     //We will check the transactionId on the sendingChain to see if he sent any money
 
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = transferEvent.sendingChain },
+    ];
+
     // Fetch transaction details using transactionId
     let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
-    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, API_URL # "/interactWithNode", null, "post", transform);
+    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
 
-    // Not sure if it is to here
-    let transactionProof = await utils.getValue(parsedTransactionDetails, "to");
+    let result = await utils.getValue(parsedTransactionDetails, "result");
+    let resultJson = JSON.parse(result);
 
-    let transactionAmount = await utils.getValue(parsedTransactionDetails, "amount");
+    Debug.print("result" # result);
 
-    let transactionNat =Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+    let transactionProof = await utils.getValue(resultJson, "to");
+
+    let transactionProofClean = utils.subText(transactionProof, 1, transactionProof.size() - 1);
+
+    Debug.print("TO" # transactionProofClean);
+
+    let transactionAmount = await utils.getValue(resultJson, "value");
+
+    Debug.print("transactionAmount" # transactionAmount);
+
+    let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
     // Check if the recipient address and amount in the transaction match your criteria
-    if (transactionProof == signerAddress) {
+    if (transactionProofClean == "0x" #signerAddress) {
       return await createAndSendTransaction(
-        "0x000", //to test later
+        recipientChainId,
         derivationPath,
         keyName,
         signerAddress,
@@ -243,7 +253,7 @@ module {
       );
     } else {
       Debug.print("Transaction does not match the criteria");
-      return "Not valid transaction";
+      throw Error.reject("Error: Not valid transaction");
     };
 
   };

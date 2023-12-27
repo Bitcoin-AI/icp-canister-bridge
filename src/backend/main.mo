@@ -22,6 +22,10 @@ import Types "Types";
 
 actor {
 
+  let keyName = "dfx_test_key"; // this is for local network
+
+  // let keyName = "test_key_1";    This is for IC network
+
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
       status = raw.response.status;
@@ -63,7 +67,6 @@ actor {
   /*
   public shared (msg) func swapFromLightningNetwork(hexChainId:Text,rpcUrl: Text,wbtcAddress:Text,payment_hash : Text, timestamp : Text) : async Text {
 
-    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
@@ -115,54 +118,10 @@ actor {
     return sendTxResponse;
   };
   */
-  type TransferEvent = {
-     sendingChain : Text;
-     recipientAddress : Text;
-     recipientChain : Text;
-     proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-  };
-  public shared (msg) func swapEVM2EVM(hexChainId: Text,transferEvent: TransferEvent) : async Text {
-
-    let keyName = "dfx_test_key";
-    let principalId = msg.caller;
-    let derivationPath = [Principal.toBlob(principalId)];
-
-
-    let transactionId = transferEvent.proofTxId;
-
-    let isPaid = paidTransactions.get(transactionId);
-
-    let isPaidBoolean : Bool = switch (isPaid) {
-      case (null) { false };
-      case (?true) { true };
-      case (?false) { false };
-    };
-
-    if (isPaidBoolean) {
-      return "Transaction/ Invoice is already paid";
-    };
-
-    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(hexChainId,transferEvent, derivationPath, keyName,  transform);
-
-    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
-
-    switch (isError) {
-      case ("") {
-        paidTransactions.put(transactionId, true);
-      };
-      case (errorValue) {
-        Debug.print("Could not pay invoice tx error: " # errorValue);
-      };
-    };
-
-    return sendTxResponse;
-  };
 
 
   public shared (msg) func swapLN2EVM(hexChainId: Text,payment_hash : Text, timestamp : Text) : async Text {
 
-    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
@@ -221,113 +180,50 @@ actor {
   };
 
   public shared (msg) func getEvmAddr() : async Text {
-    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
     return address;
   };
 
-  public shared (msg) func getEvents() : async [Event] {
+  public shared (msg) func swapEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
 
-    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
-
-    return events;
-
-  };
-
-  //From RSK Blockchain to LightningNetwork
-  public shared (msg) func payInvoicesAccordingToEvents(timestamp : Text) : async Text {
-    var result : Text = "No actions taken";
-
-    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let events : [Event] = await RSK_testnet_mo.readRSKSmartContractEvents(transform);
 
-    ignore Array.tabulate<Event>(
-      Array.size(events),
-      func(index : Nat) : Event {
-        let event = events[index];
-        let { address; amount } = event;
-        switch (paidInvoicestoLN.get(address)) {
-          case (null) {
-            paidInvoicestoLN.put(address, (false, amount));
-          };
-          case (?(isPaid, existingAmount)) {
-            //Do nothing
-          };
-        };
-        return event;
-      },
-    );
+    let transactionId = transferEvent.proofTxId;
 
-    let unpaidInvoices = HashMap.mapFilter<Text, (Bool, Nat), (Bool, Nat)>(
-      paidInvoicestoLN,
-      Text.equal,
-      Text.hash,
-      func(key : Text, value : (Bool, Nat)) : ?(Bool, Nat) {
-        let (isPaid, amount) = value;
-        if (not isPaid) {
-          return ?(isPaid, amount);
-        };
-        return null;
-      },
-    );
+    let isPaid = paidTransactions.get(transactionId);
 
-    let entries = unpaidInvoices.entries();
-    for ((invoiceId, (isPaid, amount)) in entries) {
-      try {
-        let treatedRequest = Text.replace(invoiceId, #char 'E', "");
-        let paymentRequest = utils.trim(treatedRequest);
-        // let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
-        // let payReqResponse = JSON.parse(decodedPayReq);
-        // let amountString = await utils.getValue(payReqResponse, "num_satoshis");
-        // let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-        let amountCheckedOpt : ?Nat = Nat.fromText("100" # "0000000000");
+    let isPaidBoolean : Bool = switch (isPaid) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
 
-        switch (amountCheckedOpt) {
-          case (null) {
-            paidInvoicestoLN.put(invoiceId, (true, amount));
-            result := "Failed to convert amountChecked to Nat. Skipping invoice.";
-          };
-          case (?amountChecked) {
-            if (amountChecked > amountChecked) {
-              paidInvoicestoLN.put(invoiceId, (true, amount));
-              result := "Amount mismatch. Marking as paid to skip.";
-            } else {
-              let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
-              let paymentResultJson = JSON.parse(paymentResult);
-              let errorField = await utils.getValue(paymentResultJson, "error");
-              let resultField = await utils.getValue(paymentResultJson, "result");
-              let statusField = await utils.getValue(JSON.parse(resultField), "status");
+    if (isPaidBoolean) {
+      return "Transaction/ Invoice is already paid";
+    };
 
-              if (errorField == "" and statusField == "SUCCEEDED") {
-                paidInvoicestoLN.put(invoiceId, (true, amount));
-                result := "Payment Result: Successful";
-              } else {
-                // For now just skip any error
-                paidInvoicestoLN.put(invoiceId, (true, amount));
-                result := "Payment Result: Failed";
-              };
-            };
-          };
-        };
-      } catch (e : Error.Error) {
-        // For now just skip any error
-        paidInvoicestoLN.put(invoiceId, (true, amount));
+    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
+    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
 
-        result := "Caught exception: " # Error.message(e);
+    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
+
+    switch (isError) {
+      case ("") {
+        paidTransactions.put(transactionId, true);
+      };
+      case (errorValue) {
+        Debug.print("Could not pay invoice tx error: " # errorValue);
       };
     };
 
-    return result;
+    return sendTxResponse;
   };
-
 
   public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
-    let keyName = "dfx_test_key";
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 

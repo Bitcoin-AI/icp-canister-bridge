@@ -114,7 +114,7 @@ module {
                 JSON.show(value);
             };
             case _ {
-                "Unknown";
+                "";
             };
         };
     };

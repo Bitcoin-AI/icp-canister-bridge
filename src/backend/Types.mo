@@ -67,10 +67,10 @@ module Types {
     };
 
     public type TransferEvent = {
-      sendingChain : Text;
-      recipientAddress : Text;
-      recipientChain : Text;
-      proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-      invoiceId: ?Text; // Optional only For LN cases
-  };
+        sendingChain : Text;
+        recipientAddress : Text;
+        recipientChain : Text;
+        proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+        invoiceId: ?Text; // Optional only For LN cases
+    };
 };
