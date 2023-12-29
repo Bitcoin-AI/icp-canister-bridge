@@ -354,7 +354,7 @@ module {
           { name = "Idempotency-Key"; value = AU.toText(value.1) },
           { name = "chain-id"; value = hexChainId },
         ];
-        let request_body_json : Text = "{ \"chainId\" : \"" # hexChainId # "\",\"sendTxPayload\" : " # sendTxPayload # "  }";
+        let request_body_json : Text = sendTxPayload;
         Debug.print("Body "#request_body_json);
 
         let sendTxResponse : Text = await utils.httpRequest(?request_body_json, API_URL#"/payBlockchainTx", ?requestHeaders, "post", transform);
