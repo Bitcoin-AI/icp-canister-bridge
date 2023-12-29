@@ -82,7 +82,7 @@ const RSKLightningBridge = () => {
       const r_hashUrl = base64PaymentHash.replace(/\+/g, '-').replace(/\//g, '_');
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
-        setMessage("Pay invoice");
+        setMessage(`Pay invoice ${invoice}`);
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice paid, wait for service send evm transaction ...");
         const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
@@ -168,7 +168,6 @@ const RSKLightningBridge = () => {
       setMessage(`Storing invoice in smart contract`);
       //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
       // Change for wbtc or rsk transaction based on ChainId
-      alert(amount)
       const tx = await signer.sendTransaction({
           to: `0x${canisterAddr}`,
           value: ethers.parseUnits(amount.toString(),10)
@@ -198,34 +197,35 @@ const RSKLightningBridge = () => {
     try {
       let resp;
       let paymentRequest;
+      const transaction = await provider.getTransaction(evm_txHash);
+      if(!transaction){
+        setMessage(`No transaction found`);
+        setTimeout(() => {
+          setMessage();
+        },5000);
+        return;
+      }
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
         setMessage("Preparing invoice");
-        const transaction = await provider.getTransaction(evm_txHash);
-        if(!transaction){
-          setMessage(`No transaction found`);
-          setTimeout(() => {
-            setMessage();
-          },5000);
-          return;
-        }
+
         const sats = Number(transaction.value)/10**10;
         const invoice = await webln.makeInvoice({
           amount: sats,
           defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
         });
-        setMessage(`Invoice: ${invoice.paymentRequest}`);
+        setMessage(`Sending invoice ${invoice.paymentRequest}`);
         paymentRequest = invoice.paymentRequest
       } else {
         paymentRequest = userInvoice;
       }
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      resp = await main.EVM2LN(
+      resp = await main.swapEVM2LN(
         {
-          proofTxId: evm_txHash.hash,
+          proofTxId: transaction.hash,
           invoiceId: paymentRequest,
-          sendingChain: null,
+          sendingChain: ethers.toBeHex(netId),
           recipientChain: ethers.toBeHex(netId),
           recipientAddress: `0x${canisterAddr}`
         },

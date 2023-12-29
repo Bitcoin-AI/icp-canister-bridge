@@ -186,41 +186,7 @@ actor {
     return address;
   };
 
-  public shared (msg) func swapEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
 
-    let principalId = msg.caller;
-    let derivationPath = [Principal.toBlob(principalId)];
-
-    let transactionId = transferEvent.proofTxId;
-
-    let isPaid = paidTransactions.get(transactionId);
-
-    let isPaidBoolean : Bool = switch (isPaid) {
-      case (null) { false };
-      case (?true) { true };
-      case (?false) { false };
-    };
-
-    if (isPaidBoolean) {
-      return "Transaction/ Invoice is already paid";
-    };
-
-    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
-
-    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
-
-    switch (isError) {
-      case ("") {
-        paidTransactions.put(transactionId, true);
-      };
-      case (errorValue) {
-        Debug.print("Could not pay invoice tx error: " # errorValue);
-      };
-    };
-
-    return sendTxResponse;
-  };
 
   public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
@@ -244,9 +210,13 @@ actor {
     if (isPaidBoolean) {
       return "Transaction/ Invoice is already paid";
     };
-
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = transferEvent.sendingChain },
+    ];
     let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
-    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
     let txResult = await utils.getValue(parsedTransactionDetails, "result");
     // Not sure if it is to here
@@ -266,24 +236,12 @@ actor {
 
     var result : Text = "";
 
-    let invoiceIdOpt = transferEvent.invoiceId;
-    var treatedRequest : Text = "";
+    let invoiceId = transferEvent.invoiceId;
 
-    switch (invoiceIdOpt) {
-      case (null) {
-        // Handle the case where invoiceId is null
-        // You can assign a default value or handle it as per your logic
-        treatedRequest := ""; // Example: default to an empty string if invoiceId is null
-      };
-      case (?invoiceId) {
-        // invoiceId is not null and can be safely used
-        treatedRequest := invoiceId;
-      };
-    };
 
     try {
 
-      let paymentRequest = utils.trim(treatedRequest);
+      let paymentRequest = utils.trim(invoiceId);
 
       // TODO:  check why this was not working before, or if it is working now
       Debug.print(paymentRequest);
@@ -296,12 +254,12 @@ actor {
       let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
       switch (amountCheckedOpt) {
         case (null) {
-          paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+          paidInvoicestoLN.put(invoiceId, (true, transactionNat));
           result := "Failed to convert amountChecked to Nat. Skipping invoice.";
         };
         case (?amountChecked) {
           if (amountChecked > amountChecked) {
-            paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+            paidInvoicestoLN.put(invoiceId, (true, transactionNat));
             result := "Amount mismatch. Marking as paid to skip.";
           } else {
             let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
@@ -310,12 +268,12 @@ actor {
             let resultField = await utils.getValue(paymentResultJson, "result");
             let statusField = await utils.getValue(JSON.parse(resultField), "status");
 
-            if (errorField == "" and statusField == "SUCCEEDED") {
-              paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+            if (statusField == "SUCCEEDED") {
+              paidInvoicestoLN.put(invoiceId, (true, transactionNat));
               result := "Payment Result: Successful";
             } else {
               // For now just skip any error
-              paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+              paidInvoicestoLN.put(invoiceId, (true, transactionNat));
               result := "Payment Result: Failed";
             };
           };
@@ -323,7 +281,7 @@ actor {
       };
     } catch (e : Error.Error) {
       // For now just skip any error
-      paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+      paidInvoicestoLN.put(invoiceId, (true, transactionNat));
 
       result := "Caught exception: " # Error.message(e);
     };
