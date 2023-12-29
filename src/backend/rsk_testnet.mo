@@ -158,7 +158,7 @@ module {
     ];
 
     // Check for baseFeePerGas in the latest block
-    let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", true] }";
+    let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", false] }";
     let responseGasPrice : Text = await utils.httpRequest(?blockPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedBlock = JSON.parse(responseGasPrice);
 
@@ -206,26 +206,33 @@ module {
     // Fetching maxPriorityFeePerGas for EIP-1559 transactions
     let maxPriorityFeePerGas = if (varEIP1159) {
       let priorityFeePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_maxPriorityFeePerGas\", \"params\": [] }";
+
       let responsePriorityFee = await utils.httpRequest(?priorityFeePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+      Debug.print("responsePriorityFee" # responsePriorityFee);
+
       let parsedPriorityFee = JSON.parse(responsePriorityFee);
       await utils.getValue(parsedPriorityFee, "result");
     } else {
       "0x0"; // Default value for non-EIP-1559 chains
     };
 
-    
+    Debug.print("maxPriorityFeePerGas" # maxPriorityFeePerGas);
 
     //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
     let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+
     let parsedGasPrice = JSON.parse(responseGasPrice);
+
     let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
     Debug.print("gasPrice" # gasPrice);
 
-    //Estimating gas
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # "0x00" # "\" }] }";
+    // //Estimating gas 21000
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": \"0x00\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    Debug.print("responseGas" # responseGas);
+
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
 
@@ -233,8 +240,10 @@ module {
 
     //Getting nonce
 
-    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
+    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # signerAddress # "\", \"latest\"] }";
     let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+
+    Debug.print("responseNoncepayLoad" # responseNoncepayLoad);
 
     let parsedNonce = JSON.parse(responseNoncepayLoad);
     let nonce = await utils.getValue(parsedNonce, "result");
@@ -249,8 +258,8 @@ module {
     let transactionEIP1559 = {
       // EIP-1559 transaction structure
       nonce = utils.hexStringToNat64(nonce);
-      maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas); // You'll need to define how to calculate this
-      maxFeePerGas = utils.hexStringToNat64(gasPrice); // This should include the base fee + max priority fee
+      maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas);
+      maxFeePerGas = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
       value = transactionAmount;
@@ -259,11 +268,11 @@ module {
       v = "0x00";
       r = "0x00";
       s = "0x00";
-      accessList = emptyAccessList; //No access list needed
+      accessList = emptyAccessList;
 
     };
+
     let transactionLegacy = {
-      // Legacy transaction structure
       nonce = utils.hexStringToNat64(nonce);
       gasPrice = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
@@ -280,9 +289,8 @@ module {
 
     let serializedTx = await* (
       if (varEIP1159) {
-        // If EIP1159 flag is true, use the EIP1159 variant
         Transaction.signTx(
-          #EIP1559(?transactionEIP1559), // Ensure transaction has all EIP1159-specific fields
+          #EIP1559(?transactionEIP1559),
           chainId,
           keyName,
           derivationPath,
@@ -291,9 +299,8 @@ module {
           { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
         );
       } else {
-        // If EIP1159 flag is false, use the Legacy variant
         Transaction.signTx(
-          #Legacy(?transactionLegacy), // Ensure transaction has all Legacy-specific fields
+          #Legacy(?transactionLegacy),
           chainId,
           keyName,
           derivationPath,
