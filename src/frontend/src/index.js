@@ -48,20 +48,13 @@ const RSKLightningBridge = () => {
     });
   }, []);
 
-  // Effect hook for initializing the bridge
-  useEffect(() => {
-    if (netId === 31 && provider) {
-      const newBridge = new ethers.Contract(addresses.bridge.testnet, abis.bridge, provider);
-      setBridge(newBridge);
-    }
-  }, [netId, provider]);
-
 
   useEffect(() => {
     if (coinbase) {
       setEvmAddr(coinbase);
     }
-  }, [coinbase])
+  }, [coinbase]);
+
 
   const base64UrlEncode = (input) => {
     let base64 = Buffer.from(input, 'hex').toString('base64');
@@ -98,174 +91,105 @@ const RSKLightningBridge = () => {
     setProcessing(false);
 
   }
-  const sendInvoiceAndRBTC = async () => {
-    setProcessing(true);
-    try {
-      let resp;
-      let paymentRequest;
-      const canisterAddr = await main.getEvmAddr();
-      if (typeof window.webln !== 'undefined') {
-        await window.webln.enable();
-        setMessage("Preparing invoice");
-        const invoice = await webln.makeInvoice({
-          amount: amount,
-          defaultMemo: memo
-        });
-        setMessage(`Invoice: ${invoice.paymentRequest}`);
-        paymentRequest = invoice.paymentRequest
-      } else {
-        paymentRequest = userInvoice;
-      }
-      // Send the transaction
-      if(!provider){
-        await loadWeb3Modal();
-      }
-      const signer = await provider.getSigner();
 
-      const bridgeWithSigner = bridge.connect(signer);
-      setMessage(`Storing invoice in smart contract`);
-      //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
-      const tx = await igner.sendTransaction({
-          to: `0x${canisterAddr}`,
-          value: ethers.parseEther(amount/10**10)
-      });
-      console.log("Transaction sent:", tx.hash);
-      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
-      // Wait for the transaction to be mined
-      await tx.wait();
-      setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a> calling service to pay invoice</>);
-      // Do eth tx and then call main.payInvoicesAccordingToEvents();
-      //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      resp = await main.EVM2LN(
-        {
-          proofTxId: tx.hash,
-          invoiceId: paymentRequest,
-          sendingChain: null,
-          recipientChain: ethers.toBeHex(netId),
-          recipientAddress: `0x${canisterAddr}`
-        },
-        new Date().getTime().toString()
-      );
-      setMessage("Service processing lightning payment");
-      setTimeout(() => {
-        setMessage()
-      },5000);
-    } catch (err) {
-      setMessage(err.message);
-    }
-    setProcessing(false);
-  };
-
-  const sendToken = async () => {
-    try{
-      // Send the transaction
-      if(!provider){
-        await loadWeb3Modal();
-      }
-      const signer = await provider.getSigner();
-
-      const bridgeWithSigner = bridge.connect(signer);
-      setMessage(`Storing invoice in smart contract`);
-      //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
-      // Change for wbtc or rsk transaction based on ChainId
-      const tx = await signer.sendTransaction({
-          to: `0x${canisterAddr}`,
-          value: ethers.parseUnits(amount.toString(),10)
-      });
-      console.log("Transaction sent:", tx.hash);
-      // Use explorers based on chainlist
-      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
-      // Wait for the transaction to be mined
-      await tx.wait();
-      setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
-      setEvmTxHash(tx.hash);
-
-      setTimeout(() => {
-        setMessage()
-      },5000);
-    } catch(err){
-      console.log(err)
-      setMessage(err.message);
-      setTimeout(() => {
-        setMessage()
-      },5000);
-    }
-  }
-
-  const sendInvoiceAndTxHash = async () => {
-    setProcessing(true);
-    try {
-      let resp;
-      let paymentRequest;
-      const transaction = await provider.getTransaction(evm_txHash);
-      if(!transaction){
-        setMessage(`No transaction found`);
-        setTimeout(() => {
-          setMessage();
-        },5000);
-        return;
-      }
-      if (typeof window.webln !== 'undefined') {
-        await window.webln.enable();
-        setMessage("Preparing invoice");
-
-        const sats = Number(transaction.value)/10**10;
-        const invoice = await webln.makeInvoice({
-          amount: sats,
-          defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
-        });
-        setMessage(`Sending invoice ${invoice.paymentRequest}`);
-        paymentRequest = invoice.paymentRequest
-      } else {
-        paymentRequest = userInvoice;
-      }
-      // Do eth tx and then call main.payInvoicesAccordingToEvents();
-      //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      resp = await main.swapEVM2LN(
-        {
-          proofTxId: transaction.hash,
-          invoiceId: paymentRequest,
-          sendingChain: ethers.toBeHex(netId),
-          recipientChain: ethers.toBeHex(netId),
-          recipientAddress: `0x${canisterAddr}`
-        },
-        new Date().getTime().toString()
-      );
-      setMessage("Service processing lightning payment");
-      setTimeout(() => {
-        setMessage()
-      },5000);
-    } catch (err) {
-      setMessage(err.message);
-    }
-    setProcessing(false);
-  };
   const checkInvoice = async () => {
     setProcessing(true);
     try {
       setMessage("Processing evm transaction ...")
       const resp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
-      const parsed = JSON.parse(resp);
-      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${parsed.result}`} target="_blank">{tx.hash}</a>. Wait confirmation and claim RBTC</>);
+      //const parsed = JSON.parse(resp);
+      setMessage(resp);
     } catch (err) {
       setMessage(`${err.message}`)
     }
     setProcessing(false);
   }
 
-  const claimRBTC = useCallback(async () => {
-    if (provider && bridge) {
-      setProcessing(true);
 
-      setMessage("Confirm transaction to claim");
-      const signer = await provider.getSigner();
-      const bridgeWithSigner = bridge.connect(signer);
-      const tx = await bridgeWithSigner.claimRBTC();
-      setMessage(<>RBTC claimed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
-      await tx.wait();
-      setProcessing(false)
+    const sendToken = async () => {
+      try{
+        // Send the transaction
+        if(!provider){
+          await loadWeb3Modal();
+        }
+        const signer = await provider.getSigner();
+
+        const bridgeWithSigner = bridge.connect(signer);
+        setMessage(`Storing invoice in smart contract`);
+        //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
+        // Change for wbtc or rsk transaction based on ChainId
+        const tx = await signer.sendTransaction({
+            to: `0x${canisterAddr}`,
+            value: ethers.parseUnits(amount.toString(),10)
+        });
+        console.log("Transaction sent:", tx.hash);
+        // Use explorers based on chainlist
+        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+        // Wait for the transaction to be mined
+        await tx.wait();
+        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setEvmTxHash(tx.hash);
+
+        setTimeout(() => {
+          setMessage()
+        },5000);
+      } catch(err){
+        console.log(err)
+        setMessage(err.message);
+        setTimeout(() => {
+          setMessage()
+        },5000);
+      }
     }
-  }, [provider, bridge]);
+
+    const sendInvoiceAndTxHash = async () => {
+      setProcessing(true);
+      try {
+        let resp;
+        let paymentRequest;
+        const transaction = await provider.getTransaction(evm_txHash);
+        if(!transaction){
+          setMessage(`No transaction found`);
+          setTimeout(() => {
+            setMessage();
+          },5000);
+          return;
+        }
+        if (typeof window.webln !== 'undefined') {
+          await window.webln.enable();
+          setMessage("Preparing invoice");
+
+          const sats = Number(transaction.value)/10**10;
+          const invoice = await webln.makeInvoice({
+            amount: sats,
+            defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
+          });
+          setMessage(`Sending invoice ${invoice.paymentRequest}`);
+          paymentRequest = invoice.paymentRequest
+        } else {
+          paymentRequest = userInvoice;
+        }
+        // Do eth tx and then call main.payInvoicesAccordingToEvents();
+        //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+        resp = await main.swapEVM2LN(
+          {
+            proofTxId: transaction.hash,
+            invoiceId: paymentRequest,
+            sendingChain: ethers.toBeHex(netId),
+            recipientChain: ethers.toBeHex(netId),
+            recipientAddress: `0x${canisterAddr}`
+          },
+          new Date().getTime().toString()
+        );
+        setMessage("Service processing lightning payment");
+        setTimeout(() => {
+          setMessage()
+        },5000);
+      } catch (err) {
+        setMessage(err.message);
+      }
+      setProcessing(false);
+    };
 
   // UI Rendering
 
@@ -303,6 +227,18 @@ const RSKLightningBridge = () => {
           onChange={(ev) => setEvmTxHash(ev.target.value)}
           placeholder="Transaction Hash"
         />
+        {
+          typeof(window.webln) == 'undefined' &&
+          <>
+          <label className={styles.label}>Invoice</label>
+          <input
+            className={styles.input}
+            value={userInvoice}
+            onChange={(ev) => setUserInvoice(ev.target.value)}
+            placeholder="Enter Invoice"
+          />
+          </>
+        }
         <button className={styles.button} onClick={sendInvoiceAndTxHash} >Prepare and send invoice</button>
       </div>
       {

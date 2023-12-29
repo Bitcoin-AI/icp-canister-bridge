@@ -352,6 +352,7 @@ module {
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "Idempotency-Key"; value = AU.toText(value.1) },
+          { name = "chain-id"; value = hexChainId },
         ];
         let request_body_json : Text = "{ \"chainId\" : \"" # hexChainId # "\",\"sendTxPayload\" : " # sendTxPayload # "  }";
         Debug.print("Body "#request_body_json);
