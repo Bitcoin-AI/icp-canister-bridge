@@ -106,90 +106,90 @@ const RSKLightningBridge = () => {
   }
 
 
-    const sendToken = async () => {
-      try{
-        // Send the transaction
-        if(!provider){
-          await loadWeb3Modal();
-        }
-        const signer = await provider.getSigner();
-
-        const bridgeWithSigner = bridge.connect(signer);
-        setMessage(`Storing invoice in smart contract`);
-        //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
-        // Change for wbtc or rsk transaction based on ChainId
-        const tx = await signer.sendTransaction({
-            to: `0x${canisterAddr}`,
-            value: ethers.parseUnits(amount.toString(),10)
-        });
-        console.log("Transaction sent:", tx.hash);
-        // Use explorers based on chainlist
-        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
-        // Wait for the transaction to be mined
-        await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
-        setEvmTxHash(tx.hash);
-
-        setTimeout(() => {
-          setMessage()
-        },5000);
-      } catch(err){
-        console.log(err)
-        setMessage(err.message);
-        setTimeout(() => {
-          setMessage()
-        },5000);
+  const sendToken = async () => {
+    try{
+      // Send the transaction
+      if(!provider){
+        await loadWeb3Modal();
       }
+      const signer = await provider.getSigner();
+
+      const bridgeWithSigner = bridge.connect(signer);
+      setMessage(`Storing invoice in smart contract`);
+      //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
+      // Change for wbtc or rsk transaction based on ChainId
+      const tx = await signer.sendTransaction({
+          to: `0x${canisterAddr}`,
+          value: ethers.parseUnits(amount.toString(),10)
+      });
+      console.log("Transaction sent:", tx.hash);
+      // Use explorers based on chainlist
+      setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+      // Wait for the transaction to be mined
+      await tx.wait();
+      setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+      setEvmTxHash(tx.hash);
+
+      setTimeout(() => {
+        setMessage()
+      },5000);
+    } catch(err){
+      console.log(err)
+      setMessage(err.message);
+      setTimeout(() => {
+        setMessage()
+      },5000);
     }
+  }
 
-    const sendInvoiceAndTxHash = async () => {
-      setProcessing(true);
-      try {
-        let resp;
-        let paymentRequest;
-        const transaction = await provider.getTransaction(evm_txHash);
-        if(!transaction){
-          setMessage(`No transaction found`);
-          setTimeout(() => {
-            setMessage();
-          },5000);
-          return;
-        }
-        if (typeof window.webln !== 'undefined') {
-          await window.webln.enable();
-          setMessage("Preparing invoice");
-
-          const sats = Number(transaction.value)/10**10;
-          const invoice = await webln.makeInvoice({
-            amount: sats,
-            defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
-          });
-          setMessage(`Sending invoice ${invoice.paymentRequest}`);
-          paymentRequest = invoice.paymentRequest
-        } else {
-          paymentRequest = userInvoice;
-        }
-        // Do eth tx and then call main.payInvoicesAccordingToEvents();
-        //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-        resp = await main.swapEVM2LN(
-          {
-            proofTxId: transaction.hash,
-            invoiceId: paymentRequest,
-            sendingChain: ethers.toBeHex(netId),
-            recipientChain: ethers.toBeHex(netId),
-            recipientAddress: `0x${canisterAddr}`
-          },
-          new Date().getTime().toString()
-        );
-        setMessage("Service processing lightning payment");
+  const sendInvoiceAndTxHash = async () => {
+    setProcessing(true);
+    try {
+      let resp;
+      let paymentRequest;
+      const transaction = await provider.getTransaction(evm_txHash);
+      if(!transaction){
+        setMessage(`No transaction found`);
         setTimeout(() => {
-          setMessage()
+          setMessage();
         },5000);
-      } catch (err) {
-        setMessage(err.message);
+        return;
       }
-      setProcessing(false);
-    };
+      if (typeof window.webln !== 'undefined') {
+        await window.webln.enable();
+        setMessage("Preparing invoice");
+
+        const sats = Number(transaction.value)/10**10;
+        const invoice = await webln.makeInvoice({
+          amount: sats,
+          defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
+        });
+        setMessage(`Sending invoice ${invoice.paymentRequest}`);
+        paymentRequest = invoice.paymentRequest
+      } else {
+        paymentRequest = userInvoice;
+      }
+      // Do eth tx and then call main.payInvoicesAccordingToEvents();
+      //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+      resp = await main.swapEVM2LN(
+        {
+          proofTxId: transaction.hash,
+          invoiceId: paymentRequest,
+          sendingChain: ethers.toBeHex(netId),
+          recipientChain: ethers.toBeHex(netId),
+          recipientAddress: `0x${canisterAddr}`
+        },
+        new Date().getTime().toString()
+      );
+      setMessage("Service processing lightning payment");
+      setTimeout(() => {
+        setMessage()
+      },5000);
+    } catch (err) {
+      setMessage(err.message);
+    }
+    setProcessing(false);
+  };
 
   // UI Rendering
 
@@ -372,6 +372,83 @@ const RSKLightningBridge = () => {
     </div>
   );
 
+  const renderEVM2EVM = () => (
+    <div>
+      {/* Content for Lightning to RSK */}
+      <div className={styles.step}>
+        <p>Step 1: Select recipient and EVM compatible chain</p>
+        <label className={styles.label}>EVM Recipient Address</label>
+        <input
+          className={styles.input}
+          value={evm_address}
+          onChange={(ev) => setEvmAddr(ev.target.value)}
+          placeholder="Enter EVM address"
+        />
+        <label className={styles.label}>Select Destiny Chain</label>
+        <select
+          className={styles.input}
+          type="select"
+          onChange={(ev) => setChain(ev.target.value)}
+        >
+        {
+          chains.map(item => {
+            return(<option value={JSON.stringify(
+              {
+                rpc: item.rpc.filter(rpcUrl => {
+                  if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
+                })[0],
+                chainId: item.chainId,
+                name: item.name
+              }
+            )}>{item.name}</option>)
+          })
+        }
+        </select>
+        {
+          chain &&
+          <>
+          <p>Bridging to {JSON.parse(chain).name}</p>
+          <p>ChainId {JSON.parse(chain).chainId}</p>
+          </>
+
+        }
+      </div>
+      <div class={styles.step}>
+        <p>Step 2: Send token to 0x{canisterAddr}</p>
+        <label className={styles.label}>Amount in satoshis</label>
+        <input
+          className={styles.input}
+          value={amount}
+          onChange={(ev) => setAmount(ev.target.value)}
+          placeholder="Satoshis"
+        />
+        {
+          !coinbase ?
+            <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
+            <button className={styles.button} onClick={sendToken} >Send token</button>
+        }
+      </div>
+      {
+        coinbase && netId &&
+        <div class={styles.step}>
+          <p>Sending from chainId {netId.toString()}</p>
+        </div>
+      }
+      <div class={styles.step}>
+        <p>Step 3: Input evm transaction hash</p>
+        <label className={styles.label}>Transaction Hash</label>
+        <input
+          className={styles.input}
+          value={evm_txHash}
+          onChange={(ev) => setEvmTxHash(ev.target.value)}
+          placeholder="Transaction Hash"
+        />
+        <button className={styles.button}>Finalize swap</button>
+      </div>
+    </div>
+  );
+
+
   const renderNostrEvents = () => (
     <div>
       {/* Content for nostr messages */}
@@ -480,6 +557,15 @@ const RSKLightningBridge = () => {
           Lightning to EVM
         </button>
         <button
+          className={activeTab === 'evmToEvm' ? styles.activeTab : ''}
+          onClick={() => {
+            setActiveTab('evmToEvm');
+            setMessage();
+          }}
+        >
+          EVM to EVM
+        </button>
+        <button
           className={activeTab === 'nostrEvents' ? styles.activeTab : ''}
           onClick={() => {
             setActiveTab('nostrEvents');
@@ -490,7 +576,14 @@ const RSKLightningBridge = () => {
         </button>
       </div>
 
-      {activeTab === 'rskToLight' ? renderRSKToLight() : activeTab === 'lightToRSK' ? renderLightToRSK() : renderNostrEvents()}
+      {
+        activeTab === 'rskToLight' ?
+        renderRSKToLight() :
+        activeTab === 'lightToRSK' ?
+        renderLightToRSK() :
+        activeTab==='evmToEvm'? renderEVM2EVM() :
+        renderNostrEvents()
+      }
 
 
       <div style={{overflowX: "auto"}}>
