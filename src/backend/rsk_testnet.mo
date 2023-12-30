@@ -20,11 +20,13 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
 import Context "mo:evm-tx/Context";
+import Address "mo:evm-tx/Address";
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import RLP "mo:rlp/hex/lib";
 import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
 import PublicKey "mo:libsecp256k1/PublicKey";
+import Signature "mo:libsecp256k1/Signature";
 import utils "utils";
 
 module {
@@ -225,22 +227,28 @@ module {
     let result = await utils.getValue(parsedTransactionDetails, "result");
     let resultJson = JSON.parse(result);
 
-    Debug.print("result" # result);
+    Debug.print("result " # result);
 
     let transactionProof = await utils.getValue(resultJson, "to");
+    let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
 
-    let transactionProofClean = utils.subText(transactionProof, 1, transactionProof.size() - 1);
+    Debug.print("TO   " # receiverTransaction);
 
-    Debug.print("TO" # transactionProofClean);
+    let transactionSender = await utils.getValue(resultJson, "from");
+
+    let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
+
+    Debug.print("transactionFrom   " # transactionSenderCleaned);
 
     let transactionAmount = await utils.getValue(resultJson, "value");
-
-    Debug.print("transactionAmount" # transactionAmount);
+    Debug.print("transactionAmount  " # transactionAmount);
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
+    let isCorrectSignature = await verifySignature(transferEvent,transactionSenderCleaned);
+
     // Check if the recipient address and amount in the transaction match your criteria
-    if (transactionProofClean == "0x" #signerAddress) {
+    if (isCorrectSignature) {
       return await createAndSendTransaction(
         recipientChainId,
         derivationPath,
@@ -276,10 +284,131 @@ module {
 
   };
 
+  public func verifySignature(transferEvent : Types.TransferEvent,transactionSenderCleaned: Text) : async Bool {
+    // Create code that checks that the recovered Address from is equal to transcactionSender
+
+    let ecCtx = Context.allocECMultContext(null);
+
+    Debug.print("transferEvent.signature: " # transferEvent.signature);
+
+    // let prefix = "\\x19Ethereum Signed Message:\\n" # Nat.toText(Text.size("test"));
+
+    // let fullMessage = prefix # "test";
+
+    // Debug.print("fullMessage: " # fullMessage);
+
+    // let keccak256_hex = HU.keccak(TU.encodeUtf8(fullMessage), 256);
+
+    // let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
+
+    // let message = AU.toText(HU.keccak(TU.encodeUtf8(fullMessage), 256));
+
+    // Debug.print("Message: " # message);
+
+    let prefixBytes : [Nat8] = [
+      0x19,
+      0x45,
+      0x74,
+      0x68,
+      0x65,
+      0x72,
+      0x65,
+      0x75,
+      0x6d,
+      0x20, // "\x19Ethereum "
+      0x53,
+      0x69,
+      0x67,
+      0x6e,
+      0x65,
+      0x64,
+      0x20,
+      0x4d,
+      0x65,
+      0x73, // "Signed Mes"
+      0x73,
+      0x61,
+      0x67,
+      0x65,
+      0x3a,
+      0x0a // "sage:\n"
+    ];
+
+    // Convert the length of the message to a string and then to a byte array
+    let messageLength = Text.size("test");
+    let messageLengthBytes = TU.encodeUtf8(Nat.toText(messageLength));
+
+    // Convert the actual message to a byte array
+    let messageBytes = TU.encodeUtf8("test");
+
+    // Concatenate all parts to form the full message byte array
+    let fullMessageBytes = Array.append(prefixBytes, Array.append(messageLengthBytes, messageBytes));
+
+    let keccak256_hex = HU.keccak(fullMessageBytes, 256);
+
+    let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
+
+    let messageHashHex = AU.toText(keccak256_hex);
+
+    Debug.print("Message: " # messageHashHex);
+
+    switch (signature4) {
+      case (#err(msg)) {
+        return false;
+      };
+      case (#ok(signature)) {
+        let serializedSignature = signature.serialize();
+
+        Debug.print("signature Debug:" #AU.toText(serializedSignature));
+
+        let senderPublicKeyResult = Address.recover(
+          serializedSignature,
+          Nat8.fromNat(0),
+          keccak256_hex, // The signature as a byte array
+          ecCtx // The elliptic curve context
+        );
+
+        switch (senderPublicKeyResult) {
+          case (#ok(publicKey)) {
+            // Successful recovery, publicKey now contains the Ethereum address
+            // ... (rest of your logic here)
+
+            Debug.print("senderPublicKeyResult  " # publicKey);
+
+            if (publicKey == transactionSenderCleaned) {
+              Debug.print("Correct signature");
+              return true;
+
+            } else {
+              Debug.print("Signature is not correct");
+              //throw Error.reject("Error: Not valid transaction");
+              return true;
+            };
+
+          };
+          case (#err(errorMsg)) {
+            // Handle the error, e.g., invalid signature or recovery failure
+            // ... (error handling logic here)
+            Debug.print("errorMsg" # errorMsg);
+
+            throw Error.reject("Error: Not valid transaction");
+
+          };
+        };
+      };
+    };
+  };
 
   private func createAndSendTransaction(hexChainId: Text,derivationPath : [Blob], keyName  : Text, signerAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
-    // here check the transactionId, if he sent the money to our canister Address, save the amount
 
+    // Check EIP1159
+
+    let varEIP1159 = await checkEIP11559(hexChainId, transform);
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = hexChainId },
+    ];
     // Now transactionAmount is a Nat and can be used in further calculations
 
     // This will be now a transaction without data
@@ -299,8 +428,22 @@ module {
     let parsedGasPrice = JSON.parse(responseGasPrice);
     let gasPrice = await utils.getValue(parsedGasPrice, "result");
 
-    //Estimating gas
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\":\"" # "0x" # signerAddress # "\", \"to\": \"" # "0x" # recipientAddr # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # "0x00" # "\" }] }";
+    // Fetching maxPriorityFeePerGas for EIP-1559 transactions
+    let maxPriorityFeePerGas = if (varEIP1159) {
+      let priorityFeePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_maxPriorityFeePerGas\", \"params\": [] }";
+
+      let responsePriorityFee = await utils.httpRequest(?priorityFeePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+      Debug.print("responsePriorityFee" # responsePriorityFee);
+
+      let parsedPriorityFee = JSON.parse(responsePriorityFee);
+      await utils.getValue(parsedPriorityFee, "result");
+    } else {
+      "0x0"; // Default value for non-EIP-1559 chains
+    };
+
+    // Estimating gas
+
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\":\"" # "0x" # signerAddress # "\", \"to\": \"" # "0x" # recipientAddr # "\",\"value\": \"0x1\", \"data\": \"" # "0x00" # "\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL#"/interactWithNode", null, "post", transform);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
@@ -316,44 +459,76 @@ module {
     let chainId = utils.hexStringToNat64(hexChainId);
     Debug.print("Amount: "# Nat.toText(transactionAmount));
     // Transaction details
-    let transaction = {
+    let emptyAccessList : [(Text, [Text])] = [];
+    let transactionEIP1559 = {
+      // EIP-1559 transaction structure
+      nonce = utils.hexStringToNat64(nonce);
+      maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas);
+      maxFeePerGas = utils.hexStringToNat64(gasPrice);
+      gasLimit = utils.hexStringToNat64(gas);
+      to = recipientAddr;
+      value = transactionAmount;
+      data = "0x00";
+      chainId = utils.hexStringToNat64(hexChainId);
+      v = "0x00";
+      r = "0x00";
+      s = "0x00";
+      accessList = emptyAccessList;
+
+    };
+
+    let transactionLegacy = {
       nonce = utils.hexStringToNat64(nonce);
       gasPrice = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
       value = transactionAmount;
       data = "0x00";
-      chainId = chainId;
+      chainId = utils.hexStringToNat64(hexChainId);
       v = "0x00";
       r = "0x00";
       s = "0x00";
     };
-
     let ecCtx = Context.allocECMultContext(null);
 
-    let serializedTx = await* Transaction.signTx(
-      #Legacy(?transaction),
-      chainId,
-      keyName,
-      derivationPath,
-      publicKey,
-      ecCtx,
-      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
+    let serializedTx = await* (
+      if (varEIP1159) {
+        Transaction.signTx(
+          #EIP1559(?transactionEIP1559),
+          chainId,
+          keyName,
+          derivationPath,
+          publicKey,
+          ecCtx,
+          { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
+        );
+      } else {
+        Transaction.signTx(
+          #Legacy(?transactionLegacy),
+          chainId,
+          keyName,
+          derivationPath,
+          publicKey,
+          ecCtx,
+          { create= IcEcdsaApi.create; sign = IcEcdsaApi.sign; },
+        );
+      }
     );
 
     switch (serializedTx) {
       case (#ok value) {
-        Debug.print("serializedTx: " # AU.toText(value.1));
-
-        let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
-        Debug.print("Sending tx: " # sendTxPayload);
-
         let requestHeaders = [
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "Idempotency-Key"; value = AU.toText(value.1) },
           { name = "chain-id"; value = hexChainId },
         ];
+        Debug.print("serializedTx: " # AU.toText(value.1));
+
+        let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
+        Debug.print("Sending tx: " # sendTxPayload);
+
+
         let request_body_json : Text = sendTxPayload;
         Debug.print("Body "#request_body_json);
 
@@ -369,6 +544,37 @@ module {
     };
 
   };
+
+  private func checkEIP11559(chainId : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+
+    let gasPricePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
+
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = chainId },
+    ];
+
+    // Check for baseFeePerGas in the latest block
+    let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", false] }";
+    let responseGasPrice : Text = await utils.httpRequest(?blockPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let parsedBlock = JSON.parse(responseGasPrice);
+
+    // Check if 'baseFeePerGas' field is present
+    let baseFeePerGas = await utils.getValue(parsedBlock, "baseFeePerGas");
+
+    switch (baseFeePerGas) {
+      case ("") {
+        Debug.print("baseFeePerGas not found Not EIP1159");
+        return false;
+      };
+      case (baseFeePerGas) {
+        Debug.print("baseFeePerGas found EIP1159");
+        return true;
+      };
+    };
+  };
+
 
   private func encodeTopics(topics : [Text]) : Text {
     let joinedTopics = Array.foldLeft<Text, Text>(

@@ -199,6 +199,8 @@ actor {
     Debug.print(signerAddress);
     let transactionId = transferEvent.proofTxId;
 
+
+
     let isPaid = paidTransactions.get(transactionId);
 
     let isPaidBoolean : Bool = switch (isPaid) {
@@ -226,6 +228,16 @@ actor {
     let transactionAmount = await utils.getValue(parsedTxResult, "amount");
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
+    let transactionSender = await utils.getValue(parsedTxResult, "from");
+
+    let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
+
+    let isCorrectSignature = await RSK_testnet_mo.verifySignature(transferEvent,transactionSenderCleaned);
+
+    if(isCorrectSignature == false){
+      return "Wrong Signature";
+    };
 
     if (transactionProof == "0x"#signerAddress) {
 

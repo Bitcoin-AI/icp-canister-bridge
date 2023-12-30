@@ -72,5 +72,6 @@ module Types {
         recipientChain : Text;
         proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
         invoiceId: Text; // Only For LN cases
+        signature: Text;
     };
 };

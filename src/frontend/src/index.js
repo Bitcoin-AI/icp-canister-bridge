@@ -43,8 +43,22 @@ const RSKLightningBridge = () => {
 
 
   useEffect(() => {
+    let rpcNodes = [];
     fetch("https://chainid.network/chains.json").then(async response => {
-      setChains(await response.json());
+      const chainsResp = await response.json();
+      chainsResp.map(item => {
+        const rpc = item.rpc.filter(rpc => {
+          if(rpc.indexOf("INFURA_API_KEY") !== -1 || rpc.indexOf("rsk") !== -1 || rpc.indexOf("mumbai") !== -1){
+            console.log(rpc)
+            return(rpc)
+          }
+        });
+        if(rpc.length > 0){
+          console.log(item)
+          rpcNodes.push(item)
+        }
+      });
+      setChains(rpcNodes);
     });
   }, []);
 
@@ -114,8 +128,8 @@ const RSKLightningBridge = () => {
       }
       const signer = await provider.getSigner();
 
-      const bridgeWithSigner = bridge.connect(signer);
-      setMessage(`Storing invoice in smart contract`);
+      //const bridgeWithSigner = bridge.connect(signer);
+      setMessage(`Sending token to ${canisterAddr}`);
       //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
       // Change for wbtc or rsk transaction based on ChainId
       const tx = await signer.sendTransaction({
@@ -141,12 +155,55 @@ const RSKLightningBridge = () => {
       },5000);
     }
   }
+  const sendTxHash = async () => {
+    setProcessing(true);
+    try {
+      let resp;
+      let paymentRequest;
+      const transaction = await provider.getTransaction(evm_txHash);
+      if(!transaction){
+        setMessage(`No transaction found`);
+        setTimeout(() => {
+          setMessage();
+        },5000);
+        return;
+      }
+
+      setMessage("Sign transaction hash");
+      //const signature = await signer.sign(`\x19Ethereum Signed Message:\n${transaction.hash}`);
+      const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
+      const signature = await signer.signMessage(hashedMsg);
+
+      // Do eth tx and then call main.payInvoicesAccordingToEvents();
+      //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+      setMessage("Verifying parameters to process lightning payment");
+      resp = await main.swapEVM2LN(
+        {
+          proofTxId: transaction.hash,
+          invoiceId: "",
+          sendingChain: ethers.toBeHex(netId),
+          recipientChain: ethers.toBeHex(netId),
+          recipientAddress: `0x${canisterAddr}`,
+          signature: signature
+        },
+        new Date().getTime().toString()
+      );
+      setMessage("Service processing lightning payment");
+      setTimeout(() => {
+        setMessage()
+      },5000);
+    } catch (err) {
+      setMessage(err.message);
+    }
+    setProcessing(false);
+  };
 
   const sendInvoiceAndTxHash = async () => {
     setProcessing(true);
     try {
       let resp;
       let paymentRequest;
+      const signer = await provider.getSigner();
       const transaction = await provider.getTransaction(evm_txHash);
       if(!transaction){
         setMessage(`No transaction found`);
@@ -169,7 +226,11 @@ const RSKLightningBridge = () => {
       } else {
         paymentRequest = userInvoice;
       }
-      // Do eth tx and then call main.payInvoicesAccordingToEvents();
+      setMessage("Sign transaction hash");
+      //const signature = await signer.sign(transaction.hash);
+      //const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
+      const signature = await signer.signMessage("test");
+      console.log(signature)
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       resp = await main.swapEVM2LN(
         {
@@ -177,7 +238,8 @@ const RSKLightningBridge = () => {
           invoiceId: paymentRequest,
           sendingChain: ethers.toBeHex(netId),
           recipientChain: ethers.toBeHex(netId),
-          recipientAddress: `0x${canisterAddr}`
+          recipientAddress: `0x${canisterAddr}`,
+          signature: signature
         },
         new Date().getTime().toString()
       );
