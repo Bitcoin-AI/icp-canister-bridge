@@ -21,11 +21,14 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
 import Context "mo:evm-tx/Context";
+import Address "mo:evm-tx/Address";
+
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import RLP "mo:rlp/hex/lib";
 import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
 import PublicKey "mo:libsecp256k1/PublicKey";
+import Signature "mo:libsecp256k1/Signature";
 import utils "utils";
 
 module {
@@ -75,22 +78,137 @@ module {
     let result = await utils.getValue(parsedTransactionDetails, "result");
     let resultJson = JSON.parse(result);
 
-    Debug.print("result" # result);
+    Debug.print("result " # result);
 
     let transactionProof = await utils.getValue(resultJson, "to");
+    let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
 
-    let transactionProofClean = utils.subText(transactionProof, 1, transactionProof.size() - 1);
+    Debug.print("TO   " # receiverTransaction);
 
-    Debug.print("TO" # transactionProofClean);
+    let transactionSender = await utils.getValue(resultJson, "from");
+
+    let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
+
+    Debug.print("transactionFrom   " # transactionSenderCleaned);
 
     let transactionAmount = await utils.getValue(resultJson, "value");
-
-    Debug.print("transactionAmount" # transactionAmount);
+    Debug.print("transactionAmount  " # transactionAmount);
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
+    // Create code that checks that the recovered Address from is equal to transcactionSender
+
+    let ecCtx = Context.allocECMultContext(null);
+
+    Debug.print("transferEvent.signature: " # transferEvent.signature);
+
+    // let prefix = "\\x19Ethereum Signed Message:\\n" # Nat.toText(Text.size("test"));
+
+    // let fullMessage = prefix # "test";
+
+    // Debug.print("fullMessage: " # fullMessage);
+
+    // let keccak256_hex = HU.keccak(TU.encodeUtf8(fullMessage), 256);
+
+    // let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
+
+    // let message = AU.toText(HU.keccak(TU.encodeUtf8(fullMessage), 256));
+
+    // Debug.print("Message: " # message);
+
+    let prefixBytes : [Nat8] = [
+      0x19,
+      0x45,
+      0x74,
+      0x68,
+      0x65,
+      0x72,
+      0x65,
+      0x75,
+      0x6d,
+      0x20, // "\x19Ethereum "
+      0x53,
+      0x69,
+      0x67,
+      0x6e,
+      0x65,
+      0x64,
+      0x20,
+      0x4d,
+      0x65,
+      0x73, // "Signed Mes"
+      0x73,
+      0x61,
+      0x67,
+      0x65,
+      0x3a,
+      0x0a // "sage:\n"
+    ];
+
+    // Convert the length of the message to a string and then to a byte array
+    let messageLength = Text.size("test");
+    let messageLengthBytes = TU.encodeUtf8(Nat.toText(messageLength));
+
+    // Convert the actual message to a byte array
+    let messageBytes = TU.encodeUtf8("test");
+
+    // Concatenate all parts to form the full message byte array
+    let fullMessageBytes = Array.append(prefixBytes, Array.append(messageLengthBytes, messageBytes));
+
+    let keccak256_hex = HU.keccak(fullMessageBytes, 256);
+
+    let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
+
+    let messageHashHex = AU.toText(keccak256_hex);
+
+    Debug.print("Message: " # messageHashHex);
+
+    switch (signature4) {
+      case (#err(msg)) {
+        return "";
+      };
+      case (#ok(signature)) {
+        let serializedSignature = signature.serialize();
+
+        Debug.print("signature Debug:" #AU.toText(serializedSignature));
+
+        let senderPublicKeyResult = Address.recover(
+          serializedSignature,
+          Nat8.fromNat(0),
+          keccak256_hex, // The signature as a byte array
+          ecCtx // The elliptic curve context
+        );
+
+        switch (senderPublicKeyResult) {
+          case (#ok(publicKey)) {
+            // Successful recovery, publicKey now contains the Ethereum address
+            // ... (rest of your logic here)
+
+            Debug.print("senderPublicKeyResult  " # publicKey);
+
+            if (publicKey == transactionSenderCleaned) {
+              Debug.print("Correct signature");
+
+            } else {
+              Debug.print("Signature is not correct");
+              throw Error.reject("Error: Not valid transaction");
+            };
+
+          };
+          case (#err(errorMsg)) {
+            // Handle the error, e.g., invalid signature or recovery failure
+            // ... (error handling logic here)
+            Debug.print("errorMsg" # errorMsg);
+
+            throw Error.reject("Error: Not valid transaction");
+
+          };
+        };
+      };
+    };
+
     // Check if the recipient address and amount in the transaction match your criteria
-    if (transactionProofClean == "0x" #signerAddress) {
+    if (receiverTransaction == "0x" #signerAddress) {
       return await createAndSendTransaction(
         derivationPath,
         keyName,
