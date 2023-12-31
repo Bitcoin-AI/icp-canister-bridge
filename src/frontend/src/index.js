@@ -160,6 +160,7 @@ const RSKLightningBridge = () => {
     try {
       let resp;
       let paymentRequest;
+      const signer = await provider.getSigner();
       const transaction = await provider.getTransaction(evm_txHash);
       if(!transaction){
         setMessage(`No transaction found`);
@@ -168,12 +169,12 @@ const RSKLightningBridge = () => {
         },5000);
         return;
       }
-
-      setMessage("Sign transaction hash");
       //const signature = await signer.sign(`\x19Ethereum Signed Message:\n${transaction.hash}`);
-      const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
-      const signature = await signer.signMessage(hashedMsg);
-
+      setMessage("Sign transaction hash");
+      //const signature = await signer.sign(transaction.hash);
+      //const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
+      const signature = await signer.signMessage("test");
+      console.log(signature)
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       setMessage("Verifying parameters to process lightning payment");
@@ -188,7 +189,7 @@ const RSKLightningBridge = () => {
         },
         new Date().getTime().toString()
       );
-      setMessage("Service processing lightning payment");
+      setMessage("Service processing evm payment");
       setTimeout(() => {
         setMessage()
       },5000);
@@ -505,7 +506,7 @@ const RSKLightningBridge = () => {
           onChange={(ev) => setEvmTxHash(ev.target.value)}
           placeholder="Transaction Hash"
         />
-        <button className={styles.button}>Finalize swap</button>
+        <button className={styles.button} onClick={sendTxHash}>Finalize swap</button>
       </div>
     </div>
   );
