@@ -86,7 +86,6 @@ module {
     Debug.print("TO   " # receiverTransaction);
 
     let transactionSender = await utils.getValue(resultJson, "from");
-
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
     Debug.print("transactionFrom   " # transactionSenderCleaned);
@@ -96,119 +95,11 @@ module {
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-    // Create code that checks that the recovered Address from is equal to transcactionSender
+    // Check signature, signer = transaction sender
 
-    let ecCtx = Context.allocECMultContext(null);
-
-    Debug.print("transferEvent.signature: " # transferEvent.signature);
-
-    // let prefix = "\\x19Ethereum Signed Message:\\n" # Nat.toText(Text.size("test"));
-
-    // let fullMessage = prefix # "test";
-
-    // Debug.print("fullMessage: " # fullMessage);
-
-    // let keccak256_hex = HU.keccak(TU.encodeUtf8(fullMessage), 256);
-
-    // let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
-
-    // let message = AU.toText(HU.keccak(TU.encodeUtf8(fullMessage), 256));
-
-    // Debug.print("Message: " # message);
-
-    let prefixBytes : [Nat8] = [
-      0x19,
-      0x45,
-      0x74,
-      0x68,
-      0x65,
-      0x72,
-      0x65,
-      0x75,
-      0x6d,
-      0x20, // "\x19Ethereum "
-      0x53,
-      0x69,
-      0x67,
-      0x6e,
-      0x65,
-      0x64,
-      0x20,
-      0x4d,
-      0x65,
-      0x73, // "Signed Mes"
-      0x73,
-      0x61,
-      0x67,
-      0x65,
-      0x3a,
-      0x0a // "sage:\n"
-    ];
-
-    // Convert the length of the message to a string and then to a byte array
-    let messageLength = Text.size("test");
-    let messageLengthBytes = TU.encodeUtf8(Nat.toText(messageLength));
-
-    // Convert the actual message to a byte array
-    let messageBytes = TU.encodeUtf8("test");
-
-    // Concatenate all parts to form the full message byte array
-    let fullMessageBytes = Array.append(prefixBytes, Array.append(messageLengthBytes, messageBytes));
-
-    let keccak256_hex = HU.keccak(fullMessageBytes, 256);
-
-    let signature4 = Signature.parse_standard(AU.fromText(transferEvent.signature));
-
-    let messageHashHex = AU.toText(keccak256_hex);
-
-    Debug.print("Message: " # messageHashHex);
-
-    switch (signature4) {
-      case (#err(msg)) {
-        return "";
-      };
-      case (#ok(signature)) {
-        let serializedSignature = signature.serialize();
-
-        Debug.print("signature Debug:" #AU.toText(serializedSignature));
-
-        let senderPublicKeyResult = Address.recover(
-          serializedSignature,
-          Nat8.fromNat(0),
-          keccak256_hex, // The signature as a byte array
-          ecCtx // The elliptic curve context
-        );
-
-        switch (senderPublicKeyResult) {
-          case (#ok(publicKey)) {
-            // Successful recovery, publicKey now contains the Ethereum address
-            // ... (rest of your logic here)
-
-            Debug.print("senderPublicKeyResult  " # publicKey);
-
-            if (publicKey == transactionSenderCleaned) {
-              Debug.print("Correct signature");
-
-            } else {
-              Debug.print("Signature is not correct");
-              throw Error.reject("Error: Not valid transaction");
-            };
-
-          };
-          case (#err(errorMsg)) {
-            // Handle the error, e.g., invalid signature or recovery failure
-            // ... (error handling logic here)
-            Debug.print("errorMsg" # errorMsg);
-
-            throw Error.reject("Error: Not valid transaction");
-
-          };
-        };
-      };
-    };
-
+    let validSignature = await checkSignature(transactionId, transactionSenderCleaned, transferEvent.signature);
     // Check if the recipient address and amount in the transaction match your criteria
-    if (receiverTransaction == "0x" #signerAddress) {
+    if (receiverTransaction == "0x" #signerAddress and validSignature) {
       return await createAndSendTransaction(
         derivationPath,
         keyName,
@@ -247,23 +138,104 @@ module {
 
   };
 
-  // public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
+  private func checkSignature(transactionId : Text, from : Text, signature : Text) : async Bool {
 
-  //   let ic : Types.IC = actor ("aaaaa-aa");
+    let ecCtx = Context.allocECMultContext(null);
 
-  //   // Topic for encoded keccack-256 hash of SwapToLightningNetwork event
-  //   let topics : [Text] = ["0xd7064750d0bfcc43414a0eaf761384271b3f77200c7ad833cc059d015b5e12a7", "0x0000000000000000000000005d6235587677478b75bd088f7730abdcc2c39110"];
+    let prefixBytes : [Nat8] = [
+      0x19,
+      0x45,
+      0x74,
+      0x68,
+      0x65,
+      0x72,
+      0x65,
+      0x75,
+      0x6d,
+      0x20, // "\x19Ethereum "
+      0x53,
+      0x69,
+      0x67,
+      0x6e,
+      0x65,
+      0x64,
+      0x20,
+      0x4d,
+      0x65,
+      0x73, // "Signed Mes"
+      0x73,
+      0x61,
+      0x67,
+      0x65,
+      0x3a,
+      0x0a // "sage:\n"
+    ];
 
-  //   let blockNumber : Text = "0x409492"; // We will filter after the contract creation
+    let messageLength = Text.size(transactionId);
+    let messageLengthBytes = TU.encodeUtf8(Nat.toText(messageLength));
 
-  //   let jsonRpcPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getLogs\", \"params\": [{ \"address\": \"" # contractAddress # "\", \"fromBlock\": \"" # blockNumber # "\", \"topics\": " # encodeTopics(topics) # " }] }";
+    let messageBytes = TU.encodeUtf8(transactionId);
 
-  //   let decodedText = await utils.httpRequest(?jsonRpcPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/getEvents", null, "post", transform);
+    let fullMessageBytes = Array.append(prefixBytes, Array.append(messageLengthBytes, messageBytes));
 
-  //   let events = await handleLogs(decodedText);
+    let keccak256_hex = HU.keccak(fullMessageBytes, 256);
 
-  //   return events;
-  // };
+    let signatureLength = Text.size(signature);
+    let v = utils.subText(signature, signatureLength - 2, signatureLength);
+
+    let recoveryId = await utils.hexToNat(v);
+
+    let signatureParsed = Signature.parse_standard(AU.fromText(signature));
+
+    Debug.print("recoveryId: " # Nat.toText(recoveryId -27));
+
+    let messageHashHex = AU.toText(keccak256_hex);
+
+    Debug.print("Message: " # messageHashHex);
+
+    switch (signatureParsed) {
+      case (#err(msg)) {
+        return false;
+      };
+      case (#ok(signature)) {
+        let serializedSignature = signature.serialize();
+
+        Debug.print("signature Debug:" #AU.toText(serializedSignature));
+
+        let senderPublicKeyResult = Address.recover(
+          serializedSignature,
+          Nat8.fromNat(recoveryId -27),
+          keccak256_hex,
+          ecCtx,
+        );
+
+        switch (senderPublicKeyResult) {
+          case (#ok(publicKey)) {
+
+            Debug.print("senderPublicKeyResult  " # publicKey);
+
+            if (publicKey == from) {
+              Debug.print("Correct signature");
+              return true;
+
+            } else {
+              Debug.print("Signature is not correct");
+              return false;
+            };
+
+          };
+          case (#err(errorMsg)) {
+
+            Debug.print("errorMsg" # errorMsg);
+
+            throw Error.reject("Error: Not valid transaction");
+
+          };
+        };
+      };
+    };
+
+  };
 
   private func checkEIP11559(chainId : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
