@@ -1,5 +1,5 @@
-import RSK_testnet_mo "./rsk_testnet";
-import lightning_testnet "./lightning_testnet";
+import EVM "./evm";
+import LN "./ln";
 import utils "utils";
 import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
@@ -61,7 +61,7 @@ actor {
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
-    let invoiceResponse = await lightning_testnet.generateInvoice(amount, address, time, transform);
+    let invoiceResponse = await LN.generateInvoice(amount, address, time, transform);
     return invoiceResponse;
   };
 
@@ -85,7 +85,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
+    let sendTxResponse = await EVM.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -105,7 +105,7 @@ actor {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
+    let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
@@ -138,7 +138,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
+    let sendTxResponse = await EVM.swapLN2EVM(hexChainId, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -155,14 +155,14 @@ actor {
   };
 
   public func decodePayReq(payment_request : Text, timestamp : Text) : async Text {
-    let response = await lightning_testnet.decodePayReq(payment_request, timestamp, transform);
+    let response = await LN.decodePayReq(payment_request, timestamp, transform);
     return response;
   };
 
   public shared (msg) func getEvmAddr() : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
+    let address = await LN.getEvmAddr(derivationPath, keyName);
     return address;
   };
 
@@ -209,7 +209,7 @@ actor {
 
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
-    let isCorrectSignature = await RSK_testnet_mo.checkSignature(transferEvent.proofTxId, transferEvent.signature, transactionSenderCleaned);
+    let isCorrectSignature = await EVM.checkSignature(transferEvent.proofTxId, transferEvent.signature, transactionSenderCleaned);
 
     if (isCorrectSignature == false) {
       Debug.print("Transaction does not match the criteria");
@@ -226,7 +226,7 @@ actor {
 
       // TODO:  check why this was not working before, or if it is working now
       Debug.print(paymentRequest);
-      let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
+      let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
       let payReqResponse = JSON.parse(decodedPayReq);
       let amountString = await utils.getValue(payReqResponse, "num_satoshis");
       let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
@@ -243,7 +243,7 @@ actor {
             paidInvoicestoLN.put(invoiceId, (true, transactionNat));
             result := "Amount mismatch. Marking as paid to skip.";
           } else {
-            let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
+            let paymentResult = await LN.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
             let paymentResultJson = JSON.parse(paymentResult);
             let errorField = await utils.getValue(paymentResultJson, "error");
             let resultField = await utils.getValue(paymentResultJson, "result");
