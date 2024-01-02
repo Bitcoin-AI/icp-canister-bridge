@@ -49,17 +49,17 @@ module {
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let signerAddress = utils.publicKeyToAddress(publicKey);
+    let canisterAddress = utils.publicKeyToAddress(publicKey);
 
     Debug.print("Recipient address: 0x" # recipientAddr);
     Debug.print("recipientChainId" # recipientChainId);
     Debug.print("sendingChainId" # sendingChainId);
 
-    if (signerAddress == "") {
+    if (canisterAddress == "") {
       Debug.print("Could not get address!");
       return "";
     } else {
-      Debug.print("Canister Address: 0x" # signerAddress);
+      Debug.print("Canister Address: 0x" # canisterAddress);
     };
 
     //We will check the transactionId on the sendingChain to see if he sent any money
@@ -83,7 +83,7 @@ module {
     let transactionProof = await utils.getValue(resultJson, "to");
     let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
 
-    Debug.print("TO   " # receiverTransaction);
+    Debug.print("TO " # receiverTransaction);
 
     let transactionSender = await utils.getValue(resultJson, "from");
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
@@ -99,11 +99,11 @@ module {
 
     let validSignature = await checkSignature(transactionId, transactionSenderCleaned, transferEvent.signature);
     // Check if the recipient address and amount in the transaction match your criteria
-    if (receiverTransaction == "0x" #signerAddress and validSignature) {
+    if (receiverTransaction == "0x" #canisterAddress and validSignature) {
       return await createAndSendTransaction(
         derivationPath,
         keyName,
-        signerAddress,
+        canisterAddress,
         recipientAddr,
         recipientChainId,
         transactionNat,
@@ -120,7 +120,7 @@ module {
   public func swapLN2EVM(derivationPath : [Blob], keyName : Text, amount : Nat, transferEvent : Types.TransferEvent, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let signerAddress = utils.publicKeyToAddress(publicKey);
+    let canisterAddress = utils.publicKeyToAddress(publicKey);
 
     let recipientAddr = transferEvent.recipientAddress;
     let chainId = transferEvent.recipientChain;
@@ -128,7 +128,7 @@ module {
     return await createAndSendTransaction(
       derivationPath,
       keyName,
-      signerAddress,
+      canisterAddress,
       recipientAddr,
       chainId,
       amount,
@@ -212,7 +212,7 @@ module {
         switch (senderPublicKeyResult) {
           case (#ok(publicKey)) {
 
-            Debug.print("senderPublicKeyResult  " # publicKey);
+            Debug.print("signer  " # publicKey);
 
             if (publicKey == from) {
               Debug.print("Correct signature");
@@ -225,9 +225,7 @@ module {
 
           };
           case (#err(errorMsg)) {
-
             Debug.print("errorMsg" # errorMsg);
-
             throw Error.reject("Error: Not valid transaction");
 
           };
@@ -267,7 +265,7 @@ module {
     };
   };
 
-  private func createAndSendTransaction(derivationPath : [Blob], keyName : Text, signerAddress : Text, recipientAddr : Text, recipientChainId : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  private func createAndSendTransaction(derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, recipientChainId : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
@@ -308,7 +306,6 @@ module {
 
     Debug.print("maxPriorityFeePerGas" # maxPriorityFeePerGas);
 
-    //Getting gas Price
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
     let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
 
@@ -318,7 +315,6 @@ module {
 
     Debug.print("gasPrice" # gasPrice);
 
-    // //Estimating gas 21000
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": \"0x00\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
@@ -328,9 +324,7 @@ module {
 
     Debug.print("gas" # gas);
 
-    //Getting nonce
-
-    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # signerAddress # "\", \"latest\"] }";
+    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # canisterAddress # "\", \"latest\"] }";
     let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
 
     Debug.print("responseNoncepayLoad" # responseNoncepayLoad);
@@ -346,7 +340,6 @@ module {
 
     // Transaction details
     let transactionEIP1559 = {
-      // EIP-1559 transaction structure
       nonce = utils.hexStringToNat64(nonce);
       maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas);
       maxFeePerGas = utils.hexStringToNat64(gasPrice);
@@ -428,120 +421,4 @@ module {
 
   };
 
-  private func encodeTopics(topics : [Text]) : Text {
-    let joinedTopics = Array.foldLeft<Text, Text>(
-      topics,
-      "",
-      func(acc, topic) {
-        if (acc == "") {
-          "\"" # topic # "\"";
-        } else {
-          acc # "," # "\"" # topic # "\"";
-        };
-      },
-    );
-    return "[" # joinedTopics # "]";
-  };
-
-  private func handleLogs(decodedText : Text) : async [Event] {
-    Debug.print("Decoded Text: " # decodedText);
-
-    let parsedJson = JSON.parse(decodedText);
-
-    switch (parsedJson) {
-      case (null) {
-        Debug.print("JSON parsing failed.");
-        return [];
-      };
-      case (?parsedObj) {
-        switch (parsedObj) {
-          case (#Object(fields)) {
-            let resultField = Array.find(fields, func((k : Text, _ : JSON.JSON)) : Bool { k == "result" });
-            switch (resultField) {
-              case (null) {
-                Debug.print("Result field not found.");
-                return [];
-              };
-              case (?(_, #Array(logArray))) {
-                Debug.print("Processing logs: " # JSON.show(#Array(logArray)));
-                return await processLog(JSON.show(#Array(logArray)));
-              };
-              case (_) {
-                Debug.print("Result field is not an array or not found");
-                return [];
-              };
-            };
-          };
-          case (_) {
-            Debug.print("JSON parsing did not produce an object");
-            return [];
-          };
-        };
-      };
-    };
-  };
-
-  private func processLog(logText : Text) : async [Event] {
-    Debug.print("Input logText: " # logText);
-
-    var events : [Event] = [];
-
-    let parsedJSON = JSON.parse(logText);
-
-    //Refactor this switch
-    switch (parsedJSON) {
-      case (null) {
-        Debug.print("JSON parsing failed");
-      };
-      case (?v) switch (v) {
-        case (#Array(logArray)) {
-
-          for (log in logArray.vals()) {
-            Debug.print("Processing log: " # JSON.show(log));
-
-            switch (log) {
-              case (#Object(logFields)) {
-
-                let finalAddress = await utils.getFieldAsString(logFields, "address");
-                let data0x = await utils.getFieldAsString(logFields, "data");
-                let data = utils.subText(data0x, 3, data0x.size() -1);
-
-                Debug.print("data: " # data);
-
-                let dataBytes = AU.fromText(data);
-                let amountBytes = AU.slice(dataBytes, 0, 32);
-
-                let amount = AU.toNat256(amountBytes);
-                let invoiceIdHexBytes = AU.slice(dataBytes, 80, dataBytes.size() - 80);
-
-                let invoiceIdHexString = AU.toText(invoiceIdHexBytes);
-                let invoiceIdBytes = AU.fromText(invoiceIdHexString);
-                let invoiceId = await utils.bytes32ToString(invoiceIdHexString);
-
-                switch (invoiceId) {
-                  case (null) {
-                    Debug.print("Failed to decode invoiceId");
-                  };
-                  case (?invoiceIdString) {
-
-                    let invoiceTrim = Text.replace(invoiceIdString, #char ',', "");
-
-                    let newEvent : Event = {
-                      address = invoiceTrim;
-                      amount = amount;
-                    };
-                    events := Array.append(events, [newEvent]);
-                  };
-                };
-
-              };
-              case _ { Debug.print("Unexpected JSON structure") };
-            };
-          };
-        };
-        case _ { Debug.print("Parsed JSON is not an array") };
-      };
-    };
-    return events;
-  };
 };
