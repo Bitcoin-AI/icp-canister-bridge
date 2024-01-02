@@ -248,7 +248,7 @@ module {
     let isCorrectSignature = await verifySignature(transferEvent,transactionSenderCleaned);
 
     // Check if the recipient address and amount in the transaction match your criteria
-    if (isCorrectSignature) {
+    if (isCorrectSignature == true) {
       return await createAndSendTransaction(
         recipientChainId,
         derivationPath,
@@ -381,8 +381,8 @@ module {
 
             } else {
               Debug.print("Signature is not correct");
-              //throw Error.reject("Error: Not valid transaction");
-              return true;
+              throw Error.reject("Error: Not valid transaction");
+              //return true;
             };
 
           };

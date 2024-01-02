@@ -236,15 +236,10 @@ actor {
     let isCorrectSignature = await RSK_testnet_mo.verifySignature(transferEvent,transactionSenderCleaned);
 
     if(isCorrectSignature == false){
+      Debug.print("Transaction does not match the criteria");
       return "Wrong Signature";
     };
 
-    if (transactionProof == "0x"#signerAddress) {
-
-    } else {
-      Debug.print("Transaction does not match the criteria");
-      //return "Not valid transaction";
-    };
 
     var result : Text = "";
 
