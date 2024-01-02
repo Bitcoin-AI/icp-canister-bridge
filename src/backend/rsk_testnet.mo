@@ -29,20 +29,15 @@ import Legacy "mo:evm-tx/transactions/Legacy";
 import Transaction "mo:evm-tx/Transaction";
 import PublicKey "mo:libsecp256k1/PublicKey";
 import Signature "mo:libsecp256k1/Signature";
-import Signature "mo:libsecp256k1/Signature";
 import utils "utils";
 
 module {
 
-  type Event = {
-    address : Text;
-    amount : Nat;
-  };
+  let API_URL : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
 
   type JSONField = (Text, JSON.JSON);
 
   public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
-
 
     let recipientAddr = transferEvent.recipientAddress;
     let recipientChainId = transferEvent.recipientChain;
@@ -81,7 +76,6 @@ module {
     let resultJson = JSON.parse(result);
 
     Debug.print("result " # result);
-    Debug.print("result " # result);
 
     let transactionProof = await utils.getValue(resultJson, "to");
     let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
@@ -92,15 +86,11 @@ module {
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
     Debug.print("transactionFrom   " # transactionSenderCleaned);
-    Debug.print("transactionFrom   " # transactionSenderCleaned);
 
     let transactionAmount = await utils.getValue(resultJson, "value");
     Debug.print("transactionAmount  " # transactionAmount);
-    Debug.print("transactionAmount  " # transactionAmount);
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
-
-    let isCorrectSignature = await verifySignature(transferEvent,transactionSenderCleaned);
 
     // Check signature, signer = transaction sender
 
@@ -124,13 +114,10 @@ module {
 
   };
 
-  public func swapLN2EVM(hexChainId: Text,derivationPath : [Blob], keyName : Text,  amount : Nat, recipientAddr:Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapLN2EVM(hexChainId : Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let canisterAddress = utils.publicKeyToAddress(publicKey);
-
-    let recipientAddr = transferEvent.recipientAddress;
-    let chainId = transferEvent.recipientChain;
 
     return await createAndSendTransaction(
       hexChainId,
@@ -272,7 +259,7 @@ module {
     };
   };
 
-  private func createAndSendTransaction(derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, recipientChainId : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  private func createAndSendTransaction(hexChainId : Text, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
@@ -288,14 +275,14 @@ module {
 
     // let data = "0x" # method_id # address_64 # amount_64;
 
-    let varEIP1159 = await checkEIP11559(recipientChainId, transform);
+    let varEIP1159 = await checkEIP11559(recipientAddr, transform);
 
     // if true .. etc
 
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
-      { name = "chain-id"; value = recipientChainId },
+      { name = "chain-id"; value = hexChainId },
     ];
 
     // Fetching maxPriorityFeePerGas for EIP-1559 transactions
@@ -341,7 +328,7 @@ module {
 
     Debug.print("nonce" # nonce);
 
-    let chainId = utils.hexStringToNat64(recipientChainId);
+    let chainId = utils.hexStringToNat64(hexChainId);
 
     let emptyAccessList : [(Text, [Text])] = [];
 
@@ -354,7 +341,7 @@ module {
       to = recipientAddr;
       value = transactionAmount;
       data = "0x00";
-      chainId = utils.hexStringToNat64(recipientChainId);
+      chainId = chainId;
       v = "0x00";
       r = "0x00";
       s = "0x00";
@@ -369,7 +356,7 @@ module {
       to = recipientAddr;
       value = transactionAmount;
       data = "0x00";
-      chainId = utils.hexStringToNat64(recipientChainId);
+      chainId = chainId;
       v = "0x00";
       r = "0x00";
       s = "0x00";
@@ -413,11 +400,10 @@ module {
         let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
         Debug.print("Sending tx: " # sendTxPayload);
 
-
         let request_body_json : Text = sendTxPayload;
-        Debug.print("Body "#request_body_json);
+        Debug.print("Body " #request_body_json);
 
-        let sendTxResponse : Text = await utils.httpRequest(?request_body_json, API_URL#"/payBlockchainTx", ?requestHeaders, "post", transform);
+        let sendTxResponse : Text = await utils.httpRequest(?request_body_json, API_URL # "/payBlockchainTx", ?requestHeaders, "post", transform);
         Debug.print("Tx response: " # sendTxResponse);
         return sendTxResponse;
 
@@ -428,36 +414,6 @@ module {
       };
     };
 
-  };
-
-  private func checkEIP11559(chainId : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
-
-    let gasPricePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-
-    let requestHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-      { name = "chain-id"; value = chainId },
-    ];
-
-    // Check for baseFeePerGas in the latest block
-    let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", false] }";
-    let responseGasPrice : Text = await utils.httpRequest(?blockPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
-    let parsedBlock = JSON.parse(responseGasPrice);
-
-    // Check if 'baseFeePerGas' field is present
-    let baseFeePerGas = await utils.getValue(parsedBlock, "baseFeePerGas");
-
-    switch (baseFeePerGas) {
-      case ("") {
-        Debug.print("baseFeePerGas not found Not EIP1159");
-        return false;
-      };
-      case (baseFeePerGas) {
-        Debug.print("baseFeePerGas found EIP1159");
-        return true;
-      };
-    };
   };
 
 };
