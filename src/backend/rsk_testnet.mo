@@ -40,7 +40,7 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  // let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
+  let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
 
   let API_URL: Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
