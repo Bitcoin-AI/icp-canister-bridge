@@ -11,6 +11,8 @@ import Nat64 "mo:base/Nat64";
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 
 import Error "mo:base/Error";
+import Nat64 "mo:base/Nat64";
+import Blob "mo:base/Blob";
 import JSON "mo:json/JSON";
 import Text "mo:base-0.7.3/Text";
 import Debug "mo:base-0.7.3/Debug";
@@ -18,6 +20,7 @@ import AU "mo:evm-tx/utils/ArrayUtils";
 import TU "mo:evm-tx/utils/TextUtils";
 
 import HU "mo:evm-tx/utils/HashUtils";
+import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import Types "Types";
 
 actor {
@@ -30,6 +33,7 @@ actor {
     let transformed : Types.CanisterHttpResponsePayload = {
       status = raw.response.status;
       body = raw.response.body;
+
       headers = [
         {
           name = "Content-Security-Policy";
@@ -55,7 +59,7 @@ actor {
     amount : Nat;
   };
 
-  let paidInvoicestoRSK = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
+  let paidTransactions = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
   let paidTransactions = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
@@ -106,7 +110,168 @@ actor {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
+
+    let transactionId = transferEvent.proofTxId;
+
+    let isPaid = paidTransactions.get(transactionId);
+
+    let isPaidBoolean : Bool = switch (isPaid) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
+
+    if (isPaidBoolean) {
+      return "Transaction/ Invoice is already paid";
+    };
+
+    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
+    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
+
+    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
+
+    switch (isError) {
+      case ("") {
+        paidTransactions.put(transactionId, true);
+      };
+      case (errorValue) {
+        Debug.print("Could not pay invoice tx error: " # errorValue);
+      };
+    };
+
+    return sendTxResponse;
+  };
+
+  public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
+
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    let signerAddress = utils.publicKeyToAddress(publicKey);
+
+    let transactionId = transferEvent.proofTxId;
+
+    let isPaid = paidTransactions.get(transactionId);
+
+    let isPaidBoolean : Bool = switch (isPaid) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
+
+    if (isPaidBoolean) {
+      return "Transaction/ Invoice is already paid";
+    };
+
+    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\",  \"method\": \"eth_getTransactionByHash\" , \"params\": [\"" # transactionId # "\"] }";
+    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", null, "post", transform);
+    let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+
+    // Not sure if it is to here
+    let transactionProof = await utils.getValue(parsedTransactionDetails, "to");
+
+    let transactionAmount = await utils.getValue(parsedTransactionDetails, "value");
+
+    let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
+    if (transactionProof == signerAddress) {
+
+    } else {
+      Debug.print("Transaction does not match the criteria");
+      return "Not valid transaction";
+    };
+
+    var result : Text = "";
+
+    let invoiceIdOpt = transferEvent.invoiceId;
+    var treatedRequest : Text = "";
+
+    switch (invoiceIdOpt) {
+      case (null) {
+        // Handle the case where invoiceId is null
+        // You can assign a default value or handle it as per your logic
+        treatedRequest := ""; // Example: default to an empty string if invoiceId is null
+      };
+      case (?invoiceId) {
+        // invoiceId is not null and can be safely used
+        treatedRequest := invoiceId;
+      };
+    };
+
+    try {
+
+      let paymentRequest = utils.trim(treatedRequest);
+
+      // TODO:  check why this was not working before, or if it is working now
+
+      // let decodedPayReq = await lightning_testnet.decodePayReq(paymentRequest, timestamp, transform);
+      // let payReqResponse = JSON.parse(decodedPayReq);
+      // let amountString = await utils.getValue(payReqResponse, "num_satoshis");
+      // let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+      let amountCheckedOpt : ?Nat = Nat.fromText("100" # "0000000000");
+
+      switch (amountCheckedOpt) {
+        case (null) {
+          paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+          result := "Failed to convert amountChecked to Nat. Skipping invoice.";
+        };
+        case (?amountChecked) {
+          if (amountChecked > amountChecked) {
+            paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+            result := "Amount mismatch. Marking as paid to skip.";
+          } else {
+            let paymentResult = await lightning_testnet.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
+            let paymentResultJson = JSON.parse(paymentResult);
+            let errorField = await utils.getValue(paymentResultJson, "error");
+            let resultField = await utils.getValue(paymentResultJson, "result");
+            let statusField = await utils.getValue(JSON.parse(resultField), "status");
+
+            if (errorField == "" and statusField == "SUCCEEDED") {
+              paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+              result := "Payment Result: Successful";
+            } else {
+              // For now just skip any error
+              paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+              result := "Payment Result: Failed";
+            };
+          };
+        };
+      };
+    } catch (e : Error.Error) {
+      // For now just skip any error
+      paidInvoicestoLN.put(treatedRequest, (true, transactionNat));
+
+      result := "Caught exception: " # Error.message(e);
+    };
+
+    return result;
+  };
+
+  public shared (msg) func swapLN2EVM(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
+
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+
+    let payment_hash = transferEvent.invoiceId;
+
+    var paymentHash : Text = "";
+
+    switch (payment_hash) {
+      case (null) {
+        // Handle the case where invoiceId is null
+        // You can assign a default value or handle it as per your logic
+        paymentHash := "";
+        return "No Invoice Id declared";
+      };
+      case (?invoiceId) {
+        // invoiceId is not null and can be safely used
+        paymentHash := invoiceId;
+      };
+    };
+
+    let paymentCheckResponse = await lightning_testnet.checkInvoice(paymentHash, timestamp, transform);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let evm_addr = await utils.getValue(parsedResponse, "memo");
     let isSettled = await utils.getValue(parsedResponse, "settled");
@@ -141,6 +306,7 @@ actor {
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
     let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId,derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1),  transform);
 
+
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
     switch (isError) {
@@ -167,7 +333,6 @@ actor {
     let address = await lightning_testnet.getEvmAddr(derivationPath, keyName);
     return address;
   };
-
 
 
   public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
@@ -275,6 +440,4 @@ actor {
       result := "Caught exception: " # Error.message(e);
     };
 
-    return result;
-  };
 };

@@ -13,6 +13,7 @@ import List "mo:base-0.7.3/List";
 import Iter "mo:base-0.7.3/Iter";
 import Char "mo:base-0.7.3/Char";
 import Principal "mo:base/Principal";
+import HashMap "mo:base/HashMap";
 import JSON "mo:json/JSON";
 import Buffer "mo:base-0.7.3/Buffer";
 import Helper "mo:evm-tx/transactions/Helper";
@@ -30,6 +31,7 @@ import Signature "mo:libsecp256k1/Signature";
 import utils "utils";
 
 module {
+
   type Event = {
     address : Text;
     amount : Nat;
@@ -38,13 +40,11 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  let rskNodeUrl : Text = "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/";
+  // let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
-  let contractAddress : Text = "0x8F707cc9825aEE803deE09a05B919Ff33ace3A75";
 
   let API_URL: Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
   //let API_URL: Text = "http://127.0.0.1:8080";
-
 
 
   public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
@@ -66,6 +66,7 @@ module {
   };
 
   public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+
 
     let recipientAddr = transferEvent.recipientAddress;
     let recipientChainId = transferEvent.recipientChain;
@@ -324,6 +325,8 @@ module {
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
 
+    Debug.print("gas" # gas);
+
     //Getting nonce
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # "0x" # signerAddress # "\", \"latest\"] }";
@@ -334,6 +337,7 @@ module {
 
     let chainId = utils.hexStringToNat64(hexChainId);
     Debug.print("Amount: "# Nat.toText(transactionAmount));
+
     // Transaction details
     let emptyAccessList : [(Text, [Text])] = [];
     let transactionEIP1559 = {
@@ -450,7 +454,6 @@ module {
       };
     };
   };
-
 
   private func encodeTopics(topics : [Text]) : Text {
     let joinedTopics = Array.foldLeft<Text, Text>(
