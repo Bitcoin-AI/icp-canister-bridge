@@ -65,7 +65,6 @@ actor {
     return invoiceResponse;
   };
 
-
   public shared (msg) func swapEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
 
     let principalId = msg.caller;
@@ -102,7 +101,7 @@ actor {
     return sendTxResponse;
   };
 
-  public shared (msg) func swapLN2EVM(hexChainId: Text,payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapLN2EVM(hexChainId : Text, payment_hash : Text, timestamp : Text) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
@@ -139,7 +138,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId,derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1),  transform);
+    let sendTxResponse = await RSK_testnet_mo.swapLN2EVM(hexChainId, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -155,7 +154,6 @@ actor {
     return sendTxResponse;
   };
 
-
   public func decodePayReq(payment_request : Text, timestamp : Text) : async Text {
     let response = await lightning_testnet.decodePayReq(payment_request, timestamp, transform);
     return response;
@@ -168,7 +166,6 @@ actor {
     return address;
   };
 
-
   public shared (msg) func swapEVM2LN(transferEvent : Types.TransferEvent, timestamp : Text) : async Text {
 
     let principalId = msg.caller;
@@ -179,8 +176,6 @@ actor {
     let signerAddress = utils.publicKeyToAddress(publicKey);
     Debug.print(signerAddress);
     let transactionId = transferEvent.proofTxId;
-
-
 
     let isPaid = paidTransactions.get(transactionId);
 
@@ -214,18 +209,16 @@ actor {
 
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
-    let isCorrectSignature = await RSK_testnet_mo.verifySignature(transferEvent,transactionSenderCleaned);
+    let isCorrectSignature = await RSK_testnet_mo.checkSignature(transferEvent.proofTxId, transferEvent.signature, transactionSenderCleaned);
 
-    if(isCorrectSignature == false){
+    if (isCorrectSignature == false) {
       Debug.print("Transaction does not match the criteria");
       return "Wrong Signature";
     };
 
-
     var result : Text = "";
 
     let invoiceId = transferEvent.invoiceId;
-
 
     try {
 
@@ -237,8 +230,8 @@ actor {
       let payReqResponse = JSON.parse(decodedPayReq);
       let amountString = await utils.getValue(payReqResponse, "num_satoshis");
       let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-      Debug.print("Satoshis: "#amountString);
-      Debug.print("cleanAmountString: "#cleanAmountString);
+      Debug.print("Satoshis: " #amountString);
+      Debug.print("cleanAmountString: " #cleanAmountString);
       let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
       switch (amountCheckedOpt) {
         case (null) {
@@ -258,18 +251,21 @@ actor {
 
             if (statusField == "SUCCEEDED") {
               paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+              paidTransactions.put(transactionId, true);
+
               result := "Payment Result: Successful";
             } else {
-              // For now just skip any error
-              paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+              // paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+              // paidTransactions.put(transactionId, true);
+
               result := "Payment Result: Failed";
             };
           };
         };
       };
     } catch (e : Error.Error) {
-      // For now just skip any error
-      paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+      // paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+      // paidTransactions.put(transactionId, true);
 
       result := "Caught exception: " # Error.message(e);
     };

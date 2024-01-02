@@ -238,7 +238,7 @@ module {
                 case ('d') { 13 };
                 case ('e') { 14 };
                 case ('f') { 15 };
-                case (_) { 0 }; // Default case, you might want to handle this differently
+                case (_) { 0 }; 
             };
             result += Nat64.fromNat(digitValue) * power;
             power *= 16;
