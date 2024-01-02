@@ -132,7 +132,7 @@ module {
 
   };
 
-  private func checkSignature(transactionId : Text, from : Text, signature : Text) : async Bool {
+  public func checkSignature(transactionId : Text, from : Text, signature : Text) : async Bool {
 
     let ecCtx = Context.allocECMultContext(null);
 
