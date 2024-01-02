@@ -64,32 +64,16 @@ actor {
     let invoiceResponse = await lightning_testnet.generateInvoice(amount, address, time, transform);
     return invoiceResponse;
   };
-  /*
-  public shared (msg) func swapFromLightningNetwork(hexChainId:Text,rpcUrl: Text,wbtcAddress:Text,payment_hash : Text, timestamp : Text) : async Text {
+
+
+  public shared (msg) func swapEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let paymentCheckResponse = await lightning_testnet.checkInvoice(payment_hash, timestamp, transform);
-    let parsedResponse = JSON.parse(paymentCheckResponse);
-    let evm_addr = await utils.getValue(parsedResponse, "memo");
-    let isSettled = await utils.getValue(parsedResponse, "settled");
-    let invoice = await utils.getValue(parsedResponse, "payment_request");
 
-    let amountSatoshi = await utils.getValue(parsedResponse, "value");
-    Debug.print(amountSatoshi);
-    let amount : Nat = switch (Nat.fromText(utils.subText(amountSatoshi, 1, amountSatoshi.size() - 1) # "0000000000")) {
+    let transactionId = transferEvent.proofTxId;
 
-      case (null) { 0 };
-      case (?value) { value };
-    };
-    Debug.print(Nat.toText(amount));
-    let falseString : Text = Bool.toText(false);
-
-    if (isSettled == falseString) {
-      return "Invoice not settled, pay invoice and try again";
-    };
-
-    let isPaid = paidInvoicestoRSK.get(invoice);
+    let isPaid = paidTransactions.get(transactionId);
 
     let isPaidBoolean : Bool = switch (isPaid) {
       case (null) { false };
@@ -98,17 +82,17 @@ actor {
     };
 
     if (isPaidBoolean) {
-      return "Invoice is already paid and rsk transaction processed";
+      return "Transaction/ Invoice is already paid";
     };
 
-    // Perform swap from Lightning Network to Ethereum
-    let sendTxResponse = await RSK_testnet_mo.swapFromLightningNetwork(hexChainId,rpcUrl,wbtcAddress,derivationPath, keyName, utils.subText(evm_addr, 1, evm_addr.size() - 1), amount, transform);
+    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
+    let sendTxResponse = await RSK_testnet_mo.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
     switch (isError) {
       case ("") {
-        paidInvoicestoRSK.put(invoice, true);
+        paidTransactions.put(transactionId, true);
       };
       case (errorValue) {
         Debug.print("Could not pay invoice tx error: " # errorValue);
@@ -117,8 +101,6 @@ actor {
 
     return sendTxResponse;
   };
-  */
-
 
   public shared (msg) func swapLN2EVM(hexChainId: Text,payment_hash : Text, timestamp : Text) : async Text {
 

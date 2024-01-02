@@ -177,17 +177,16 @@ const RSKLightningBridge = () => {
       console.log(signature)
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      setMessage("Verifying parameters to process lightning payment");
-      resp = await main.swapEVM2LN(
+      setMessage("Verifying parameters to process evm payment");
+      resp = await main.swapEVM2EVM(
         {
           proofTxId: transaction.hash,
-          invoiceId: "",
+          invoiceId: "null",
           sendingChain: ethers.toBeHex(netId),
-          recipientChain: ethers.toBeHex(netId),
-          recipientAddress: `0x${canisterAddr}`,
+          recipientChain: ethers.toBeHex(JSON.parse(chain).chainId),
+          recipientAddress: evm_address,
           signature: signature
-        },
-        new Date().getTime().toString()
+        }
       );
       setMessage("Service processing evm payment");
       setTimeout(() => {

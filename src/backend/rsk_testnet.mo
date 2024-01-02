@@ -45,132 +45,8 @@ module {
   let API_URL: Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
   //let API_URL: Text = "http://127.0.0.1:8080";
 
-  // ChainIds and Rpcs
-  type Chain = {
-    wbtcAddress : Text;
-    rpcUrl: Text;
-  };
-
-  /*
-  let rpcs = HashMap.HashMap<Text, Chain>(10,Text.equal, Text.hash);
-  rpcs.put("0x1f",{
-    wbtcAddress: "0x0",
-    rpcUrl: "https://rsk.getblock.io/437f13d7-2175-4d2c-a8c4-5e45ef6f7162/testnet/"
-  });
-
-  rpcs.put("0x13881",{
-    wbtcAddress: "0x0d787a4a1548f673ed375445535a6c7a1ee56180",
-    rpcUrl: "https://rpc-mumbai.matic.today"
-  });
-  */
 
 
-  /*
-  public func swapFromLightningNetwork(hexChainId: Text,derivationPath : [Blob], keyName : Text, address : Text, amount : Nat, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
-
-    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-
-    let signerAddress = utils.publicKeyToAddress(publicKey);
-
-
-    Debug.print("Recipient address: 0x" # address);
-
-    Debug.print("Amount in wei to send" # Nat.toText(amount));
-
-    if (signerAddress == "") {
-      Debug.print("Could not get address!");
-      return "";
-    } else {
-      Debug.print("Canister Address: 0x" # address);
-    };
-
-    // Building transactionData
-
-    let method_sig = "transfer(address,uint256)";
-    let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
-    let method_id = TU.left(keccak256_hex, 7);
-
-    let address_64 = TU.fill(TU.right(address, 2), '0', 64);
-
-    let amount_hex = AU.toText(AU.fromNat256(amount));
-    let amount_256 = TU.fill(amount_hex, '0', 256);
-
-    let data = "0x" #method_id # address_64 # amount_256;
-
-    //Getting gas Price
-    let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, rpcUrl, null, "post", transform);
-    let parsedGasPrice = JSON.parse(responseGasPrice);
-    let gasPrice = await utils.getValue(parsedGasPrice, "result");
-
-    //Estimating gas
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # wbtcAddress # "\", \"value\": \"" # "0x" # "00" # "\", \"data\": \"" # data # "\" }] }";
-    let responseGas : Text = await utils.httpRequest(?estimateGasPayload,rpcUrl, null, "post", transform);
-    let parsedGasValue = JSON.parse(responseGas);
-    let gas = await utils.getValue(parsedGasValue, "result");
-
-    //Getting nonce
-
-    let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"" # signerAddress # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, rpcUrl, null, "post", transform);
-
-    let parsedNonce = JSON.parse(responseNoncepayLoad);
-    let nonce = await utils.getValue(parsedNonce, "result");
-
-    let chainId = utils.hexStringToNat64(hexChainId);
-    let target: Text = wbtcAddress;
-
-    // Transaction details
-    let transaction = {
-      nonce = utils.hexStringToNat64(nonce);
-      gasPrice = utils.hexStringToNat64(gasPrice);
-      gasLimit = utils.hexStringToNat64(gas);
-      to = target;
-      value = transactionAmount;
-      data = data;
-      chainId = chainId;
-      v = "0x00";
-      r = "0x00";
-      s = "0x00";
-    };
-    Debug.print(JSON.stringify(transaction));
-    let ecCtx = Context.allocECMultContext(null);
-
-    let serializedTx = await* Transaction.signTx(
-      #Legacy(?transaction),
-      chainId,
-      keyName,
-      derivationPath,
-      publicKey,
-      ecCtx,
-      { create = IcEcdsaApi.create; sign = IcEcdsaApi.sign },
-    );
-
-    switch (serializedTx) {
-      case (#ok value) {
-        Debug.print("serializedTx: " # AU.toText(value.1));
-
-        let sendTxPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_sendRawTransaction\", \"params\": [\"0x" # AU.toText(value.1) # "\"] }";
-        Debug.print("Sending tx: " # sendTxPayload);
-
-        let requestHeaders = [
-          { name = "Content-Type"; value = "application/json" },
-          { name = "Accept"; value = "application/json" },
-          { name = "Idempotency-Key"; value = AU.toText(value.1) },
-        ];
-        let sendTxResponse : Text = await utils.httpRequest(?sendTxPayload, rpcUrl, ?requestHeaders, "post", transform);
-        Debug.print("Tx response: " # sendTxResponse);
-        return sendTxResponse;
-
-      };
-      case (#err errMsg) {
-        Debug.print("Error: " # errMsg);
-        return errMsg;
-      };
-    };
-
-  };
-  */
   public func readRSKSmartContractEvents(transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async [Event] {
 
     let ic : Types.IC = actor ("aaaaa-aa");
@@ -443,7 +319,7 @@ module {
 
     // Estimating gas
 
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\":\"" # "0x" # signerAddress # "\", \"to\": \"" # "0x" # recipientAddr # "\",\"value\": \"0x1\", \"data\": \"" # "0x00" # "\" }] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\":\"" # "0x" # signerAddress # "\", \"to\": \"" # recipientAddr # "\",\"value\": \"0x1\", \"data\": \"" # "0x00" # "\" }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL#"/interactWithNode", null, "post", transform);
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
