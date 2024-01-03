@@ -243,12 +243,13 @@ actor {
             result := "Amount mismatch. Marking as paid to skip.";
           } else {
             let paymentResult = await LN.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
+            Debug.print(paymentResult);
             let paymentResultJson = JSON.parse(paymentResult);
             let errorField = await utils.getValue(paymentResultJson, "error");
             let resultField = await utils.getValue(paymentResultJson, "result");
             let statusField = await utils.getValue(JSON.parse(resultField), "status");
             Debug.print(statusField);
-            if (statusField == "SUCCEEDED") {
+            if (Text.contains(paymentResult, #text "SUCCEEDED")) {
               paidInvoicestoLN.put(invoiceId, (true, transactionNat));
               paidTransactions.put(transactionId, true);
 
