@@ -197,7 +197,6 @@ actor {
     let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
     let txResult = await utils.getValue(parsedTransactionDetails, "result");
-    // Not sure if it is to here
     let parsedTxResult = JSON.parse(txResult);
     let transactionProof = await utils.getValue(parsedTxResult, "to");
     Debug.print(transactionProof);
@@ -209,7 +208,7 @@ actor {
 
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
-    let isCorrectSignature = await EVM.checkSignature(transferEvent.proofTxId, transferEvent.signature, transactionSenderCleaned);
+    let isCorrectSignature = await EVM.checkSignature(transferEvent.proofTxId, transactionSenderCleaned, transferEvent.signature);
 
     if (isCorrectSignature == false) {
       Debug.print("Transaction does not match the criteria");
