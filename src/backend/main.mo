@@ -247,7 +247,7 @@ actor {
             let errorField = await utils.getValue(paymentResultJson, "error");
             let resultField = await utils.getValue(paymentResultJson, "result");
             let statusField = await utils.getValue(JSON.parse(resultField), "status");
-
+            Debug.print(statusField);
             if (statusField == "SUCCEEDED") {
               paidInvoicestoLN.put(invoiceId, (true, transactionNat));
               paidTransactions.put(transactionId, true);

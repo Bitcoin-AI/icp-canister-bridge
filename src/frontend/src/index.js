@@ -188,10 +188,7 @@ const RSKLightningBridge = () => {
           signature: signature
         }
       );
-      setMessage("Service processing evm payment");
-      setTimeout(() => {
-        setMessage()
-      },5000);
+      setMessage(resp);
     } catch (err) {
       setMessage(err.message);
     }
@@ -232,6 +229,7 @@ const RSKLightningBridge = () => {
       const signature = await signer.signMessage(transaction.hash);
       console.log(signature)
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
+      setMessage("Service processing lightning payment");
       resp = await main.swapEVM2LN(
         {
           proofTxId: transaction.hash,
@@ -243,10 +241,7 @@ const RSKLightningBridge = () => {
         },
         new Date().getTime().toString()
       );
-      setMessage("Service processing lightning payment");
-      setTimeout(() => {
-        setMessage()
-      },5000);
+      setMessage(resp);
     } catch (err) {
       setMessage(err.message);
     }
