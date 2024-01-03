@@ -121,6 +121,7 @@ const RSKLightningBridge = () => {
 
 
   const sendToken = async () => {
+    setProcessing(true);
     try{
       // Send the transaction
       if(!provider){
@@ -143,10 +144,6 @@ const RSKLightningBridge = () => {
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
       setEvmTxHash(tx.hash);
-
-      setTimeout(() => {
-        setMessage()
-      },5000);
     } catch(err){
       console.log(err)
       setMessage(err.message);
@@ -154,6 +151,7 @@ const RSKLightningBridge = () => {
         setMessage()
       },5000);
     }
+    setProcessing(false);
   }
   const sendTxHash = async () => {
     setProcessing(true);
@@ -271,8 +269,10 @@ const RSKLightningBridge = () => {
         />
         {
           !coinbase ?
-            <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-            <button className={styles.button} onClick={sendToken} >Send token</button>
+          <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
+          !processing ?
+          <button className={styles.button} onClick={sendToken} >Send token</button> :
+          <button className={styles.button} disabled>Wait current process</button>
         }
       </div>
       <div class={styles.step}>
@@ -296,7 +296,11 @@ const RSKLightningBridge = () => {
           />
           </>
         }
-        <button className={styles.button} onClick={sendInvoiceAndTxHash} >Prepare and send invoice</button>
+        {
+          !processing ?
+          <button className={styles.button} onClick={sendInvoiceAndTxHash} >Prepare and send invoice</button> :
+          <button className={styles.button} disabled>Wait current process</button>
+        }
       </div>
       {
         /*
@@ -482,7 +486,9 @@ const RSKLightningBridge = () => {
         {
           !coinbase ?
             <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-            <button className={styles.button} onClick={sendToken} >Send token</button>
+          !processing ?
+          <button className={styles.button} onClick={sendToken} >Send token</button> :
+          <button className={styles.button} disabled >Wait current process</button>
         }
       </div>
       {
@@ -500,7 +506,11 @@ const RSKLightningBridge = () => {
           onChange={(ev) => setEvmTxHash(ev.target.value)}
           placeholder="Transaction Hash"
         />
-        <button className={styles.button} onClick={sendTxHash}>Finalize swap</button>
+        {
+          !processing ?
+          <button className={styles.button} onClick={sendTxHash}>Finalize swap</button> :
+          <button className={styles.button} disabled >Wait current process</button>
+        }
       </div>
     </div>
   );
