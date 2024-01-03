@@ -80,7 +80,7 @@ const RSKLightningBridge = () => {
     setProcessing(true);
     try {
       setMessage("Getting invoice from service");
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address.replace("0x", ""),new Date().getTime().toString());
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address,new Date().getTime().toString());
       setMessage(resp);
       console.log(JSON.parse(resp))
       const invoice = JSON.parse(resp).payment_request;
@@ -173,7 +173,7 @@ const RSKLightningBridge = () => {
       setMessage("Sign transaction hash");
       //const signature = await signer.sign(transaction.hash);
       //const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
-      const signature = await signer.signMessage("test");
+      const signature = await signer.signMessage(transaction.hash);
       console.log(signature)
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
@@ -229,7 +229,7 @@ const RSKLightningBridge = () => {
       setMessage("Sign transaction hash");
       //const signature = await signer.sign(transaction.hash);
       //const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
-      const signature = await signer.signMessage("test");
+      const signature = await signer.signMessage(transaction.hash);
       console.log(signature)
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       resp = await main.swapEVM2LN(
