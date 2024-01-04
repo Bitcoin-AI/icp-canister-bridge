@@ -120,7 +120,7 @@ module {
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
           { name = "signature"; value = AU.toText(serializedSignature) },
-
+          { name = "Idempotency-Key"; value = idempotencyKey }
         ];
 
         let response_icp_bridge_macaroon = await utils.httpRequest(?request_icp_bridge_macaroon, serviceRest # "/payInvoice", ?requestHeaders, "post", transform);
