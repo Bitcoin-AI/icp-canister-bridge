@@ -22,9 +22,9 @@ import Types "Types";
 
 actor {
 
-  let keyName = "dfx_test_key"; // this is for local network
+  // let keyName = "dfx_test_key"; // this is for local network
 
-  // let keyName = "test_key_1";    This is for IC network
+  let keyName = "test_key_1";    //This is for IC network
 
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
