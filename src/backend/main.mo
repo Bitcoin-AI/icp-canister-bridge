@@ -24,7 +24,7 @@ actor {
 
   // let keyName = "dfx_test_key"; // this is for local network
 
-  let keyName = "test_key_1";    //This is for IC network
+  let keyName = "test_key_1"; //This is for IC network
 
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
@@ -58,6 +58,8 @@ actor {
 
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
   let paidTransactions = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
+
+  let petitions = HashMap.HashMap<Text, Types.TransferEvent>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
@@ -99,6 +101,73 @@ actor {
     };
 
     return sendTxResponse;
+  };
+
+  public shared (msg) func petitionEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
+
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+
+    let transactionId = transferEvent.proofTxId;
+
+    petitions.put(transactionId, transferEvent);
+    return "Petition created successfully";
+  };
+
+  public shared (msg) func solvePetitionEVM2EVM(transactionId : Text, proofTxId : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+
+    let petition = petitions.get(transactionId);
+
+    switch (petition) {
+      case (null) {
+        return "No petition found for this transaction";
+      };
+      case (?transferEvent) {
+        let canisterAddress = await getEvmAddr();
+        let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+        let reward : Nat = switch (Nat.fromText(transferEvent.reward)) {
+          case (null) { 0 };
+          case (?value) { value };
+        };
+
+        let isValidTransaction = await EVM.validateTransaction(
+          proofTxId,
+          canisterAddress,
+          reward,
+          transferEvent.signature,
+          transform,
+        );
+
+        if (isValidTransaction) {
+          if (reward > 0) {
+            let transferResponse = await EVM.createAndSendTransaction(
+              transferEvent.recipientChain,
+              derivationPath,
+              keyName,
+              canisterAddress,
+              transferEvent.recipientAddress,
+              reward,
+              publicKey,
+              transform,
+            );
+
+            // Fix this , it should be that there is no error
+            if (transferResponse == "Success") {
+              let _ = petitions.remove(transactionId);
+              return "Petition solved successfully and reward transferred";
+            } else {
+              return "Failed to transfer reward";
+            };
+          } else {
+            return "No reward available for this petition";
+          };
+        } else {
+          return "Transaction validation failed";
+        };
+      };
+    };
   };
 
   public shared (msg) func swapLN2EVM(hexChainId : Text, payment_hash : Text, timestamp : Text) : async Text {

@@ -37,6 +37,37 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
+  public func validateTransaction(transactionId : Text, expectedCanisterAddress : Text, expectedAmount : Nat, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+    ];
+
+    // Fetch transaction details using transactionId
+    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
+    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://your-blockchain-node-url", ?requestHeaders, "post", transform);
+    let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+
+    let result = await utils.getValue(parsedTransactionDetails, "result");
+    let resultJson = JSON.parse(result);
+
+    let transactionToAddress = await utils.getValue(resultJson, "to");
+    let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
+
+    let transactionAmount = await utils.getValue(resultJson, "value");
+    let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
+    // Check if the recipient address and amount in the transaction match the expected values
+    if ("0x" # receiverTransaction == expectedCanisterAddress and transactionNat == expectedAmount) {
+      // Optionally check the signature if required
+      // let validSignature = await checkSignature(transactionId, transactionSender, signature);
+      // return validSignature;
+      return true;
+    } else {
+      return false;
+    };
+  };
+
   public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let recipientAddr = transferEvent.recipientAddress;
@@ -259,7 +290,7 @@ module {
     };
   };
 
-  private func createAndSendTransaction(hexChainId : Text, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func createAndSendTransaction(hexChainId : Text, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
