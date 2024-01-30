@@ -43,18 +43,14 @@ module {
       { name = "Accept"; value = "application/json" },
     ];
 
-    // Fetch transaction details using transactionId
-    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
-    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://your-blockchain-node-url", ?requestHeaders, "post", transform);
-    let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+    // Fetch TransactionDetails
+    let resultTxDetails = await getTransactionDetails(transactionId, transform);
+    let txDetails = JSON.parse(resultTxDetails);
 
-    let result = await utils.getValue(parsedTransactionDetails, "result");
-    let resultJson = JSON.parse(result);
-
-    let transactionToAddress = await utils.getValue(resultJson, "to");
+    let transactionToAddress = await utils.getValue(txDetails, "to");
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
-    let transactionAmount = await utils.getValue(resultJson, "value");
+    let transactionAmount = await utils.getValue(txDetails, "value");
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
     // Check if the recipient address and amount in the transaction match the expected values
@@ -66,6 +62,21 @@ module {
     } else {
       return false;
     };
+  };
+
+  public func getTransactionDetails(transactionHash : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+    ];
+
+    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionHash # "\"] }";
+    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
+    let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+
+    return await utils.getValue(parsedTransactionDetails, "result");
+
   };
 
   public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
@@ -99,26 +110,20 @@ module {
     ];
 
     // Fetch transaction details using transactionId
-    let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionId # "\"] }";
-    let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
-    let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+    let resultTxDetails = await getTransactionDetails(transactionId, transform);
+    let txDetails = JSON.parse(resultTxDetails);
 
-    let result = await utils.getValue(parsedTransactionDetails, "result");
-    let resultJson = JSON.parse(result);
-
-    Debug.print("result " # result);
-
-    let transactionProof = await utils.getValue(resultJson, "to");
+    let transactionProof = await utils.getValue(txDetails, "to");
     let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
 
     Debug.print("TO " # receiverTransaction);
 
-    let transactionSender = await utils.getValue(resultJson, "from");
+    let transactionSender = await utils.getValue(txDetails, "from");
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
     Debug.print("transactionFrom   " # transactionSenderCleaned);
 
-    let transactionAmount = await utils.getValue(resultJson, "value");
+    let transactionAmount = await utils.getValue(txDetails, "value");
     Debug.print("transactionAmount  " # transactionAmount);
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
@@ -272,7 +277,7 @@ module {
 
     // Check for baseFeePerGas in the latest block
     let blockPayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getBlockByNumber\", \"params\": [\"latest\", false] }";
-    let responseGasPrice : Text = await utils.httpRequest(?blockPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let responseGasPrice : Text = await utils.httpRequest(?blockPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     let parsedBlock = JSON.parse(responseGasPrice);
 
     // Check if 'baseFeePerGas' field is present
@@ -320,7 +325,7 @@ module {
     let maxPriorityFeePerGas = if (varEIP1159) {
       let priorityFeePayload = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_maxPriorityFeePerGas\", \"params\": [] }";
 
-      let responsePriorityFee = await utils.httpRequest(?priorityFeePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+      let responsePriorityFee = await utils.httpRequest(?priorityFeePayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
       Debug.print("responsePriorityFee" # responsePriorityFee);
 
       let parsedPriorityFee = JSON.parse(responsePriorityFee);
@@ -332,7 +337,7 @@ module {
     Debug.print("maxPriorityFeePerGas" # maxPriorityFeePerGas);
 
     let gasPricePayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_gasPrice\", \"params\": [] }";
-    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let responseGasPrice : Text = await utils.httpRequest(?gasPricePayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
 
     let parsedGasPrice = JSON.parse(responseGasPrice);
 
@@ -341,7 +346,7 @@ module {
     Debug.print("gasPrice" # gasPrice);
 
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": \"0x00\" }] }";
-    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
 
     let parsedGasValue = JSON.parse(responseGas);
@@ -350,7 +355,7 @@ module {
     Debug.print("gas" # gas);
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # canisterAddress # "\", \"latest\"] }";
-    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/interactWithNode", ?requestHeaders, "post", transform);
+    let responseNoncepayLoad : Text = await utils.httpRequest(?noncePayLoad, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
 
     Debug.print("responseNoncepayLoad" # responseNoncepayLoad);
 

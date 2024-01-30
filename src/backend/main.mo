@@ -26,6 +26,8 @@ actor {
 
   let keyName = "test_key_1"; //This is for IC network
 
+  let API_URL : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
+
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
       status = raw.response.status;
@@ -110,15 +112,32 @@ actor {
 
     let transactionId = transferEvent.proofTxId;
 
-    petitions.put(transactionId, transferEvent);
-    return "Petition created successfully";
+    let resultTxDetails = await EVM.getTransactionDetails(transactionId, transform);
+    let txDetails = JSON.parse(resultTxDetails);
+
+    let transactionToAddress = await utils.getValue(txDetails, "to");
+    let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
+
+    let canisterAddress = await getEvmAddr();
+    if ("0x" # receiverTransaction == canisterAddress) {
+      petitions.put(transactionId, transferEvent);
+      return "Petition created successfully";
+    } else {
+      return "Bad transaction";
+    };
+
   };
 
-  public shared (msg) func solvePetitionEVM2EVM(transactionId : Text, proofTxId : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
-    let petition = petitions.get(transactionId);
+    let petition = petitions.get(petitionTxId);
+
+    let requestHeaders = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Accept"; value = "application/json" },
+    ];
 
     switch (petition) {
       case (null) {
@@ -132,10 +151,16 @@ actor {
           case (?value) { value };
         };
 
+        let resultTxDetails = await EVM.getTransactionDetails(proofTxId, transform);
+        let txDetails = JSON.parse(resultTxDetails);
+
+        let transactionAmount = await utils.getValue(txDetails, "value");
+        let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
         let isValidTransaction = await EVM.validateTransaction(
           proofTxId,
           canisterAddress,
-          reward,
+          transactionNat,
           transferEvent.signature,
           transform,
         );
@@ -155,7 +180,7 @@ actor {
 
             // Fix this , it should be that there is no error
             if (transferResponse == "Success") {
-              let _ = petitions.remove(transactionId);
+              let _ = petitions.remove(petitionTxId);
               return "Petition solved successfully and reward transferred";
             } else {
               return "Failed to transfer reward";
@@ -292,7 +317,6 @@ actor {
 
       let paymentRequest = utils.trim(invoiceId);
 
-      // TODO:  check why this was not working before, or if it is working now
       Debug.print(paymentRequest);
       let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
       let payReqResponse = JSON.parse(decodedPayReq);
@@ -313,9 +337,9 @@ actor {
           } else {
             let paymentResult = await LN.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
             Debug.print(paymentResult);
-            let paymentResultJson = JSON.parse(paymentResult);
-            let errorField = await utils.getValue(paymentResultJson, "error");
-            let resultField = await utils.getValue(paymentResultJson, "result");
+            let paymenttxDetails = JSON.parse(paymentResult);
+            let errorField = await utils.getValue(paymenttxDetails, "error");
+            let resultField = await utils.getValue(paymenttxDetails, "result");
             let statusField = await utils.getValue(JSON.parse(resultField), "status");
             Debug.print(statusField);
             if (Text.contains(paymentResult, #text "SUCCEEDED")) {
