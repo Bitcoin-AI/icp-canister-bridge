@@ -37,7 +37,7 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  public func validateTransaction(transactionId : Text, expectedCanisterAddress : Text, expectedAmount : Nat, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+  public func validateTransaction(transactionId : Text, expectedAddress : Text, expectedAmount : Nat, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
@@ -53,11 +53,13 @@ module {
     let transactionAmount = await utils.getValue(txDetails, "value");
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
+    let transactionSender = await utils.getValue(txDetails, "from");
+    let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
+
+    let validSignature = await checkSignature(transactionId, transactionSenderCleaned, signature);
+
     // Check if the recipient address and amount in the transaction match the expected values
-    if ("0x" # receiverTransaction == expectedCanisterAddress and transactionNat == expectedAmount) {
-      // Optionally check the signature if required
-      // let validSignature = await checkSignature(transactionId, transactionSender, signature);
-      // return validSignature;
+    if ("0x" # receiverTransaction == expectedAddress and transactionNat == expectedAmount and validSignature) {
       return true;
     } else {
       return false;
@@ -128,11 +130,9 @@ module {
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-    // Check signature, signer = transaction sender
+    let validTransaction = await validateTransaction(transactionId, receiverTransaction, transactionNat, transferEvent.signature, transform);
 
-    let validSignature = await checkSignature(transactionId, transactionSenderCleaned, transferEvent.signature);
-    // Check if the recipient address and amount in the transaction match your criteria
-    if (receiverTransaction == "0x" #canisterAddress and validSignature) {
+    if (validTransaction) {
       return await createAndSendTransaction(
         recipientChainId,
         derivationPath,

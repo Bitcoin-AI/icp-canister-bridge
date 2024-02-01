@@ -61,7 +61,7 @@ actor {
   let paidInvoicestoLN = HashMap.HashMap<Text, (Bool, Nat)>(10, Text.equal, Text.hash);
   let paidTransactions = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
-  let petitions = HashMap.HashMap<Text, Types.TransferEvent>(10, Text.equal, Text.hash);
+  let petitions = HashMap.HashMap<Text, Types.PetitionEvent>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
@@ -105,7 +105,7 @@ actor {
     return sendTxResponse;
   };
 
-  public shared (msg) func petitionEVM2EVM(transferEvent : Types.TransferEvent) : async Text {
+  public shared (msg) func petitionEVM2EVM(transferEvent : Types.PetitionEvent) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
@@ -128,25 +128,21 @@ actor {
 
   };
 
-  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
     let petition = petitions.get(petitionTxId);
 
-    let requestHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-    ];
-
     switch (petition) {
       case (null) {
         return "No petition found for this transaction";
       };
-      case (?transferEvent) {
+      case (?petitionEvent) {
         let canisterAddress = await getEvmAddr();
+
         let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
-        let reward : Nat = switch (Nat.fromText(transferEvent.reward)) {
+        let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
           case (null) { 0 };
           case (?value) { value };
         };
@@ -159,31 +155,41 @@ actor {
 
         let isValidTransaction = await EVM.validateTransaction(
           proofTxId,
-          canisterAddress,
+          petitionEvent.wantedAddress, // Expected address
           transactionNat,
-          transferEvent.signature,
+          signature,
           transform,
         );
+
+        let transactionSolver = await utils.getValue(txDetails, "from");
+
+        let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
 
         if (isValidTransaction) {
           if (reward > 0) {
             let transferResponse = await EVM.createAndSendTransaction(
-              transferEvent.recipientChain,
+              petitionEvent.sendingChain,
               derivationPath,
               keyName,
               canisterAddress,
-              transferEvent.recipientAddress,
+              transactionSenderCleaned,
               reward,
               publicKey,
               transform,
             );
 
             // Fix this , it should be that there is no error
-            if (transferResponse == "Success") {
-              let _ = petitions.remove(petitionTxId);
-              return "Petition solved successfully and reward transferred";
-            } else {
-              return "Failed to transfer reward";
+
+            let isError = await utils.getValue(JSON.parse(transferResponse), "error");
+            switch (isError) {
+              case ("") {
+                let _ = petitions.remove(petitionTxId);
+                return "Petition solved successfully and reward transferred";
+              };
+              case (errorValue) {
+                Debug.print("Failed to transfer reward due to error: " # errorValue);
+                return "Failed to transfer reward";
+              };
             };
           } else {
             return "No reward available for this petition";

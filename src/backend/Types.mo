@@ -71,8 +71,19 @@ module Types {
         recipientAddress : Text;
         recipientChain : Text;
         proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-        invoiceId: Text; // Only For LN cases
-        signature: Text;
-        reward: Text;
+        invoiceId : Text; // Only For LN cases
+        signature : Text;
+        reward : Text;
     };
+
+    public type PetitionEvent = {
+        sendingChain : Text;
+        wantedAddress : Text;
+        wantedChain : Text;
+        proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+        invoiceId : Text; // Only For LN cases
+        signature : Text;
+        reward : Text;
+    };
+
 };
