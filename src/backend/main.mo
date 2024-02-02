@@ -105,14 +105,14 @@ actor {
     return sendTxResponse;
   };
 
-  public shared (msg) func petitionEVM2EVM(transferEvent : Types.PetitionEvent) : async Text {
+  public shared (msg) func petitionEVM2EVM(petitionEvent : Types.PetitionEvent) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
-    let transactionId = transferEvent.proofTxId;
+    let transactionId = petitionEvent.proofTxId;
 
-    let resultTxDetails = await EVM.getTransactionDetails(transactionId, transform);
+    let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
     let transactionToAddress = await utils.getValue(txDetails, "to");
@@ -120,7 +120,7 @@ actor {
 
     let canisterAddress = await getEvmAddr();
     if ("0x" # receiverTransaction == canisterAddress) {
-      petitions.put(transactionId, transferEvent);
+      petitions.put(transactionId, petitionEvent);
       return "Petition created successfully";
     } else {
       return "Bad transaction";
@@ -147,21 +147,25 @@ actor {
           case (?value) { value };
         };
 
-        let resultTxDetails = await EVM.getTransactionDetails(proofTxId, transform);
-        let txDetails = JSON.parse(resultTxDetails);
+        let resultTxDetailsPetition = await EVM.getTransactionDetails(petitionTxId, petitionEvent.sendingChain, transform);
+        let txDetailsPetition = JSON.parse(resultTxDetailsPetition);
 
-        let transactionAmount = await utils.getValue(txDetails, "value");
+        let transactionAmount = await utils.getValue(txDetailsPetition, "value");
         let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
         let isValidTransaction = await EVM.validateTransaction(
           proofTxId,
           petitionEvent.wantedAddress, // Expected address
-          transactionNat,
+          transactionNat, // Expected amount
+          petitionEvent.wantedChain,
           signature,
           transform,
         );
 
-        let transactionSolver = await utils.getValue(txDetails, "from");
+        let resultTxDetailsProof = await EVM.getTransactionDetails(proofTxId, petitionEvent.sendingChain, transform);
+        let proofTxDetails = JSON.parse(resultTxDetailsProof);
+
+        let transactionSolver = await utils.getValue(proofTxDetails, "from");
 
         let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
 
@@ -173,13 +177,10 @@ actor {
               keyName,
               canisterAddress,
               transactionSenderCleaned,
-              reward,
+              reward + transactionNat,
               publicKey,
               transform,
             );
-
-            // Fix this , it should be that there is no error
-
             let isError = await utils.getValue(JSON.parse(transferResponse), "error");
             switch (isError) {
               case ("") {

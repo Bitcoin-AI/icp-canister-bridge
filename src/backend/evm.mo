@@ -37,14 +37,10 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  public func validateTransaction(transactionId : Text, expectedAddress : Text, expectedAmount : Nat, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
-    let requestHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-    ];
+  public func validateTransaction(transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
     // Fetch TransactionDetails
-    let resultTxDetails = await getTransactionDetails(transactionId, transform);
+    let resultTxDetails = await getTransactionDetails(transactionId, chainId, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
     let transactionToAddress = await utils.getValue(txDetails, "to");
@@ -66,11 +62,13 @@ module {
     };
   };
 
-  public func getTransactionDetails(transactionHash : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func getTransactionDetails(transactionHash : Text, chainId : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
+      { name = "chain-id"; value = chainId },
+
     ];
 
     let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionHash # "\"] }";
@@ -105,32 +103,16 @@ module {
 
     //We will check the transactionId on the sendingChain to see if he sent any money
 
-    let requestHeaders = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Accept"; value = "application/json" },
-      { name = "chain-id"; value = transferEvent.sendingChain },
-    ];
-
     // Fetch transaction details using transactionId
-    let resultTxDetails = await getTransactionDetails(transactionId, transform);
+    let resultTxDetails = await getTransactionDetails(transactionId, transferEvent.sendingChain, transform);
     let txDetails = JSON.parse(resultTxDetails);
-
-    let transactionProof = await utils.getValue(txDetails, "to");
-    let receiverTransaction = utils.subText(transactionProof, 1, transactionProof.size() - 1);
-
-    Debug.print("TO " # receiverTransaction);
-
-    let transactionSender = await utils.getValue(txDetails, "from");
-    let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
-
-    Debug.print("transactionFrom   " # transactionSenderCleaned);
 
     let transactionAmount = await utils.getValue(txDetails, "value");
     Debug.print("transactionAmount  " # transactionAmount);
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-    let validTransaction = await validateTransaction(transactionId, receiverTransaction, transactionNat, transferEvent.signature, transform);
+    let validTransaction = await validateTransaction(transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
 
     if (validTransaction) {
       return await createAndSendTransaction(
