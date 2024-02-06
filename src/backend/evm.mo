@@ -284,24 +284,35 @@ module {
 
     // This will be now a transaction without data
 
-    // let method_sig = "swapFromLightningNetwork(address,uint256)";
-    // let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
-    // let method_id = TU.left(keccak256_hex, 7);
-    // let address_64 = TU.fill(address, '0', 64);
-    // let amount_hex = AU.toText(AU.fromNat256(amount));
-    // let amount_64 = TU.fill(amount_hex, '0', 64);
-
-    // let data = "0x" # method_id # address_64 # amount_64;
-
-    let varEIP1159 = await checkEIP11559(recipientAddr, transform);
-
-    // if true .. etc
+    let method_sig = "transfer(address,uint256)";
+    let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
+    let method_id = TU.left(keccak256_hex, 7);
+    let address_64 = TU.fill(recipientAddr, '0', 64);
+    let amount_hex = AU.toText(AU.fromNat256(transactionAmount));
+    let amount_64 = TU.fill(amount_hex, '0', 64);
 
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
       { name = "chain-id"; value = hexChainId },
     ];
+    let data : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
+      "0x00";
+    } else {
+      "0x" # method_id # address_64 # amount_64;
+    };
+
+    let transactionReceiver : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
+      recipientAddr;
+    } else {
+      await utils.httpRequest(null, API_URL # "/getContractAddress", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
+    };
+
+    // Definition of gettxReceiver function
+
+    let varEIP1159 = await checkEIP11559(recipientAddr, transform);
+
+    // if true .. etc
 
     // Fetching maxPriorityFeePerGas for EIP-1559 transactions
     let maxPriorityFeePerGas = if (varEIP1159) {
@@ -327,7 +338,7 @@ module {
 
     Debug.print("gasPrice" # gasPrice);
 
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": \"0x00\" }] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": " #data # " }] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
 
@@ -358,7 +369,7 @@ module {
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
       value = transactionAmount;
-      data = "0x00";
+      data = data;
       chainId = chainId;
       v = "0x00";
       r = "0x00";
@@ -373,7 +384,7 @@ module {
       gasLimit = utils.hexStringToNat64(gas);
       to = recipientAddr;
       value = transactionAmount;
-      data = "0x00";
+      data = data;
       chainId = chainId;
       v = "0x00";
       r = "0x00";

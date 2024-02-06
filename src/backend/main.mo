@@ -170,7 +170,7 @@ actor {
         let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
 
         if (isValidTransaction) {
-          if (reward > 0) {
+          // if (reward > 0) {
             let transferResponse = await EVM.createAndSendTransaction(
               petitionEvent.sendingChain,
               derivationPath,
@@ -192,9 +192,9 @@ actor {
                 return "Failed to transfer reward";
               };
             };
-          } else {
-            return "No reward available for this petition";
-          };
+          // } else {
+          //   return "No reward available for this petition";
+          // };
         } else {
           return "Transaction validation failed";
         };
