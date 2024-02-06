@@ -63,7 +63,9 @@ actor {
 
   let petitions = HashMap.HashMap<Text, Types.PetitionEvent>(10, Text.equal, Text.hash);
 
-  // From Lightning network to RSK blockchain
+  var liquidityProvided : HashMap.HashMap<Text, Nat> = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash); 
+
+  
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
     let invoiceResponse = await LN.generateInvoice(amount, address, time, transform);
     return invoiceResponse;
@@ -128,6 +130,63 @@ actor {
 
   };
 
+  public func addLiquidity(userId : Text, transactionIdA : Text, transactionIdB : Text, chainA : Text, chainB : Text) : async Text {
+    // Fetch and verify transaction A details
+    let txDetailsA = await EVM.getTransactionDetails(transactionIdA, chainA, transform);
+    let parsedTxDetailsA = JSON.parse(txDetailsA);
+    let transactionToAddressA = await utils.getValue(parsedTxDetailsA, "to");
+
+    let canisterAddress = await getEvmAddr();
+
+    // Assuming utils and error handling are implemented
+    // switch (transactionToAddressA) {
+    //   let canisterAddress = await getEvmAddr();
+    //   if ("0x" # addressA != canisterAddress) {
+    //     return "Bad transaction for transaction A";
+    //   };
+    // };
+
+    if ("0x" # transactionToAddressA == canisterAddress) {} else {
+      return "Bad transaction for transaction An";
+    };
+
+    // Fetch and verify transaction B details similarly...
+    let txDetailsB : Text = await EVM.getTransactionDetails(transactionIdB, chainB, transform);
+    let parsedTxDetailsB = JSON.parse(txDetailsB);
+    let transactionToAddressB : Text = await utils.getValue(parsedTxDetailsB, "to");
+
+    // switch (transactionToAddressB) {
+    //   case (null) { return "Transaction B details not found" };
+    //   case (?addressB) {
+    //     let canisterAddress = await getEvmAddr();
+    //     if ("0x" # addressB != canisterAddress) {
+    //       return "Bad transaction for transaction B";
+    //     };
+    //   };
+    // };
+
+    if ("0x" # transactionToAddressB == canisterAddress) {} else {
+      return "Bad transaction for transaction B";
+    };
+
+    // If both transactions are verified, calculate the amount to add to liquidity
+    let transactionAmountA : Text = await utils.getValue(parsedTxDetailsA, "value");
+    let amountA : Nat = Nat64.toNat(utils.hexStringToNat64(transactionAmountA));
+
+    let transactionAmountB : Text = await utils.getValue(parsedTxDetailsB, "value");
+    let amountB : Nat = Nat64.toNat(utils.hexStringToNat64(transactionAmountB));
+
+    // Update liquidity provided by the user (simplified)
+    let currentLiquidity : ?Nat = liquidityProvided.get(userId);
+    let newLiquidity = switch (currentLiquidity) {
+      case (null) { amountA + amountB }; // Assuming a simple sum for illustration
+      case (?amount) { amount + amountA + amountB };
+    };
+    liquidityProvided.put(userId, newLiquidity);
+
+    return "Liquidity added successfully.";
+  };
+
   public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
@@ -170,31 +229,31 @@ actor {
         let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
 
         if (isValidTransaction) {
-          if (reward > 0) {
-            let transferResponse = await EVM.createAndSendTransaction(
-              petitionEvent.sendingChain,
-              derivationPath,
-              keyName,
-              canisterAddress,
-              transactionSenderCleaned,
-              reward + transactionNat,
-              publicKey,
-              transform,
-            );
-            let isError = await utils.getValue(JSON.parse(transferResponse), "error");
-            switch (isError) {
-              case ("") {
-                let _ = petitions.remove(petitionTxId);
-                return "Petition solved successfully and reward transferred";
-              };
-              case (errorValue) {
-                Debug.print("Failed to transfer reward due to error: " # errorValue);
-                return "Failed to transfer reward";
-              };
+          // if (reward > 0) {
+          let transferResponse = await EVM.createAndSendTransaction(
+            petitionEvent.sendingChain,
+            derivationPath,
+            keyName,
+            canisterAddress,
+            transactionSenderCleaned,
+            reward + transactionNat,
+            publicKey,
+            transform,
+          );
+          let isError = await utils.getValue(JSON.parse(transferResponse), "error");
+          switch (isError) {
+            case ("") {
+              let _ = petitions.remove(petitionTxId);
+              return "Petition solved successfully and reward transferred";
             };
-          } else {
-            return "No reward available for this petition";
+            case (errorValue) {
+              Debug.print("Failed to transfer reward due to error: " # errorValue);
+              return "Failed to transfer reward";
+            };
           };
+          // } else {
+          //   return "No reward available for this petition";
+          // };
         } else {
           return "Transaction validation failed";
         };
