@@ -22,9 +22,9 @@ import Types "Types";
 
 actor {
 
-  // let keyName = "dfx_test_key"; // this is for local network
+  let keyName = "dfx_test_key"; // this is for local network
 
-  let keyName = "test_key_1"; //This is for IC network
+  //let keyName = "test_key_1"; //This is for IC network
 
   let API_URL : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
 
@@ -371,5 +371,13 @@ actor {
     };
 
     return result;
+  };
+
+  public query func getPetitions() : async [Types.PetitionEvent] {
+    var entries: [Types.PetitionEvent] = [];
+    for ((_, value) in petitions.entries()) {
+      entries := Array.append(entries,[value]);
+    };
+    entries;
   };
 };

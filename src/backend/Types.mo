@@ -85,5 +85,4 @@ module Types {
         signature : Text;
         reward : Text;
     };
-
 };

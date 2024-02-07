@@ -3,10 +3,14 @@ import { main } from "../../declarations/main";
 import useWeb3Modal from "./hooks/useWeb3Modal";
 import styles from './RSKLightningBridge.module.css';  // Import the CSS module
 
-import EvmToLightning from "./pages/evmToLightning";
-import EvmToEvm from "./pages/evmToEvm";
-import LightningToEvm from "./pages/lightningToEvm";
-import NostrEvents from "./pages/nostrEvents";
+import Header from "./components/Header";
+
+
+import EvmToLightning from "./pages/EvmToLightning";
+import EvmToEvm from "./pages/EvmToEvm";
+import LightningToEvm from "./pages/LightningToEvm";
+import NostrEvents from "./pages/NostrEvents";
+import Petitions from "./pages/Petitions";
 
 
 const App = () => {
@@ -99,32 +103,12 @@ const App = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <p>Welcome to RSK Lightning Bridge!</p>
-        <p>Follow the steps below to bridge your assets.</p>
-      </div>
-      {
-        typeof(window.webln) !== 'undefined' &&
-
-          <div className={styles.balance}>
-            <button className={styles.button} onClick={fetchNodeInfo}>Fetch Node Info</button>
-            {
-              nodeInfo &&
-              <>
-              <p>Alias {nodeInfo.node.alias}</p>
-              <p>Pubkey {nodeInfo.node.pubkey}</p>
-              <p>Balance: {nodeInfo.balance} sats</p>
-              </>
-            }
-          </div>
-      }
-      {
-        coinbase &&
-        <div className={styles.balance}>
-          <p>EVM connected as {coinbase}</p>
-          <p>Your RSK Balance: {rskBalance/10**10} satoshis of rbtc</p>
-        </div>
-      }
+      <Header
+        nodeInfo={nodeInfo}
+        coinbase={coinbase}
+        fetchNodeInfo={fetchNodeInfo}
+        rskBalance={rskBalance}
+      />
       <div className={styles.tabs}>
         <button
           className={activeTab === 'rskToLight' ? styles.activeTab : ''}
@@ -151,6 +135,14 @@ const App = () => {
           EVM to EVM
         </button>
         <button
+          className={activeTab === 'petitions' ? styles.activeTab : ''}
+          onClick={() => {
+            setActiveTab('petitions');
+          }}
+        >
+          Petitions
+        </button>
+        <button
           className={activeTab === 'nostrEvents' ? styles.activeTab : ''}
           onClick={() => {
             setActiveTab('nostrEvents');
@@ -159,7 +151,6 @@ const App = () => {
           Nostr Events
         </button>
       </div>
-
       {
         activeTab === 'rskToLight' ?
         <EvmToLightning 
@@ -175,6 +166,15 @@ const App = () => {
         /> :
         activeTab==='evmToEvm'?
         <EvmToEvm 
+            coinbase={coinbase}
+            netId={netId}
+            provider={provider}
+            canisterAddr={canisterAddr}
+            loadWeb3Modal={loadWeb3Modal}
+            chains={chains}
+        /> :
+        activeTab==='petitions'?
+        <Petitions 
             coinbase={coinbase}
             netId={netId}
             provider={provider}
