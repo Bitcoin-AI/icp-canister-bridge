@@ -1,3 +1,4 @@
+import Bool "mo:base/Bool";
 module Types {
 
     public type Timestamp = Nat64;
@@ -84,6 +85,9 @@ module Types {
         invoiceId : Text; // Only For LN cases
         signature : Text;
         reward : Text;
+        wbtc: Bool;  // If he wants to send just WBTC from wbtc network or rootstock as native btc
+        wantedERC: Text; // The ERC20 that he wants to receive
+        sentERC: Text; // The ERC20 that he is sending
     };
 
 };

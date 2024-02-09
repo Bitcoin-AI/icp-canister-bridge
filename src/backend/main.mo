@@ -20,6 +20,8 @@ import HU "mo:evm-tx/utils/HashUtils";
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import Types "Types";
 
+import Result "mo:base/Result";
+
 actor {
 
   // let keyName = "dfx_test_key"; // this is for local network
@@ -106,10 +108,8 @@ actor {
   };
 
   public shared (msg) func petitionEVM2EVM(petitionEvent : Types.PetitionEvent) : async Text {
-
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-
     let transactionId = petitionEvent.proofTxId;
 
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
@@ -118,14 +118,36 @@ actor {
     let transactionToAddress = await utils.getValue(txDetails, "to");
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
+    // let transactionData = await utils.getValue(txDetails, "to");
     let canisterAddress = await getEvmAddr();
-    if ("0x" # receiverTransaction == canisterAddress) {
-      petitions.put(transactionId, petitionEvent);
-      return "Petition created successfully";
-    } else {
-      return "Bad transaction";
-    };
 
+    let transactionData = await utils.getValue(txDetails, "data");
+
+    // If there is no sentERC20 it is considered that he sent native coin, or if he is sending wbtc
+    if (petitionEvent.sentERC == "0" or petitionEvent.wbtc) {
+      if ("0x" # receiverTransaction == canisterAddress) {
+        petitions.put(transactionId, petitionEvent);
+        return "Petition created successfully";
+      } else {
+        return "Bad transaction";
+      };
+    } else {
+      let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+      switch (decodedDataResult) {
+        case (#ok((address, _))) {
+          if (canisterAddress == address) {
+            // Check if receiver of ERC20 is the canister
+            return "Petition for ERC20 transfer created successfully";
+          } else {
+            return "Bad ERC20 transaction";
+          };
+        };
+        case (#err(errorMsg)) {
+          Debug.print("Error decoding ERC20 data: " # errorMsg);
+          return "Error decoding transaction data";
+        };
+      };
+    };
   };
 
   public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
@@ -150,10 +172,31 @@ actor {
         let resultTxDetailsPetition = await EVM.getTransactionDetails(petitionTxId, petitionEvent.sendingChain, transform);
         let txDetailsPetition = JSON.parse(resultTxDetailsPetition);
 
+        let transactionData = await utils.getValue(txDetailsPetition, "data");
+
         let transactionAmount = await utils.getValue(txDetailsPetition, "value");
-        let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+
+
+
+      // Check the correct Amount depending if it was a ERC20 transaction or not
+        let transactionNat : Nat = if (petitionEvent.wbtc == false or petitionEvent.sentERC == "0") {
+          let transactionAmountText = await utils.getValue(txDetailsPetition, "value");
+          let transactionAmountNat64 = utils.hexStringToNat64(transactionAmountText);
+          Nat64.toNat(transactionAmountNat64); 
+        } else {
+          
+          let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+          switch (decodedDataResult) {
+            case (#ok((_, amountNat))) { amountNat };
+            case (#err(_)) { 0 }; 
+          };
+        };
+
+        let isWBTC = petitionEvent.wbtc;
 
         let isValidTransaction = await EVM.validateTransaction(
+          isWBTC,
+          petitionEvent.wantedERC20,
           proofTxId,
           petitionEvent.wantedAddress, // Expected address
           transactionNat, // Expected amount
@@ -171,27 +214,29 @@ actor {
 
         if (isValidTransaction) {
           // if (reward > 0) {
-            let transferResponse = await EVM.createAndSendTransaction(
-              petitionEvent.sendingChain,
-              derivationPath,
-              keyName,
-              canisterAddress,
-              transactionSenderCleaned,
-              reward + transactionNat,
-              publicKey,
-              transform,
-            );
-            let isError = await utils.getValue(JSON.parse(transferResponse), "error");
-            switch (isError) {
-              case ("") {
-                let _ = petitions.remove(petitionTxId);
-                return "Petition solved successfully and reward transferred";
-              };
-              case (errorValue) {
-                Debug.print("Failed to transfer reward due to error: " # errorValue);
-                return "Failed to transfer reward";
-              };
+          let transferResponse = await EVM.createAndSendTransaction(
+            petitionEvent.sendingChain,
+            petitionEvent.sentERC20,
+            petitionEvent.wbtc,
+            derivationPath,
+            keyName,
+            canisterAddress,
+            transactionSenderCleaned,
+            reward + transactionNat,
+            publicKey,
+            transform,
+          );
+          let isError = await utils.getValue(JSON.parse(transferResponse), "error");
+          switch (isError) {
+            case ("") {
+              let _ = petitions.remove(petitionTxId);
+              return "Petition solved successfully and reward transferred";
             };
+            case (errorValue) {
+              Debug.print("Failed to transfer reward due to error: " # errorValue);
+              return "Failed to transfer reward";
+            };
+          };
           // } else {
           //   return "No reward available for this petition";
           // };

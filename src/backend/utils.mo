@@ -17,19 +17,18 @@ import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
 import Nat32 "mo:base/Nat32";
 import Error "mo:base/Error";
+import Result "mo:base/Result";
 
 module {
 
     type JSONField = (Text, JSON.JSON);
-
-
 
     public func httpRequest(
         jsonRpcPayload : ?Text,
         url : Text,
         headers : ?[{ name : Text; value : Text }],
         method : Text,
-        transform: shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload
+        transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload,
     ) : async Text {
         let ic : Types.IC = actor ("aaaaa-aa");
         var retryCount : Nat = 0;
@@ -207,11 +206,14 @@ module {
     public func hexStringToNat64(hexString : Text) : Nat64 {
 
         let hexStringArray = Iter.toArray(Text.toIter(hexString));
-        let cleanHexString = if (hexString.size() >= 2 and hexStringArray[1] == '0' and hexStringArray[2] == 'x') {
-            subText(hexString, 3, hexString.size() -1);
+        let noPrefixString = if (hexString.size() >= 2 and hexStringArray[0] == '0' and hexStringArray[1] == 'x') {
+            subText(hexString, 2, hexString.size());
         } else {
             hexString;
         };
+
+        let cleanHexString = Text.trimStart(noPrefixString, #char '0');
+
 
         var result : Nat64 = 0;
         var power : Nat64 = 1;
@@ -238,7 +240,10 @@ module {
                 case ('d') { 13 };
                 case ('e') { 14 };
                 case ('f') { 15 };
-                case (_) { 0 }; 
+                case (_) {
+                    Debug.print("Unexpected character in hex string: " # Text.fromChar(char));
+                    0;
+                };
             };
             result += Nat64.fromNat(digitValue) * power;
             power *= 16;
@@ -276,6 +281,29 @@ module {
                 };
             };
         };
+    };
+    public func decodeTransferERC20Data(data : Text) : async Result.Result<(Text, Nat), Text> {
+        Debug.print("Received data: " # data);
+        if (Text.size(data) < 138) {
+            Debug.print("Error: Data too short");
+            return #err("Data too short");
+        };
+
+        // Correctly extract the address part
+        // The address starts at position 10 (after '0xa9059cbb') and is 40 characters long, but with padding in the data string
+        let addressHex = TU.right(TU.left(data, 73), 34); // Extract address with padding
+        let address = "0x" # addressHex; // Prepend '0x'
+        Debug.print("Extracted address: " # address);
+
+        // Correctly extract the amount part
+        let amountHex = TU.right(data, 74); // Last 64 characters for amount
+        Debug.print("Amount hex: " # amountHex);
+        let amount = hexStringToNat64(amountHex); // Convert hex string to Nat
+        let amountNat = Nat64.toNat(amount);
+
+        Debug.print("Converted amount: " # Nat.toText(amountNat));
+
+        return #ok((address, amountNat));
     };
 
 };

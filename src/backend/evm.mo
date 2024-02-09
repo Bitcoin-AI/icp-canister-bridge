@@ -37,7 +37,7 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  public func validateTransaction(transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+  public func validateTransaction(isWBTC : Bool, wantedERC20 : Text, transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
     // Fetch TransactionDetails
     let resultTxDetails = await getTransactionDetails(transactionId, chainId, transform);
@@ -52,13 +52,35 @@ module {
     let transactionSender = await utils.getValue(txDetails, "from");
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
+    let transactionData = await utils.getValue(txDetails, "data");
+
     let validSignature = await checkSignature(transactionId, transactionSenderCleaned, signature);
 
-    // Check if the recipient address and amount in the transaction match the expected values
-    if ("0x" # receiverTransaction == expectedAddress and transactionNat == expectedAmount and validSignature) {
-      return true;
+    if (isWBTC or (wantedERC20 == "0")) {
+      // Validate WBTC transaction or direct value transfer
+      if (("0x" # receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
+        return true;
+      } else {
+        return false;
+      };
     } else {
-      return false;
+      // Decode ERC20 transfer data to validate the transaction
+      let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+      switch (decodedDataResult) {
+        case (#ok((decodedAddress, decodedAmountNat))) {
+          // Here, you need to ensure decodedAddress is the expected ERC20 contract address and decodedAmountNat matches the expectedAmount
+          if (decodedAddress == wantedERC20 and decodedAmountNat == expectedAmount and "0x" # receiverTransaction == expectedAddress and validSignature) {
+            return true;
+          } else {
+            return false;
+          };
+        };
+        case (#err(_)) {
+          // Handle decoding error
+          Debug.print("Error decoding ERC20 transfer data.");
+          return false;
+        };
+      };
     };
   };
 
@@ -112,11 +134,13 @@ module {
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-    let validTransaction = await validateTransaction(transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
+    let validTransaction = await validateTransaction(false, transactionId, "0", canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
 
     if (validTransaction) {
       return await createAndSendTransaction(
         recipientChainId,
+        "0",
+        false,
         derivationPath,
         keyName,
         canisterAddress,
@@ -139,6 +163,8 @@ module {
 
     return await createAndSendTransaction(
       hexChainId,
+      "0",
+      false,
       derivationPath,
       keyName,
       canisterAddress,
@@ -277,7 +303,7 @@ module {
     };
   };
 
-  public func createAndSendTransaction(hexChainId : Text, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func createAndSendTransaction(hexChainId : Text, erc20 : Text, isWBTC : Bool, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
@@ -296,16 +322,18 @@ module {
       { name = "Accept"; value = "application/json" },
       { name = "chain-id"; value = hexChainId },
     ];
-    let data : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
+    let data : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       "0x00";
     } else {
       "0x" # method_id # address_64 # amount_64;
     };
 
-    let transactionReceiver : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
+    let transactionReceiver : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       recipientAddr;
-    } else {
+    } else if (erc20 == "0") {
       await utils.httpRequest(null, API_URL # "/getContractAddress", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
+    } else {
+      erc20;
     };
 
     // Definition of gettxReceiver function
