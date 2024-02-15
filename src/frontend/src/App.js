@@ -53,11 +53,7 @@ const App = () => {
   }, []);
 
 
-  useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
+
 
   /*
   const fetchUserBalance = useCallback(async () => {

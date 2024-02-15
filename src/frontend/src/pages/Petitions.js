@@ -67,11 +67,13 @@ const Petitions = ({
             proofTxId: transaction.hash,
             invoiceId: "null",
             sendingChain: ethers.toBeHex(netId),
-            recipientChain: ethers.toBeHex(JSON.parse(chain).chainId),
-            recipientAddress: evm_address,
-            signature: signature
+            wantedChain: ethers.toBeHex(JSON.parse(chain).chainId),
+            wantedAddress: evm_address,
+            signature: signature,
+            reward: '1'
           }
         );
+        fetchPetitions();
       }
       setMessage(resp);
     } catch (err) {
@@ -117,9 +119,23 @@ const Petitions = ({
   useEffect(() => {
     fetchPetitions();
   },[]);
-
+  useEffect(() => {
+    if (coinbase) {
+      setEvmAddr(coinbase);
+    }
+  }, [coinbase]);
   return(
   <>
+  <div className={styles.step}>
+    <h2>Petitions</h2>
+    {
+      petitions.map(item => {
+        return(
+          JSON.stringify(item)
+        );
+      })
+    }
+  </div>
   <div>
     {/* Content for Petitions */}
     <div className={styles.step}>
@@ -173,7 +189,7 @@ const Petitions = ({
         !coinbase ?
           <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
         !processing ?
-        <button className={styles.button} onClick={sendToken} >Send token</button> :
+        <button className={styles.button} onClick={() => {sendToken(false);}} >Send token</button> :
         <button className={styles.button} disabled >Wait current process</button>
       }
     </div>
@@ -194,19 +210,10 @@ const Petitions = ({
       />
       {
         !processing ?
-        <button className={styles.button} onClick={sendPetitionTxHash}>Finalize swap</button> :
+        <button className={styles.button} onClick={() => {sendPetitionTxHash(false);}}>Finalize petition</button> :
         <button className={styles.button} disabled >Wait current process</button>
       }
     </div>
-  </div>
-  <div className={styles.step}>
-    {
-      petitions.map(item => {
-        return(
-          JSON.stringify(item)
-        );
-      })
-    }
   </div>
   <div style={{overflowX: "auto"}}>
         <span className={styles.message}>{message}</span>
