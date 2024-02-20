@@ -113,13 +113,16 @@ actor {
     let transactionId = petitionEvent.proofTxId;
 
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
+    Debug.print(resultTxDetails);
     let txDetails = JSON.parse(resultTxDetails);
 
     let transactionToAddress = await utils.getValue(txDetails, "to");
+    Debug.print(transactionToAddress);
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
-    let canisterAddress = await getEvmAddr();
-    if ("0x" # receiverTransaction == canisterAddress) {
+    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);    Debug.print("Canister Address: "# canisterAddress);
+    Debug.print("Receiver Address: "# receiverTransaction);
+    if (receiverTransaction == "0x" # canisterAddress) {
       petitions.put(transactionId, petitionEvent);
       return "Petition created successfully";
     } else {
@@ -139,7 +142,7 @@ actor {
         return "No petition found for this transaction";
       };
       case (?petitionEvent) {
-        let canisterAddress = await getEvmAddr();
+        let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);    Debug.print("Canister Address: "# canisterAddress);
 
         let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
         let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
@@ -263,7 +266,8 @@ actor {
   public shared (msg) func getEvmAddr() : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let address = await LN.getEvmAddr(derivationPath, keyName);
+
+    let address = await LN.getEvmAddr(derivationPath,keyName);
     return address;
   };
 
