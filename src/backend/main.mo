@@ -216,7 +216,7 @@ actor {
           // if (reward > 0) {
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
-            petitionEvent.sentERC20,
+            petitionEvent.wantedERC20,
             petitionEvent.wbtc,
             derivationPath,
             keyName,
