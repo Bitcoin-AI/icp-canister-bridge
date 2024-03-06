@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useState,useEffect,useRef } from "react";
 
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
@@ -17,11 +17,27 @@ const Petitions = ({
   const [evm_address, setEvmAddr] = useState('');
   const [chain,setChain] = useState();
   const [amount,setAmount] = useState();
-  
+
+
+  const [solve,setSolvePetition] = useState(false);
+  const petitionToSolve = useRef();
   const [petitions,setPetitions] = useState([]);
+
+  
   const fetchPetitions = async () => {
     try {
-      const newPetitions = await main.getPetitions();
+      const mainPetitions = await main.getPetitions();
+      let newPetitions = [];
+      console.log(chains)
+      for(let mainPetition of mainPetitions){
+        const sendingChain = chains.filter(item => item.chainId === Number(mainPetition.sendingChain))[0];
+        console.log(sendingChain)
+        const jsonRpcProvider = new ethers.JsonRpcProvider(sendingChain.rpc[0]);
+        const transaction = await jsonRpcProvider.getTransaction(mainPetition.proofTxId);
+        mainPetition.transaction = transaction;
+        newPetitions.push(mainPetition);
+        setChain(mainPetition.sendingChain);
+      }
       setPetitions(newPetitions);
       console.log('Petitions:', newPetitions);
     } catch (error) {
@@ -46,7 +62,6 @@ const Petitions = ({
       //const signature = await signer.sign(transaction.hash);
       //const hashedMsg = ethers.hashMessage(`\x19Ethereum Signed Message:\ntest`)
       const signature = await signer.signMessage(transaction.hash);
-      console.log(signature)
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       setMessage("Verifying parameters to process evm payment");
@@ -90,14 +105,18 @@ const Petitions = ({
           await loadWeb3Modal();
         }
         const signer = await provider.getSigner();
-  
+
+        if(solve && !(Number(petitionToSolve.current.wantedChain) === Number(netId))){
+          alert("Wrong network");
+          return
+        }
         //const bridgeWithSigner = bridge.connect(signer);
-        setMessage(`Sending token to ${canisterAddr}`);
+        setMessage(`Sending token to ${solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`}`);
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         const tx = await signer.sendTransaction({
-            to: solve ? `0x${canisterAddr}` : `0x${canisterAddr}`,
-            value: ethers.parseUnits(amount.toString(),10)
+            to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
+            value: solve ? (petitionToSolve.current.transaction.value + petitionToSolve.current.reward).toString() : ethers.parseUnits(amount.toString(),10)
         });
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
@@ -120,87 +139,130 @@ const Petitions = ({
     fetchPetitions();
   },[]);
   useEffect(() => {
+    if(chains){
+      const filteredRpc = chains[0].rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"));
+      if (filteredRpc.length > 0) {
+        setChain(JSON.stringify({
+          rpc: filteredRpc[0].toString(), // Convert rpc to string
+          chainId: chains[0].chainId,
+          name: chains[0].name
+        }));
+      }
+    }
+  },[chains]);
+  useEffect(() => {
     if (coinbase) {
       setEvmAddr(coinbase);
     }
   }, [coinbase]);
   return(
   <>
-  <div className={styles.step}>
-    <h2>Petitions</h2>
-    {
-      petitions.map(item => {
-        return(
-          JSON.stringify(item)
-        );
-      })
-    }
-  </div>
-  <div>
-    {/* Content for Petitions */}
-    <div className={styles.step}>
-      <p>Step 1: Select recipient and EVM compatible chain</p>
-      <label className={styles.label}>EVM Recipient Address</label>
-      <input
-        className={styles.input}
-        value={evm_address}
-        onChange={(ev) => setEvmAddr(ev.target.value)}
-        placeholder="Enter EVM address"
-      />
-      <label className={styles.label}>Select Destiny Chain</label>
-      <select
-        className={styles.input}
-        type="select"
-        onChange={(ev) => setChain(ev.target.value)}
+  <div className={styles.tabs}>
+    <button
+        className={!solve ? styles.activeTab : ''}
+        onClick={() => {
+          setSolvePetition(false);
+        }}
       >
-      {
-        chains.map(item => {
-          return(<option value={JSON.stringify(
-            {
-              rpc: item.rpc.filter(rpcUrl => {
-                if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
-              })[0],
-              chainId: item.chainId,
-              name: item.name
+        Create Petitions
+      </button>
+      <button
+        className={solve ? styles.activeTab : ''}
+        onClick={() => {
+          setSolvePetition(true);
+        }}
+      >
+        Solve Petitions
+      </button>
+  </div>
+  {
+    !solve ?
+    <div className={styles.container}>
+      {/* Content for Petitions */}
+      <div className={styles.step}>
+        <p>Step 1: Select recipient and EVM compatible chain</p>
+        <label className={styles.label}>EVM Recipient Address</label>
+        <input
+          className={styles.input}
+          value={evm_address}
+          onChange={(ev) => setEvmAddr(ev.target.value)}
+          placeholder="Enter EVM address"
+        />
+        <label className={styles.label}>Select Destiny Chain</label>
+        <select
+          className={styles.input}
+          type="select"
+          onChange={(ev) => setChain(ev.target.value)}
+        >
+        {
+          chains.map(item => {
+            const filteredRpc = item.rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"));
+            if (filteredRpc.length > 0) {
+              return (
+                <option value={JSON.stringify({
+                  rpc: filteredRpc[0].toString(), 
+                  chainId: item.chainId,
+                  name: item.name
+                })}>{item.name}</option>
+              );
+            } else {
+              return null; 
             }
-          )}>{item.name}</option>)
-        })
-      }
-      </select>
-      {
-        chain &&
-        <>
-        <p>Bridging to {JSON.parse(chain).name}</p>
-        <p>ChainId {JSON.parse(chain).chainId}</p>
-        </>
+          })
+        }
+        </select>
 
-      }
-    </div>
-    <div class={styles.step}>
-      <p>Step 2: Send token to 0x{canisterAddr}</p>
-      <label className={styles.label}>Amount in satoshis</label>
-      <input
-        className={styles.input}
-        value={amount}
-        onChange={(ev) => setAmount(ev.target.value)}
-        placeholder="Satoshis"
-      />
-      {
-        !coinbase ?
-          <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-        !processing ?
-        <button className={styles.button} onClick={() => {sendToken(false);}} >Send token</button> :
-        <button className={styles.button} disabled >Wait current process</button>
-      }
-    </div>
-    {
-      coinbase && netId &&
-      <div class={styles.step}>
-        <p>Sending from chainId {netId.toString()}</p>
       </div>
-    }
+      <div class={styles.step}>
+        <p>Step 2: Send token to 0x{canisterAddr}</p>
+        <label className={styles.label}>Amount in satoshis</label>
+        <input
+          className={styles.input}
+          value={amount}
+          onChange={(ev) => setAmount(ev.target.value)}
+          placeholder="Satoshis"
+        />
+        {
+          !coinbase ?
+            <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
+          !processing ?
+          <button className={styles.button} onClick={() => {sendToken(solve);}} >Send token</button> :
+          <button className={styles.button} disabled >Wait current process</button>
+        }
+      </div>
+      {
+        coinbase && netId &&
+        <div class={styles.step}>
+          <p>Sending from chainId {netId.toString()}</p>
+        </div>
+      }
+    </div> :
+    <div className={styles.container}>
+      <div className={styles.step}>
+        <h2>Petitions</h2>
+        {
+          petitions.map(item => {
+            return(
+              <div>
+                <p>From chain: {item.sendingChain}</p>
+                <p>To chain: {item.wantedChain}</p>
+                <p>Amount: {(item.transaction?.value)?.toString()}</p>
+                <p>Reward: {item.reward}</p>
+                <button className={styles.button} onClick={async () => {
+                    petitionToSolve.current = item;
+                    sendToken(solve);
+                  }}>Initiate petition solving</button> 
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+
+  }
+  <div className={styles.container}>
     <div class={styles.step}>
-      <p>Step 3: Input evm transaction hash</p>
+      <p>Input evm transaction hash</p>
       <label className={styles.label}>Transaction Hash</label>
       <input
         className={styles.input}
@@ -208,11 +270,13 @@ const Petitions = ({
         onChange={(ev) => setEvmTxHash(ev.target.value)}
         placeholder="Transaction Hash"
       />
-      {
-        !processing ?
-        <button className={styles.button} onClick={() => {sendPetitionTxHash(false);}}>Finalize petition</button> :
-        <button className={styles.button} disabled >Wait current process</button>
-      }
+    </div>
+    <div className={styles.step}>
+    {
+      !processing ?
+      <button className={styles.button} onClick={() => {sendPetitionTxHash(solve);}}>Finalize petition</button> :
+      <button className={styles.button} disabled >Wait current process</button>
+    }
     </div>
   </div>
   <div style={{overflowX: "auto"}}>
