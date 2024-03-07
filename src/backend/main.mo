@@ -131,7 +131,7 @@ actor {
 
   };
 
-  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
@@ -156,23 +156,37 @@ actor {
         let transactionAmount = await utils.getValue(txDetailsPetition, "value");
         let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-        let isValidTransaction = await EVM.validateTransaction(
-          proofTxId,
-          petitionEvent.wantedAddress, // Expected address
-          transactionNat, // Expected amount
-          petitionEvent.wantedChain,
-          signature,
-          transform,
-        );
+        let transactionFrom = await utils.getValue(txDetailsPetition, "from");
 
-        let resultTxDetailsProof = await EVM.getTransactionDetails(proofTxId, petitionEvent.sendingChain, transform);
+
+        let resultTxDetailsProof = await EVM.getTransactionDetails(proofTxId, petitionEvent.wantedChain, transform);
         let proofTxDetails = JSON.parse(resultTxDetailsProof);
 
+        let transactionSolverAmount = await utils.getValue(proofTxDetails, "value");
+        let transactionSolverNat = Nat64.toNat(utils.hexStringToNat64(transactionSolverAmount));
+        Debug.print("TransactionAmount: "#transactionAmount);
+
+        Debug.print("TransactionSolverAmount: "#transactionSolverAmount);
+        
+        if(transactionSolverNat != transactionNat){
+            Debug.print("Amount does not match");
+            return "Failed to solve petition: amount does not match";
+        };
+
         let transactionSolver = await utils.getValue(proofTxDetails, "from");
-
+        let transactionSolverTo = await utils.getValue(proofTxDetails, "to");
+        Debug.print("transactionFrom: "#transactionFrom);
+        Debug.print("transactionSolverTo: "#transactionSolverTo);
+        if(transactionFrom != transactionSolverTo){
+            Debug.print("Amount does not match");
+            return "Failed to solve petition: address to send tokens does not match to the one sent";
+        };
         let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
+        let validSignature = await EVM.checkSignature(proofTxId, transactionSenderCleaned, signature);
 
-        if (isValidTransaction) {
+
+
+        if (validSignature) {
           // if (reward > 0) {
             let transferResponse = await EVM.createAndSendTransaction(
               petitionEvent.sendingChain,
@@ -180,7 +194,7 @@ actor {
               keyName,
               canisterAddress,
               transactionSenderCleaned,
-              reward + transactionNat,
+              transactionNat,
               publicKey,
               transform,
             );

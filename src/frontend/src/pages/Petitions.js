@@ -28,7 +28,6 @@ const Petitions = ({
     try {
       const mainPetitions = await main.getPetitions();
       let newPetitions = [];
-      console.log(chains)
       for(let mainPetition of mainPetitions){
         const sendingChain = chains.filter(item => item.chainId === Number(mainPetition.sendingChain))[0];
         console.log(sendingChain)
@@ -36,7 +35,6 @@ const Petitions = ({
         const transaction = await jsonRpcProvider.getTransaction(mainPetition.proofTxId);
         mainPetition.transaction = transaction;
         newPetitions.push(mainPetition);
-        setChain(mainPetition.sendingChain);
       }
       setPetitions(newPetitions);
       console.log('Petitions:', newPetitions);
@@ -67,14 +65,9 @@ const Petitions = ({
       setMessage("Verifying parameters to process evm payment");
       if(solve){
         resp = await main.solvePetitionEVM2EVM(
-          {
-            proofTxId: transaction.hash,
-            invoiceId: "null",
-            sendingChain: ethers.toBeHex(netId),
-            recipientChain: ethers.toBeHex(JSON.parse(chain).chainId),
-            recipientAddress: evm_address,
-            signature: signature
-          }
+          petitionToSolve.current.transaction.hash,
+          transaction.hash,
+          signature
         );
       } else {
         resp = await main.petitionEVM2EVM(
@@ -116,7 +109,7 @@ const Petitions = ({
         // Change for wbtc or rsk transaction based on ChainId
         const tx = await signer.sendTransaction({
             to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
-            value: solve ? (petitionToSolve.current.transaction.value + petitionToSolve.current.reward).toString() : ethers.parseUnits(amount.toString(),10)
+            value: solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
         });
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
@@ -252,6 +245,9 @@ const Petitions = ({
                     petitionToSolve.current = item;
                     sendToken(solve);
                   }}>Initiate petition solving</button> 
+                <button className={styles.button} onClick={async () => {
+                    petitionToSolve.current = item;
+                  }}>Select Petition</button> 
               </div>
             );
           })
