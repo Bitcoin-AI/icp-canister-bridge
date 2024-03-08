@@ -150,7 +150,7 @@ actor {
     };
   };
 
-  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text, keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
