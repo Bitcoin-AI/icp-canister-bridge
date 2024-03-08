@@ -53,9 +53,9 @@ module {
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
     let validSignature = await checkSignature(transactionId, transactionSenderCleaned, signature);
-    Debug.print("Transaction Receiver: "#receiverTransaction);
-    Debug.print("Expected Address: "#expectedAddress);
-    Debug.print("Transaction Amount: "#transactionAmount);
+    Debug.print("Transaction Receiver: " #receiverTransaction);
+    Debug.print("Expected Address: " #expectedAddress);
+    Debug.print("Transaction Amount: " #transactionAmount);
 
     // Check if the recipient address and amount in the transaction match the expected values
     if (receiverTransaction == "0x" # expectedAddress and transactionNat == expectedAmount and validSignature) {
@@ -299,11 +299,20 @@ module {
       { name = "Accept"; value = "application/json" },
       { name = "chain-id"; value = hexChainId },
     ];
+
+    // Debug hexchainID
+
+    Debug.print("chainId " #hexChainId);
+
     let data : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
       "0x00";
     } else {
       "0x" # method_id # address_64 # amount_64;
     };
+
+    Debug.print("data " #data);
+
+    Debug.print("recipientAddr " # recipientAddr);
 
     let transactionReceiver : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
       recipientAddr;
@@ -312,6 +321,8 @@ module {
     };
 
     // Definition of gettxReceiver function
+
+    Debug.print("transactionReceiver " #transactionReceiver);
 
     let varEIP1159 = await checkEIP11559(recipientAddr, transform);
 
@@ -341,20 +352,16 @@ module {
 
     Debug.print("gasPrice" # gasPrice);
 
-    
-    /*Fetching gas for EIP-1559 transactions
-    let gas = if (varEIP1159) {
-      "0x5474"; // Fast Fix to test
-    } else {
-      let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": " #data # " }] }";
-      let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
-      Debug.print("responseGas" # responseGas);
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # transactionReceiver # "\", \"value\": \"0x1\", \"data\": \"" # data # "\" }] }";
 
-      let parsedGasValue = JSON.parse(responseGas);
-      await utils.getValue(parsedGasValue, "result");
-    };
-    */
-    let gas = "0x5474"; // Fast Fix to test
+    Debug.print("estimateGasPayload" # estimateGasPayload);
+
+    let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
+    Debug.print("responseGas" # responseGas);
+
+    let parsedGasValue = JSON.parse(responseGas);
+    let gas = await utils.getValue(parsedGasValue, "result");
+
     Debug.print("gas" # gas);
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # canisterAddress # "\", \"latest\"] }";
