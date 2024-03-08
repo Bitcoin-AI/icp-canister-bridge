@@ -58,7 +58,8 @@ const EvmToLightning = ({
             sendingChain: ethers.toBeHex(netId),
             recipientChain: ethers.toBeHex(netId),
             recipientAddress: `0x${canisterAddr}`,
-            signature: signature
+            signature: signature,
+            reward: "0"
           },
           new Date().getTime().toString()
         );

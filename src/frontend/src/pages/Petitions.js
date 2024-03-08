@@ -81,7 +81,9 @@ const Petitions = ({
             reward: '1'
           }
         );
-        fetchPetitions();
+        setTimeout(() => {
+          fetchPetitions();
+        },1000);
       }
       setMessage(resp);
     } catch (err) {
@@ -235,6 +237,7 @@ const Petitions = ({
         <h2>Petitions</h2>
         {
           petitions.map(item => {
+            //if(Number(netId) !== Number(item.wantedChain)) return;
             return(
               <div>
                 <p>From chain: {item.sendingChain}</p>

@@ -47,7 +47,8 @@ const EvmToEvm = ({
           sendingChain: ethers.toBeHex(netId),
           recipientChain: ethers.toBeHex(JSON.parse(chain).chainId),
           recipientAddress: evm_address,
-          signature: signature
+          signature: signature,
+          reward: "0"
         }
       );
       setMessage(resp);
