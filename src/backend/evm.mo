@@ -317,7 +317,7 @@ module {
     let transactionReceiver : Text = if (hexChainId == "0x1e" or hexChainId == "0x1f") {
       recipientAddr;
     } else {
-      await utils.httpRequest(null, API_URL # "/getContractAddress", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
+      await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
     };
 
     // Definition of gettxReceiver function

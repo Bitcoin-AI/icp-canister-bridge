@@ -1,6 +1,7 @@
 import React, { useState,useEffect,useRef } from "react";
 
 import { ethers } from 'ethers';
+import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
 const Petitions = ({
@@ -29,12 +30,16 @@ const Petitions = ({
       const mainPetitions = await main.getPetitions();
       let newPetitions = [];
       for(let mainPetition of mainPetitions){
-        const sendingChain = chains.filter(item => item.chainId === Number(mainPetition.sendingChain))[0];
-        console.log(sendingChain)
-        const jsonRpcProvider = new ethers.JsonRpcProvider(sendingChain.rpc[0]);
-        const transaction = await jsonRpcProvider.getTransaction(mainPetition.proofTxId);
-        mainPetition.transaction = transaction;
-        newPetitions.push(mainPetition);
+        try{
+          const sendingChain = chains.filter(item => item.chainId === Number(mainPetition.sendingChain))[0];
+          console.log(sendingChain)
+          const jsonRpcProvider = new ethers.JsonRpcProvider(sendingChain.rpc[0]);
+          const transaction = await jsonRpcProvider.getTransaction(mainPetition.proofTxId);
+          mainPetition.transaction = transaction;
+          newPetitions.push(mainPetition);
+        } catch(err){
+          console.log(mainPetition)
+        }
       }
       setPetitions(newPetitions);
       console.log('Petitions:', newPetitions);
@@ -109,10 +114,21 @@ const Petitions = ({
         setMessage(`Sending token to ${solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`}`);
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
-        const tx = await signer.sendTransaction({
+        let tx;
+        if(netId === 31){
+          tx = await signer.sendTransaction({
             to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
             value: solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
-        });
+          });
+        } else {
+          // Connect contract and do transaction;
+          const wbtcAddress = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
+          const tokenContract = new ethers.Contract(wbtcAddress, ERC20ABI, signer);
+          tx = await tokenContract.transfer(
+            solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
+            solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
+          );
+        }
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
         setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);

@@ -31,6 +31,12 @@ const App = () => {
     loadWeb3Modal
   } = useWeb3Modal();
 
+  const wbtcAddresses = {
+    '1': '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // Ethereum Mainnet
+    '8453': '0x1ceA84203673764244E05693e42E6Ace62bE9BA5', // Base 
+    '2222': '0xD359A8549802A8122C4cfe5d84685e347E22E946', // Kava
+    '11155111': '0x0311FC95124Ca345a3913b6133028Ac8DEe47AA5' // Sepolia
+  };
 
   useEffect(() => {
     let rpcNodes = [];
@@ -38,14 +44,20 @@ const App = () => {
       const chainsResp = await response.json();
       chainsResp.map(item => {
         const rpc = item.rpc.filter(rpc => {
-          if(rpc.indexOf("INFURA_API_KEY") !== -1 || rpc.indexOf("rsk") !== -1 || rpc.indexOf("mumbai") !== -1){
-            console.log(rpc)
+          if(rpc.indexOf("INFURA_API_KEY") !== -1 || rpc.indexOf("rsk") !== -1){
             return(rpc)
           }
         });
         if(rpc.length > 0){
           console.log(item)
-          rpcNodes.push(item)
+          if(wbtcAddresses[item.chainId.toString()]){
+            rpcNodes.push({
+              ...item,
+              wbtcAddress: wbtcAddresses[item.chainId.toString()].toLowerCase()
+            });
+          } else {
+            rpcNodes.push(item);
+          }
         }
       });
       setChains(rpcNodes);
@@ -138,14 +150,6 @@ const App = () => {
         >
           Petitions
         </button>
-        <button
-          className={activeTab === 'nostrEvents' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('nostrEvents');
-          }}
-        >
-          Nostr Events
-        </button>
       </div>
       {
         activeTab === 'rskToLight' ?
@@ -155,6 +159,7 @@ const App = () => {
             provider={provider}
             canisterAddr={canisterAddr}
             loadWeb3Modal={loadWeb3Modal}
+            chains={chains}
         /> :
         activeTab === 'lightToRSK' ?
         <LightningToEvm 
@@ -169,7 +174,7 @@ const App = () => {
             loadWeb3Modal={loadWeb3Modal}
             chains={chains}
         /> :
-        activeTab==='petitions'?
+        activeTab==='petitions' &&
         <Petitions 
             coinbase={coinbase}
             netId={netId}
@@ -177,8 +182,7 @@ const App = () => {
             canisterAddr={canisterAddr}
             loadWeb3Modal={loadWeb3Modal}
             chains={chains}
-        /> :
-        <NostrEvents />
+        /> 
       }
 
     </div>

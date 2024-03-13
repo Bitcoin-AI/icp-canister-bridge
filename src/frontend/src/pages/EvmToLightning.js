@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 
 import { ethers } from 'ethers';
+import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
 const EvmToLightning = ({
@@ -8,7 +9,8 @@ const EvmToLightning = ({
   netId,
   provider,
   canisterAddr,
-  loadWeb3Modal
+  loadWeb3Modal,
+  chains
 }) => {
   const [message, setMessage] = useState('');
   const [processing,setProcessing] = useState();
@@ -82,10 +84,18 @@ const EvmToLightning = ({
         setMessage(`Sending token to ${canisterAddr}`);
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
-        const tx = await signer.sendTransaction({
+        let tx;
+        if(netId === 31){
+          tx = await signer.sendTransaction({
             to: `0x${canisterAddr}`,
             value: ethers.parseUnits(amount.toString(),10)
-        });
+          });
+        } else {
+          // Connect contract and do transaction;
+          const wbtcAddress = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
+          const tokenContract = new ethers.Contract(wbtcAddress, ERC20ABI, signer);
+          tx = await tokenContract.transfer(`0x${canisterAddr}`, ethers.parseUnits(amount.toString(), 10));
+        }
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
         setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
