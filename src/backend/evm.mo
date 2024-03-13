@@ -331,7 +331,7 @@ module {
     let transactionReceiver : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       recipientAddr;
     } else if (erc20 == "0") {
-      await utils.httpRequest(null, API_URL # "/getContractAddress", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
+      await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
     } else {
       erc20;
     };
