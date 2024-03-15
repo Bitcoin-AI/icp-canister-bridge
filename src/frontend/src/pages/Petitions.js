@@ -75,6 +75,9 @@ const Petitions = ({
           signature
         );
       } else {
+        const wbtcAddressWanted = chains.filter(item => {return item.chainId === Number(JSON.parse(chain).chainId)})[0].wbtcAddress;
+        const wbtcAddressSent = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
+
         resp = await main.petitionEVM2EVM(
           {
             proofTxId: transaction.hash,
@@ -83,7 +86,10 @@ const Petitions = ({
             wantedChain: ethers.toBeHex(JSON.parse(chain).chainId),
             wantedAddress: evm_address,
             signature: signature,
-            reward: '1'
+            reward: '1',
+            wbtc: wbtcAddressWanted ? true : false,
+            wantedERC20: wbtcAddressWanted ? wbtcAddressWanted : "0",
+            sentERC: wbtcAddressSent ? wbtcAddressSent : "0"
           }
         );
         setTimeout(() => {
@@ -115,7 +121,7 @@ const Petitions = ({
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         let tx;
-        if(netId === 31){
+        if(Number(netId) === 31){
           tx = await signer.sendTransaction({
             to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
             value: solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
