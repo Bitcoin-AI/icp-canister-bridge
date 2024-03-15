@@ -213,14 +213,16 @@ module {
             hexString;
         };
         Debug.print("noPrefixString "#noPrefixString);
-        //let cleanHexString = Text.trimStart(noPrefixString, #char '0');
 
-        //Debug.print("cleanHexString: " # cleanHexString);
+        let cleanHexString = Text.trimEnd(noPrefixString, #text "\"");      
+        Debug.print("cleanHexString: " # cleanHexString);
+        let treatedCleanHexString = Text.trimStart(cleanHexString, #char '0');
+        Debug.print("treatedCleanHexString: " # treatedCleanHexString);
 
         var result : Nat64 = 0;
         var power : Nat64 = 1;
 
-        let charsArray = Iter.toArray(noPrefixString.chars());
+        let charsArray = Iter.toArray(treatedCleanHexString.chars());
         let arraySize = charsArray.size();
 
         for (i in Iter.range(0, arraySize - 1)) {
@@ -293,12 +295,12 @@ module {
 
         // Correctly extract the address part
         // The address starts at position 10 (after '0xa9059cbb') and is 40 characters long, but with padding in the data string
-        let addressHex = TU.right(TU.left(data, 73), 34); // Extract address with padding
+        let addressHex = TU.right(TU.left(data, 74), 35); // Extract address with padding
         let address = "0x" # addressHex; // Prepend '0x'
         Debug.print("Extracted address: " # address);
 
         // Correctly extract the amount part
-        let amountHex = TU.right(data, 74); // Last 64 characters for amount
+        let amountHex = TU.right(data, 75); // Last 64 characters for amount
         Debug.print("Amount hex: " # amountHex);
         let amount = hexStringToNat64(amountHex); // Convert hex string to Nat
         let amountNat = Nat64.toNat(amount);

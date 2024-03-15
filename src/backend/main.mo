@@ -106,29 +106,53 @@ actor {
   };
 
   public shared (msg) func petitionEVM2EVM(petitionEvent : Types.PetitionEvent) : async Text {
-
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-
     let transactionId = petitionEvent.proofTxId;
 
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
-    Debug.print(resultTxDetails);
     let txDetails = JSON.parse(resultTxDetails);
 
     let transactionToAddress = await utils.getValue(txDetails, "to");
-    Debug.print(transactionToAddress);
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
-    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);    Debug.print("Canister Address: "# canisterAddress);
-    Debug.print("Receiver Address: "# receiverTransaction);
-    if (receiverTransaction == "0x" # canisterAddress) {
-      petitions.put(transactionId, petitionEvent);
-      return "Petition created successfully";
-    } else {
-      return "Bad transaction";
-    };
+    // let transactionData = await utils.getValue(txDetails, "to");
+    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
 
+    let transactionData = await utils.getValue(txDetails, "input");
+
+    // If there is no sentERC20 it is considered that he sent native coin, or if he is sending wbtc
+    if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
+      if (receiverTransaction == "0x"#canisterAddress) {
+        petitions.put(transactionId, petitionEvent);
+        Debug.print("Petition for created successfully");
+        return "Petition created successfully";
+      } else {
+        Debug.print("Bad transaction");
+        return "Bad transaction";
+      };
+    } else {
+      let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+      switch (decodedDataResult) {
+        case (#ok((address, _))) {
+          Debug.print("Canister Address: "#canisterAddress);
+          Debug.print("ERC20 transfer data address: "#address);
+          if ("0x"#canisterAddress == address) {
+            // Check if receiver of ERC20 is the canister
+            petitions.put(transactionId, petitionEvent);
+            Debug.print("Petition for ERC20 transfer created successfully");
+            return "Petition for ERC20 transfer created successfully";
+          } else {
+            Debug.print("Bad ERC20 transaction");
+            return "Bad ERC20 transaction";
+          };
+        };
+        case (#err(errorMsg)) {
+          Debug.print("Error decoding ERC20 data: " # errorMsg);
+          return "Error decoding transaction data";
+        };
+      };
+    };
   };
 
   public shared (msg) func solvePetitionEVM2EVM(petitionTxId : Text, proofTxId : Text, signature : Text) : async Text {
@@ -142,18 +166,19 @@ actor {
         return "No petition found for this transaction";
       };
       case (?petitionEvent) {
-        let canisterAddress = await getEvmAddr();
+        let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
 
         let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
         let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
           case (null) { 0 };
           case (?value) { value };
         };
+        Debug.print("Checking petiton event to be solved");
 
         let resultTxDetailsPetition = await EVM.getTransactionDetails(petitionTxId, petitionEvent.sendingChain, transform);
         let txDetailsPetition = JSON.parse(resultTxDetailsPetition);
 
-        let transactionData = await utils.getValue(txDetailsPetition, "data");
+        let transactionData = await utils.getValue(txDetailsPetition, "input");
 
         let transactionAmount = await utils.getValue(txDetailsPetition, "value");
 
@@ -161,8 +186,7 @@ actor {
 
       // Check the correct Amount depending if it was a ERC20 transaction or not
         let transactionNat : Nat = if (petitionEvent.wbtc == false or petitionEvent.sentERC == "0") {
-          let transactionAmountText = await utils.getValue(txDetailsPetition, "value");
-          let transactionAmountNat64 = utils.hexStringToNat64(transactionAmountText);
+          let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
           Nat64.toNat(transactionAmountNat64); 
         } else {
           
@@ -172,12 +196,21 @@ actor {
             case (#err(_)) { 0 }; 
           };
         };
+        Debug.print("Checking WBTC");
 
-        let isWBTC = petitionEvent.wbtc;
+        let isWBTC: Bool = if(transactionAmount != "0x" and petitionEvent.wantedERC20 == "0"){
+          false;
+        } else {
+          true;
+        };
+        if(isWBTC){
+          Debug.print("WBTC transaction");
+        };
+        Debug.print("Amount: "#Nat.toText(transactionNat));
 
         let isValidTransaction = await EVM.validateTransaction(
           isWBTC,
-          petitionEvent.wantedERC20,
+          petitionEvent.wantedAddress,
           proofTxId,
           petitionEvent.wantedAddress, // Expected address
           transactionNat, // Expected amount
@@ -185,19 +218,25 @@ actor {
           signature,
           transform,
         );
+        Debug.print("Petition event transaction validation finished");
+        if(isValidTransaction == false){
+          Debug.print("Transaction Validation Failed");
+        };
+        Debug.print("Checking petition solve transaction");
 
-        let resultTxDetailsProof = await EVM.getTransactionDetails(proofTxId, petitionEvent.sendingChain, transform);
+        let resultTxDetailsProof = await EVM.getTransactionDetails(proofTxId, petitionEvent.wantedChain, transform);
         let proofTxDetails = JSON.parse(resultTxDetailsProof);
 
         let transactionSolver = await utils.getValue(proofTxDetails, "from");
 
         let transactionSenderCleaned = utils.subText(transactionSolver, 1, transactionSolver.size() - 1);
+        Debug.print("Petition solve transaction being validated");
 
         if (isValidTransaction) {
           // if (reward > 0) {
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
-            petitionEvent.wantedERC20,
+            petitionEvent.sentERC,
             petitionEvent.wbtc,
             derivationPath,
             keyName,
@@ -211,6 +250,9 @@ actor {
           switch (isError) {
             case ("") {
               let _ = petitions.remove(petitionTxId);
+                      
+              Debug.print("Petition solved");
+
               return "Petition solved successfully and reward transferred";
             };
             case (errorValue) {
@@ -222,6 +264,8 @@ actor {
           //   return "No reward available for this petition";
           // };
         } else {
+          Debug.print("Petition solve transaction failed");
+
           return "Transaction validation failed";
         };
       };

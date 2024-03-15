@@ -28,6 +28,7 @@ const Petitions = ({
   const fetchPetitions = async () => {
     try {
       const mainPetitions = await main.getPetitions();
+      console.log(mainPetitions)
       let newPetitions = [];
       for(let mainPetition of mainPetitions){
         try{
@@ -35,6 +36,7 @@ const Petitions = ({
           console.log(sendingChain)
           const jsonRpcProvider = new ethers.JsonRpcProvider(sendingChain.rpc[0]);
           const transaction = await jsonRpcProvider.getTransaction(mainPetition.proofTxId);
+          console.log(transaction)
           mainPetition.transaction = transaction;
           newPetitions.push(mainPetition);
         } catch(err){
@@ -77,17 +79,16 @@ const Petitions = ({
       } else {
         const wbtcAddressWanted = chains.filter(item => {return item.chainId === Number(JSON.parse(chain).chainId)})[0].wbtcAddress;
         const wbtcAddressSent = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
-
         resp = await main.petitionEVM2EVM(
           {
             proofTxId: transaction.hash,
             invoiceId: "null",
             sendingChain: ethers.toBeHex(netId),
             wantedChain: ethers.toBeHex(JSON.parse(chain).chainId),
-            wantedAddress: evm_address,
+            wantedAddress: evm_address.toLowerCase(),
             signature: signature,
-            reward: '1',
-            wbtc: wbtcAddressWanted ? true : false,
+            reward: '0',
+            wbtc: wbtcAddressSent ? true : false,
             wantedERC20: wbtcAddressWanted ? wbtcAddressWanted : "0",
             sentERC: wbtcAddressSent ? wbtcAddressSent : "0"
           }
@@ -121,10 +122,19 @@ const Petitions = ({
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         let tx;
+        let value;
+        if(solve){
+          value = petitionToSolve.current.transaction.value;
+          if(petitionToSolve.current.sentERC !== "0"){
+            value = `0x${petitionToSolve.current.transaction.data.slice(74).replace(/^0+/, '')}`
+          };
+          console.log(petitionToSolve.current.transaction.data)
+          alert(value)
+        }
         if(Number(netId) === 31){
           tx = await signer.sendTransaction({
             to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
-            value: solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
+            value: solve ? (value).toString() : ethers.parseUnits(amount.toString(),10)
           });
         } else {
           // Connect contract and do transaction;
@@ -132,7 +142,7 @@ const Petitions = ({
           const tokenContract = new ethers.Contract(wbtcAddress, ERC20ABI, signer);
           tx = await tokenContract.transfer(
             solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
-            solve ? (petitionToSolve.current.transaction.value).toString() : ethers.parseUnits(amount.toString(),10)
+            solve ? (value).toString() : ethers.parseUnits(amount.toString(),10)
           );
         }
         console.log("Transaction sent:", tx.hash);
@@ -264,7 +274,11 @@ const Petitions = ({
               <div>
                 <p>From chain: {item.sendingChain}</p>
                 <p>To chain: {item.wantedChain}</p>
-                <p>Amount: {(item.transaction?.value)?.toString()}</p>
+                <p>Amount: {
+                    item.sentERC20 === "0" ?
+                    (item.transaction?.value)?.toString() :
+                    Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)
+                    }</p>
                 <p>Reward: {item.reward}</p>
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;

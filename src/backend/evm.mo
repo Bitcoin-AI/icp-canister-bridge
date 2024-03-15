@@ -52,13 +52,16 @@ module {
     let transactionSender = await utils.getValue(txDetails, "from");
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);
 
-    let transactionData = await utils.getValue(txDetails, "data");
+    let transactionData = await utils.getValue(txDetails, "input");
 
     let validSignature = await checkSignature(transactionId, transactionSenderCleaned, signature);
-
-    if (isWBTC or (wantedERC20 == "0")) {
+    Debug.print("Receiver Transaction: "#receiverTransaction);
+    Debug.print("Expected address: "#expectedAddress);
+    Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
+    Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
+    if ((isWBTC == false) or (wantedERC20 == "0")) {
       // Validate WBTC transaction or direct value transfer
-      if (("0x" # receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
+      if ((receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
         return true;
       } else {
         return false;
@@ -68,8 +71,10 @@ module {
       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
       switch (decodedDataResult) {
         case (#ok((decodedAddress, decodedAmountNat))) {
+          Debug.print("Decoded Address: "#decodedAddress);
+          Debug.print("Decoded Amount Nat: "#Nat.toText(decodedAmountNat));
           // Here, you need to ensure decodedAddress is the expected ERC20 contract address and decodedAmountNat matches the expectedAmount
-          if (decodedAddress == wantedERC20 and decodedAmountNat == expectedAmount and "0x" # receiverTransaction == expectedAddress and validSignature) {
+          if (decodedAddress == wantedERC20 and decodedAmountNat == expectedAmount and receiverTransaction == expectedAddress and validSignature) {
             return true;
           } else {
             return false;
@@ -330,11 +335,13 @@ module {
 
     let transactionReceiver : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       recipientAddr;
-    } else if (erc20 == "0") {
-      await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
-    } else {
+    } else if (erc20 != "0") {
       erc20;
+    } else {
+      await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
     };
+
+    Debug.print("Transaction receiver: "#transactionReceiver);
 
     // Definition of gettxReceiver function
 
@@ -366,7 +373,7 @@ module {
 
     Debug.print("gasPrice" # gasPrice);
 
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # recipientAddr # "\", \"value\": \"0x1\", \"data\": " #data # " }] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # transactionReceiver # "\", \"value\": \"0x1\", \"data\": \"" # data # "\"}] }";
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
 
