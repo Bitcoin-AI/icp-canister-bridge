@@ -61,13 +61,16 @@ module {
     Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
     Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
     if ((isWBTC == false) or (wantedERC20 == "0")) {
+      Debug.print("Validating direct value transfer");
+
       // Validate WBTC transaction or direct value transfer
-      if ((receiverTransaction == "0x"#expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
+      if ((receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
         return true;
       } else {
         return false;
       };
     } else {
+      Debug.print(" Decoding ERC20 transfer data to validate the transaction");
       // Decode ERC20 transfer data to validate the transaction
       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
       switch (decodedDataResult) {
@@ -75,7 +78,7 @@ module {
           Debug.print("Decoded Address: "#decodedAddress);
           Debug.print("Decoded Amount Nat: "#Nat.toText(decodedAmountNat));
           // Here, you need to ensure decodedAddress is the expected ERC20 contract address and decodedAmountNat matches the expectedAmount
-          if (decodedAddress == wantedERC20 and decodedAmountNat == expectedAmount and receiverTransaction == expectedAddress and validSignature) {
+          if (decodedAddress == expectedAddress and decodedAmountNat == expectedAmount and receiverTransaction == wantedERC20 and validSignature) {
             return true;
           } else {
             return false;
@@ -144,15 +147,16 @@ module {
 
 
     Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
-    let rskId = utils.hexToNat("0x1f");
+
     Debug.print("Checking WBTC address");
 
-    let wbtcAddressSendingChain: Text = switch(utils.hexToNat(sendingChainId)){
-      case(rskId){
+    let wbtcAddressSendingChain: Text = switch(sendingChainId){
+
+      case("0x1f"){
         Debug.print("Sending chain is rsk");
         "0";
       };
-      case(_) { 
+      case(_) {
         Debug.print("Getting WBTC address for sending chain "#sendingChainId);
         let requestHeaders = [
             { name = "Content-Type"; value = "application/json" },
@@ -163,14 +167,14 @@ module {
       };
     };
 
-    let validTransaction: Bool = switch (utils.hexToNat(sendingChainId)) {
+    let validTransaction: Bool = switch (sendingChainId) {
 
-      case(rskId) { 
-        await validateTransaction(false, "0",transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
+      case("0x1f") {
+        await validateTransaction(false, "0",transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
       };
       case(_) {
         // Handle other cases here
-        await validateTransaction(true,wbtcAddressSendingChain,transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
+        await validateTransaction(true,wbtcAddressSendingChain,transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
       };
     };
 
@@ -184,12 +188,12 @@ module {
     Debug.print("Checking if recipient chain requires WBTC");
 
 
-    let wbtcAddress: Text = switch(utils.hexToNat(recipientChainId)){
-      case(rskId){
+    let wbtcAddress: Text = switch(recipientChainId){
+      case("0x1f"){
         Debug.print("Recipient chain is rsk");
         "0";
       };
-      case(_) { 
+      case(_) {
         Debug.print("Getting WBTC address for recipient chain "#recipientChainId);
 
         let requestHeaders = [
@@ -201,12 +205,12 @@ module {
       };
     };
 
-    let isWBTC: Bool = switch(utils.hexToNat(recipientChainId)){
-      case(rskId){
-        true;
+    let isWBTC: Bool = switch(recipientChainId){
+      case("0x1f"){
+        false;
       };
       case(_){
-        false;
+        true;
       };
     };
 

@@ -125,7 +125,14 @@ actor {
     if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
       if (receiverTransaction == "0x"#canisterAddress) {
         petitions.put(transactionId, petitionEvent);
-        Debug.print("Petition for created successfully");
+        Debug.print("Petition created successfully");
+        Debug.print("isWBTC: "#Bool.toText(petitionEvent.wbtc));
+        Debug.print("sendingChain: "#petitionEvent.sendingChain);
+        Debug.print("wantedAddress: "#petitionEvent.wantedAddress);
+        Debug.print("wantedChain: "#petitionEvent.wantedChain);
+        Debug.print("wantedERC20: "#petitionEvent.wantedERC20);
+        Debug.print("sentERC20: "#petitionEvent.sentERC);
+
         return "Petition created successfully";
       } else {
         Debug.print("Bad transaction");
@@ -187,30 +194,35 @@ actor {
       // Check the correct Amount depending if it was a ERC20 transaction or not
         let transactionNat : Nat = if (petitionEvent.wbtc == false or petitionEvent.sentERC == "0") {
           let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
-          Nat64.toNat(transactionAmountNat64); 
+          Nat64.toNat(transactionAmountNat64);
         } else {
-          
+
           let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
           switch (decodedDataResult) {
             case (#ok((_, amountNat))) { amountNat };
-            case (#err(_)) { 0 }; 
+            case (#err(_)) { 0 };
           };
         };
-        Debug.print("Checking WBTC");
-
-        let isWBTC: Bool = if(transactionAmount != "0x" and petitionEvent.wantedERC20 == "0"){
-          false;
-        } else {
-          true;
+        Debug.print("Amount that needs to be sent: "#Nat.toText(transactionNat));
+        let isWBTC: Bool = switch(petitionEvent.wantedChain){
+          case("0x1f"){
+            false;
+          };
+          case(_){
+            true;
+          };
         };
-        if(isWBTC){
-          Debug.print("WBTC transaction");
-        };
-        Debug.print("Amount: "#Nat.toText(transactionNat));
+        Debug.print("Validating transaction with parameters");
+        Debug.print("isWBTC: "#Bool.toText(isWBTC));
+        Debug.print("petitionEvent.wantedERC20: "#petitionEvent.wantedERC20);
+        Debug.print("proofTxId: "#proofTxId);
+        Debug.print("petitionEvent.wantedAddress: "#petitionEvent.wantedAddress);
+        Debug.print("transactionNat: "#Nat.toText(transactionNat));
+        Debug.print("petitionEvent.wantedChain: "#petitionEvent.wantedChain);
 
         let isValidTransaction = await EVM.validateTransaction(
           isWBTC,
-          petitionEvent.wantedAddress,
+          petitionEvent.wantedERC20,
           proofTxId,
           petitionEvent.wantedAddress, // Expected address
           transactionNat, // Expected amount
@@ -237,7 +249,7 @@ actor {
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
             petitionEvent.sentERC,
-            petitionEvent.wbtc,
+            isWBTC,
             derivationPath,
             keyName,
             canisterAddress,
@@ -250,7 +262,7 @@ actor {
           switch (isError) {
             case ("") {
               let _ = petitions.remove(petitionTxId);
-                      
+
               Debug.print("Petition solved");
 
               return "Petition solved successfully and reward transferred";
