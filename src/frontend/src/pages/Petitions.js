@@ -275,7 +275,7 @@ const Petitions = ({
                 <p>From chain: {item.sendingChain}</p>
                 <p>To chain: {item.wantedChain}</p>
                 <p>Amount: {
-                    item.sentERC20 === "0" ?
+                    item.sendingChain === "0x1f" ?
                     (item.transaction?.value)?.toString() :
                     Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)
                     }</p>

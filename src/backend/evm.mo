@@ -40,6 +40,7 @@ module {
   public func validateTransaction(isWBTC : Bool, wantedERC20 : Text, transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
     // Fetch TransactionDetails
+
     let resultTxDetails = await getTransactionDetails(transactionId, chainId, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
@@ -61,7 +62,7 @@ module {
     Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
     if ((isWBTC == false) or (wantedERC20 == "0")) {
       // Validate WBTC transaction or direct value transfer
-      if ((receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
+      if ((receiverTransaction == "0x"#expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
         return true;
       } else {
         return false;
@@ -118,8 +119,8 @@ module {
     let canisterAddress = utils.publicKeyToAddress(publicKey);
 
     Debug.print("Recipient address: 0x" # recipientAddr);
-    Debug.print("recipientChainId" # recipientChainId);
-    Debug.print("sendingChainId" # sendingChainId);
+    Debug.print("recipientChainId " # recipientChainId);
+    Debug.print("sendingChainId " # sendingChainId);
 
     if (canisterAddress == "") {
       Debug.print("Could not get address!");
@@ -139,25 +140,96 @@ module {
 
     let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
 
-    let validTransaction = await validateTransaction(false, transactionId, "0", canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
 
-    if (validTransaction) {
-      return await createAndSendTransaction(
-        recipientChainId,
-        "0",
-        false,
-        derivationPath,
-        keyName,
-        canisterAddress,
-        recipientAddr,
-        transactionNat,
-        publicKey,
-        transform,
-      );
-    } else {
+
+
+    Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
+    let rskId = utils.hexToNat("0x1f");
+    Debug.print("Checking WBTC address");
+
+    let wbtcAddressSendingChain: Text = switch(utils.hexToNat(sendingChainId)){
+      case(rskId){
+        Debug.print("Sending chain is rsk");
+        "0";
+      };
+      case(_) { 
+        Debug.print("Getting WBTC address for sending chain "#sendingChainId);
+        let requestHeaders = [
+            { name = "Content-Type"; value = "application/json" },
+            { name = "Accept"; value = "application/json" },
+            { name = "chain-id"; value = sendingChainId },
+        ];
+        await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform);
+      };
+    };
+
+    let validTransaction: Bool = switch (utils.hexToNat(sendingChainId)) {
+
+      case(rskId) { 
+        await validateTransaction(false, "0",transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
+      };
+      case(_) {
+        // Handle other cases here
+        await validateTransaction(true,wbtcAddressSendingChain,transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
+      };
+    };
+
+    if(validTransaction == false){
       Debug.print("Transaction does not match the criteria");
       throw Error.reject("Error: Not valid transaction");
     };
+
+    Debug.print("Transaction validaded, processing payment");
+
+    Debug.print("Checking if recipient chain requires WBTC");
+
+
+    let wbtcAddress: Text = switch(utils.hexToNat(recipientChainId)){
+      case(rskId){
+        Debug.print("Recipient chain is rsk");
+        "0";
+      };
+      case(_) { 
+        Debug.print("Getting WBTC address for recipient chain "#recipientChainId);
+
+        let requestHeaders = [
+            { name = "Content-Type"; value = "application/json" },
+            { name = "Accept"; value = "application/json" },
+            { name = "chain-id"; value = recipientChainId },
+        ];
+        await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform);
+      };
+    };
+
+    let isWBTC: Bool = switch(utils.hexToNat(recipientChainId)){
+      case(rskId){
+        true;
+      };
+      case(_){
+        false;
+      };
+    };
+
+
+    if(isWBTC){
+      Debug.print("Recipient chain requires WBTC");
+    } else {
+      Debug.print("Recipient chain does not requires WBTC");
+    };
+    Debug.print("Sending payment");
+
+    return await createAndSendTransaction(
+      recipientChainId,
+      wbtcAddress,
+      isWBTC,
+      derivationPath,
+      keyName,
+      canisterAddress,
+      recipientAddr,
+      transactionNat,
+      publicKey,
+      transform,
+    );
 
   };
 

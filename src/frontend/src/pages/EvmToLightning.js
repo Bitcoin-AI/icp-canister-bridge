@@ -85,7 +85,7 @@ const EvmToLightning = ({
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         let tx;
-        if(netId === 31){
+        if(Number(netId) === 31){
           tx = await signer.sendTransaction({
             to: `0x${canisterAddr}`,
             value: ethers.parseUnits(amount.toString(),10)

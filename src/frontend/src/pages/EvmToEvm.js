@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
@@ -73,7 +73,7 @@ const EvmToEvm = ({
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         let tx;
-        if(netId === 31){
+        if(Number(netId) === 31){
           tx = await signer.sendTransaction({
             to: `0x${canisterAddr}`,
             value: ethers.parseUnits(amount.toString(),10)
@@ -101,7 +101,11 @@ const EvmToEvm = ({
       }
       setProcessing(false);
   };
-
+  useEffect(() => {
+    if (coinbase) {
+      setEvmAddr(coinbase);
+    }
+  }, [coinbase]);
   return(
   <>
   <div>
