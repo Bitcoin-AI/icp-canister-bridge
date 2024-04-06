@@ -144,10 +144,10 @@ module {
 
 
     Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
-    let rskId = utils.hexToNat("0x1f");
+    let rskId = "0x1f";
     Debug.print("Checking WBTC address");
 
-    let wbtcAddressSendingChain: Text = switch(utils.hexToNat(sendingChainId)){
+    let wbtcAddressSendingChain: Text = switch(sendingChainId){
       case(rskId){
         Debug.print("Sending chain is rsk");
         "0";
@@ -163,7 +163,7 @@ module {
       };
     };
 
-    let validTransaction: Bool = switch (utils.hexToNat(sendingChainId)) {
+    let validTransaction: Bool = switch (sendingChainId) {
 
       case(rskId) { 
         await validateTransaction(false, "0",transactionId, canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
@@ -184,7 +184,7 @@ module {
     Debug.print("Checking if recipient chain requires WBTC");
 
 
-    let wbtcAddress: Text = switch(utils.hexToNat(recipientChainId)){
+    let wbtcAddress: Text = switch(recipientChainId){
       case(rskId){
         Debug.print("Recipient chain is rsk");
         "0";
@@ -201,7 +201,7 @@ module {
       };
     };
 
-    let isWBTC: Bool = switch(utils.hexToNat(recipientChainId)){
+    let isWBTC: Bool = switch(recipientChainId){
       case(rskId){
         true;
       };
