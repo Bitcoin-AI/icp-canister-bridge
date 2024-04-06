@@ -206,8 +206,13 @@ module {
     };
 
     let isWBTC: Bool = switch(recipientChainId){
+<<<<<<< HEAD
       case("0x1f"){
         false;
+=======
+      case(rskId){
+        true;
+>>>>>>> de3882775259304947c01a7bc0b8a0a0426c3889
       };
       case(_){
         true;
