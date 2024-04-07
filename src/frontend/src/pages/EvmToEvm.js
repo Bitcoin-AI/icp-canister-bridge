@@ -110,6 +110,20 @@ const EvmToEvm = ({
       setEvmAddr(coinbase);
     }
   }, [coinbase]);
+  useEffect(() => {
+    if(chains){
+      const initialChain = JSON.stringify(
+        {
+          rpc: chains[0].rpc.filter(rpcUrl => {
+            if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
+          })[0],
+          chainId: chains[0].chainId,
+          name: chains[0].name
+        }
+      );
+      setChain(initialChain);
+    }
+  },[chains]);
   return(
   <>
   <div>

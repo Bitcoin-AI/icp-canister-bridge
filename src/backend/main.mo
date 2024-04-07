@@ -283,7 +283,7 @@ actor {
   };
 
 
-  public shared (msg) func swapLN2EVM(hexChainId : Text, payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapLN2EVM(hexChainId : Text,wantedERC20: Text, payment_hash : Text, timestamp : Text) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
@@ -320,7 +320,7 @@ actor {
     };
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await EVM.swapLN2EVM(hexChainId, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
+    let sendTxResponse = await EVM.swapLN2EVM(hexChainId,wantedERC20, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
@@ -384,9 +384,29 @@ actor {
     let transactionProof = await utils.getValue(parsedTxResult, "to");
     Debug.print(transactionProof);
     let transactionAmount = await utils.getValue(parsedTxResult, "amount");
+    let transactionData = await utils.getValue(parsedTxResult, "input");
 
-    let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
-
+    let transactionNat: Nat = switch(transferEvent.sendingChain){
+      case("0x1f"){
+        Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+      };
+      case(_){
+        let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+            switch(decodedDataResult) {
+            case(#ok(_, decodedAmountNat)) {
+              Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
+              decodedAmountNat;
+            };
+            case(#err(err)) {
+              // Handle the error case here. You might want to log the error message
+              // and return a default value, or propagate the error up to the caller.
+              // For this example, let's just return 0.
+              Debug.print(err);
+              0;
+            };
+          };
+      };
+    };
     let transactionSender = await utils.getValue(parsedTxResult, "from");
 
     let transactionSenderCleaned = utils.subText(transactionSender, 1, transactionSender.size() - 1);

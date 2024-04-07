@@ -211,14 +211,14 @@ module {
 
   };
 
-  public func swapLN2EVM(hexChainId : Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapLN2EVM(hexChainId : Text,wantedERC20: Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let canisterAddress = utils.publicKeyToAddress(publicKey);
 
     return await createAndSendTransaction(
       hexChainId,
-      "0",
+      wantedERC20,
       derivationPath,
       keyName,
       canisterAddress,

@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
 import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
 const LightningToEvm = ({
-  chains
+  chains,
+  coinbase
 }) => {
   const [message, setMessage] = useState('');
   const [processing,setProcessing] = useState();
@@ -46,8 +47,15 @@ const LightningToEvm = ({
   const checkInvoice = async () => {
     setProcessing(true);
     try {
-      setMessage("Processing evm transaction ...")
-      const resp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hash.replace(/\+/g, '-').replace(/\//g, '_'),new Date().getTime().toString());
+      setMessage("Processing evm transaction ...");
+      const wbtcAddressWanted = chains.filter(item => {return item.chainId === Number(JSON.parse(chain).chainId)})[0].wbtcAddress;
+
+      const resp = await main.swapLN2EVM(
+        ethers.toBeHex(JSON.parse(chain).chainId),
+        wbtcAddressWanted ? wbtcAddressWanted : "0",
+        r_hash.replace(/\+/g, '-').replace(/\//g, '_'),
+        new Date().getTime().toString()
+      );
       //const parsed = JSON.parse(resp);
       setMessage(resp);
     } catch (err) {
@@ -55,7 +63,25 @@ const LightningToEvm = ({
     }
     setProcessing(false);
   }
-
+  useEffect(() => {
+    if (coinbase) {
+      setEvmAddr(coinbase);
+    }
+  }, [coinbase]);
+  useEffect(() => {
+    if(chains){
+      const initialChain = JSON.stringify(
+        {
+          rpc: chains[0].rpc.filter(rpcUrl => {
+            if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
+          })[0],
+          chainId: chains[0].chainId,
+          name: chains[0].name
+        }
+      );
+      setChain(initialChain);
+    }
+  },[chains]);
   return(
   <>
   <div>

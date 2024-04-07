@@ -53,12 +53,15 @@ const EvmToLightning = ({
         console.log(signature)
         //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
         setMessage("Service processing lightning payment");
+        const wbtcAddressSent = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
         resp = await main.swapEVM2LN(
           {
             proofTxId: transaction.hash,
             invoiceId: paymentRequest,
             sendingChain: ethers.toBeHex(netId),
+            sentERC20: wbtcAddressSent ? wbtcAddressSent : "0",
             recipientChain: ethers.toBeHex(netId),
+            wantedERC20: "0",
             recipientAddress: `0x${canisterAddr}`,
             signature: signature,
             reward: "0"

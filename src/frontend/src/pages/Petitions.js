@@ -166,14 +166,16 @@ const Petitions = ({
   },[]);
   useEffect(() => {
     if(chains){
-      const filteredRpc = chains[0].rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"));
-      if (filteredRpc.length > 0) {
-        setChain(JSON.stringify({
-          rpc: filteredRpc[0].toString(), // Convert rpc to string
+      const initialChain = JSON.stringify(
+        {
+          rpc: chains[0].rpc.filter(rpcUrl => {
+            if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
+          })[0],
           chainId: chains[0].chainId,
           name: chains[0].name
-        }));
-      }
+        }
+      );
+      setChain(initialChain);
     }
   },[chains]);
   useEffect(() => {
@@ -237,7 +239,13 @@ const Petitions = ({
           })
         }
         </select>
-
+        {
+          chain &&
+          <>
+          <p>Bridging to {JSON.parse(chain).name}</p>
+          <p>ChainId {JSON.parse(chain).chainId}</p>
+          </>
+        }
       </div>
       <div class={styles.step}>
         <p>Step 2: Send token to 0x{canisterAddr}</p>

@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useCallback } from "react";
+import { ethers } from 'ethers';
 import { main } from "../../declarations/main";
+
 import useWeb3Modal from "./hooks/useWeb3Modal";
+
 import styles from './RSKLightningBridge.module.css';  // Import the CSS module
 
 import Header from "./components/Header";
@@ -44,7 +47,8 @@ const App = () => {
       const chainsResp = await response.json();
       chainsResp.map(item => {
         const rpc = item.rpc.filter(rpc => {
-          if(rpc.indexOf("INFURA_API_KEY") !== -1 || rpc.indexOf("rsk") !== -1){
+          if((rpc.indexOf("INFURA_API_KEY") !== -1 && rpc.indexOf("sepolia") !== -1) ||
+             (rpc.indexOf("rsk") !== -1 && rpc.indexOf("testnet") !== -1)){
             return(rpc)
           }
         });
@@ -67,17 +71,26 @@ const App = () => {
 
 
 
-  /*
+
   const fetchUserBalance = useCallback(async () => {
-    if (coinbase && bridge) {
+    if (coinbase && netId && provider) {
       try {
-        const balance = await bridge.userBalances(coinbase);
+        let balance;
+        if(netId === 31){
+          balance = await provider.getBalance(coinbase);
+        } else {
+          const wbtcAddress = wbtcAddresses[netId.toString()];
+          const erc20Contract = new ethers.Contract(wbtcAddress, ['function balanceOf(address) view returns (uint)'], provider);
+          balance = await erc20Contract.balanceOf(coinbase);
+        }
         setUserBalance(balance.toString());
       } catch (error) {
+        setUserBalance("0");
+
         console.error("Error fetching user balance:", error);
       }
     }
-  }, [coinbase, bridge]);
+  }, [coinbase, netId,provider]);
 
   useEffect(() => {
     fetchUserBalance(); // Fetch balance immediately when component mounts or coinbase/bridge changes
@@ -87,7 +100,7 @@ const App = () => {
 
     return () => clearInterval(intervalId); // Clear interval on component unmount
   }, [fetchUserBalance]);
-  */
+  
 
   useEffect(() => {
     main.getEvmAddr().then(addr => {
@@ -113,6 +126,7 @@ const App = () => {
     <div className={styles.container}>
       <Header
         nodeInfo={nodeInfo}
+        netId={netId}
         coinbase={coinbase}
         fetchNodeInfo={fetchNodeInfo}
         rskBalance={rskBalance}
@@ -148,7 +162,7 @@ const App = () => {
             setActiveTab('petitions');
           }}
         >
-          Petitions
+          Petitions EVM to EVM
         </button>
       </div>
       {
@@ -164,6 +178,7 @@ const App = () => {
         activeTab === 'lightToRSK' ?
         <LightningToEvm 
             chains={chains}
+            coinbase={coinbase}
         /> :
         activeTab==='evmToEvm'?
         <EvmToEvm 

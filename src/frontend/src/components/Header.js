@@ -5,6 +5,7 @@ import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
 
 const Header = ({
     nodeInfo,
+    netId,
     coinbase,
     fetchNodeInfo,
     rskBalance
@@ -13,7 +14,7 @@ const Header = ({
   return (
     <>
       <div className={styles.header}>
-        <p>Welcome to RSK Lightning Bridge!</p>
+        <p>Welcome to EVM Lightning Bridge!</p>
         <p>Follow the steps below to bridge your assets.</p>
       </div>
       {
@@ -35,7 +36,8 @@ const Header = ({
         coinbase &&
         <div className={styles.balance}>
           <p>EVM connected as {coinbase}</p>
-          <p>Your RSK Balance: {rskBalance/10**10} satoshis of rbtc</p>
+          <p>EVM chainId: {netId.toString()}</p>
+          <p>EVM sats balance: {Math.round(rskBalance/10**10)} satoshis of {netId === 31 ? "rbtc" : "wbtc"}</p>
         </div>
       }
     </>
