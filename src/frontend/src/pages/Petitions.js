@@ -1,7 +1,7 @@
 import React, { useState,useEffect,useRef } from "react";
 
 import { ethers } from 'ethers';
-import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
+import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json';
 import { main } from "../../../declarations/main";
 import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
 const Petitions = ({
@@ -24,7 +24,7 @@ const Petitions = ({
   const petitionToSolve = useRef();
   const [petitions,setPetitions] = useState([]);
 
-  
+
   const fetchPetitions = async () => {
     try {
       const mainPetitions = await main.getPetitions();
@@ -129,7 +129,6 @@ const Petitions = ({
             value = `0x${petitionToSolve.current.transaction.data.slice(74).replace(/^0+/, '')}`
           };
           console.log(petitionToSolve.current.transaction.data)
-          alert(value)
         }
         if(Number(netId) === 31){
           tx = await signer.sendTransaction({
@@ -227,13 +226,13 @@ const Petitions = ({
             if (filteredRpc.length > 0) {
               return (
                 <option value={JSON.stringify({
-                  rpc: filteredRpc[0].toString(), 
+                  rpc: filteredRpc[0].toString(),
                   chainId: item.chainId,
                   name: item.name
                 })}>{item.name}</option>
               );
             } else {
-              return null; 
+              return null;
             }
           })
         }
@@ -283,10 +282,10 @@ const Petitions = ({
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
                     sendToken(solve);
-                  }}>Initiate petition solving</button> 
+                  }}>Initiate petition solving</button>
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
-                  }}>Select Petition</button> 
+                  }}>Select Petition</button>
               </div>
             );
           })

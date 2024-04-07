@@ -22,6 +22,7 @@ import TU "mo:evm-tx/utils/TextUtils";
 import HU "mo:evm-tx/utils/HashUtils";
 import Context "mo:evm-tx/Context";
 import Address "mo:evm-tx/Address";
+import Bool "mo:base/Bool";
 
 import IcEcdsaApi "mo:evm-tx/utils/IcEcdsaApi";
 import RLP "mo:rlp/hex/lib";
@@ -60,7 +61,7 @@ module {
     Debug.print("Expected address: "#expectedAddress);
     Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
     Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
-    if ((isWBTC == false) or (wantedERC20 == "0")) {
+    if ((wantedERC20 == "0")) {
       Debug.print("Validating direct value transfer");
 
       // Validate WBTC transaction or direct value transfer
@@ -170,10 +171,12 @@ module {
     let validTransaction: Bool = switch (sendingChainId) {
 
       case("0x1f") {
+        Debug.print("Validating non erc20 transaction");
         await validateTransaction(false, "0",transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
       };
       case(_) {
         // Handle other cases here
+        Debug.print("Validating erc20 transaction");
         await validateTransaction(true,wbtcAddressSendingChain,transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
       };
     };
@@ -206,31 +209,21 @@ module {
     };
 
     let isWBTC: Bool = switch(recipientChainId){
-<<<<<<< HEAD
       case("0x1f"){
+        Debug.print("Recipient chain does not requires WBTC");
         false;
-=======
-      case(rskId){
-        true;
->>>>>>> de3882775259304947c01a7bc0b8a0a0426c3889
       };
       case(_){
+        Debug.print("Recipient chain requires WBTC");
         true;
       };
     };
 
-
-    if(isWBTC){
-      Debug.print("Recipient chain requires WBTC");
-    } else {
-      Debug.print("Recipient chain does not requires WBTC");
-    };
     Debug.print("Sending payment");
 
     return await createAndSendTransaction(
       recipientChainId,
       wbtcAddress,
-      isWBTC,
       derivationPath,
       keyName,
       canisterAddress,
@@ -250,7 +243,6 @@ module {
     return await createAndSendTransaction(
       hexChainId,
       "0",
-      false,
       derivationPath,
       keyName,
       canisterAddress,
@@ -389,12 +381,17 @@ module {
     };
   };
 
-  public func createAndSendTransaction(hexChainId : Text, erc20 : Text, isWBTC : Bool, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func createAndSendTransaction(hexChainId : Text, erc20 : Text, derivationPath : [Blob], keyName : Text, canisterAddress : Text, recipientAddr : Text, transactionAmount : Nat, publicKey : [Nat8], transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     // here check the transactionId, if he sent the money to our canister Address, save the amount
 
     // Now transactionAmount is a Nat and can be used in further calculations
 
     // This will be now a transaction without data
+    Debug.print("Creating transaction with parameters");
+    Debug.print("hexChainId: "#hexChainId);
+    Debug.print("erc20: "#erc20);
+    Debug.print("recipientAddr: "#recipientAddr);
+    Debug.print("transactionAmount: "#Nat.toText(transactionAmount));
 
     let method_sig = "transfer(address,uint256)";
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
@@ -402,7 +399,8 @@ module {
     let address_64 = TU.fill(recipientAddr, '0', 64);
     let amount_hex = AU.toText(AU.fromNat256(transactionAmount));
     let amount_64 = TU.fill(amount_hex, '0', 64);
-
+    Debug.print("address_64: "#address_64);
+    Debug.print("Text.trimStart(address_64,#text '00000000000000000000000x'): "#Text.trimStart(address_64,#text "00000000000000000000000x"));
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
@@ -411,15 +409,13 @@ module {
     let data : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       "0x00";
     } else {
-      "0x" # method_id # address_64 # amount_64;
+      "0x" # method_id # "000000000000000000000000" # Text.trimStart(address_64,#text "00000000000000000000000x") # amount_64;
     };
-
-    let transactionReceiver : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
+    Debug.print("Data: "#data);
+    let transactionReceiver : Text = if (erc20 == "0") {
       recipientAddr;
-    } else if (erc20 != "0") {
-      erc20;
     } else {
-      await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform); // TODO create function to get contractAddress
+      erc20;
     };
 
     Debug.print("Transaction receiver: "#transactionReceiver);
@@ -454,13 +450,15 @@ module {
 
     Debug.print("gasPrice" # gasPrice);
 
-    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{ \"to\": \"" # transactionReceiver # "\", \"value\": \"0x1\", \"data\": \"" # data # "\"}] }";
+    let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\": \"0x" # canisterAddress # "\", \"to\": \"" # transactionReceiver # "\", \"value\": \"0x0\", \"data\": \"" # data # "\"}] }";
+    Debug.print("estimateGasPayload: "#estimateGasPayload);
+
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
 
     let parsedGasValue = JSON.parse(responseGas);
     let gas = await utils.getValue(parsedGasValue, "result");
-
+    //let gas = "54000";
     Debug.print("gas" # gas);
 
     let noncePayLoad : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionCount\", \"params\": [\"0x" # canisterAddress # "\", \"latest\"] }";
@@ -476,15 +474,22 @@ module {
     let chainId = utils.hexStringToNat64(hexChainId);
 
     let emptyAccessList : [(Text, [Text])] = [];
-
+    let transactionAmountSend: Nat = switch(hexChainId){
+      case("0x1f"){
+        transactionAmount;
+      };
+      case(_){
+        0;
+      };
+    };
     // Transaction details
     let transactionEIP1559 = {
       nonce = utils.hexStringToNat64(nonce);
       maxPriorityFeePerGas = utils.hexStringToNat64(maxPriorityFeePerGas);
       maxFeePerGas = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
-      to = recipientAddr;
-      value = transactionAmount;
+      to = transactionReceiver;
+      value = transactionAmountSend;
       data = data;
       chainId = chainId;
       v = "0x00";
@@ -498,8 +503,8 @@ module {
       nonce = utils.hexStringToNat64(nonce);
       gasPrice = utils.hexStringToNat64(gasPrice);
       gasLimit = utils.hexStringToNat64(gas);
-      to = recipientAddr;
-      value = transactionAmount;
+      to = transactionReceiver;
+      value = transactionAmountSend;
       data = data;
       chainId = chainId;
       v = "0x00";

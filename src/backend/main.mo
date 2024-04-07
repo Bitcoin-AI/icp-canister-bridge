@@ -249,7 +249,6 @@ actor {
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
             petitionEvent.sentERC,
-            isWBTC,
             derivationPath,
             keyName,
             canisterAddress,

@@ -214,15 +214,14 @@ module {
         };
         Debug.print("noPrefixString "#noPrefixString);
 
-        let cleanHexString = Text.trimEnd(noPrefixString, #text "\"");      
+        let cleanHexString = Text.trimEnd(noPrefixString, #text "\"");
         Debug.print("cleanHexString: " # cleanHexString);
         let treatedCleanHexString = Text.trimStart(cleanHexString, #char '0');
-        Debug.print("treatedCleanHexString: " # treatedCleanHexString);
+        Debug.print("treatedCleanHexString: " # Text.trimStart(treatedCleanHexString, #char 'x'));
 
         var result : Nat64 = 0;
         var power : Nat64 = 1;
-
-        let charsArray = Iter.toArray(treatedCleanHexString.chars());
+        let charsArray = Iter.toArray(Text.trimStart(treatedCleanHexString, #char 'x').chars());
         let arraySize = charsArray.size();
 
         for (i in Iter.range(0, arraySize - 1)) {
