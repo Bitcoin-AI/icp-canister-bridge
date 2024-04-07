@@ -221,7 +221,6 @@ actor {
         Debug.print("petitionEvent.wantedChain: "#petitionEvent.wantedChain);
 
         let isValidTransaction = await EVM.validateTransaction(
-          isWBTC,
           petitionEvent.wantedERC20,
           proofTxId,
           petitionEvent.wantedAddress, // Expected address

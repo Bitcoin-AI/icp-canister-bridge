@@ -38,10 +38,10 @@ module {
 
   type JSONField = (Text, JSON.JSON);
 
-  public func validateTransaction(isWBTC : Bool, wantedERC20 : Text, transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
+  public func validateTransaction(wantedERC20 : Text, transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
     // Fetch TransactionDetails
-
+    Debug.print("Validating transaction "#transactionId#" for chainId "#chainId);
     let resultTxDetails = await getTransactionDetails(transactionId, chainId, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
@@ -57,13 +57,13 @@ module {
     let transactionData = await utils.getValue(txDetails, "input");
 
     let validSignature = await checkSignature(transactionId, transactionSenderCleaned, signature);
-    Debug.print("Receiver Transaction: "#receiverTransaction);
-    Debug.print("Expected address: "#expectedAddress);
-    Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
-    Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
+
     if ((wantedERC20 == "0")) {
       Debug.print("Validating direct value transfer");
-
+      Debug.print("Receiver Transaction: "#receiverTransaction);
+      Debug.print("Expected address: "#expectedAddress);
+      Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
+      Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
       // Validate WBTC transaction or direct value transfer
       if ((receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
         return true;
@@ -77,7 +77,11 @@ module {
       switch (decodedDataResult) {
         case (#ok((decodedAddress, decodedAmountNat))) {
           Debug.print("Decoded Address: "#decodedAddress);
+          Debug.print("Expected Address: "#expectedAddress);
           Debug.print("Decoded Amount Nat: "#Nat.toText(decodedAmountNat));
+          Debug.print("Expected Amount Nat: "#Nat.toText(expectedAmount));
+          Debug.print("receiverTransaction: "#receiverTransaction);
+          Debug.print("wantedERC20: "#wantedERC20);
           // Here, you need to ensure decodedAddress is the expected ERC20 contract address and decodedAmountNat matches the expectedAmount
           if (decodedAddress == expectedAddress and decodedAmountNat == expectedAmount and receiverTransaction == wantedERC20 and validSignature) {
             return true;
@@ -141,45 +145,47 @@ module {
 
     let transactionAmount = await utils.getValue(txDetails, "value");
     Debug.print("transactionAmount  " # transactionAmount);
+    let transactionData = await utils.getValue(txDetails, "input");
 
-    let transactionNat = Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+    let transactionNat: Nat = switch(sendingChainId){
+      case("0x1f"){
+        Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+      };
+      case(_){
+        let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+            switch(decodedDataResult) {
+            case(#ok(_, decodedAmountNat)) {
+              Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
+              decodedAmountNat;
+            };
+            case(#err(err)) {
+              // Handle the error case here. You might want to log the error message
+              // and return a default value, or propagate the error up to the caller.
+              // For this example, let's just return 0.
+              Debug.print(err);
+              0;
+            };
+          };
+      };
+    };
 
 
 
 
     Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
 
-    Debug.print("Checking WBTC address");
+    Debug.print("Checking WBTC address sent: "#transferEvent.sentERC20);
 
-    let wbtcAddressSendingChain: Text = switch(sendingChainId){
+    let validTransaction = await validateTransaction(
+      transferEvent.sentERC20,
+      transactionId,
+      "0x"#canisterAddress,
+      transactionNat,
+      transferEvent.sendingChain,
+      transferEvent.signature,
+      transform
+    );
 
-      case("0x1f"){
-        Debug.print("Sending chain is rsk");
-        "0";
-      };
-      case(_) {
-        Debug.print("Getting WBTC address for sending chain "#sendingChainId);
-        let requestHeaders = [
-            { name = "Content-Type"; value = "application/json" },
-            { name = "Accept"; value = "application/json" },
-            { name = "chain-id"; value = sendingChainId },
-        ];
-        await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform);
-      };
-    };
-
-    let validTransaction: Bool = switch (sendingChainId) {
-
-      case("0x1f") {
-        Debug.print("Validating non erc20 transaction");
-        await validateTransaction(false, "0",transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
-      };
-      case(_) {
-        // Handle other cases here
-        Debug.print("Validating erc20 transaction");
-        await validateTransaction(true,wbtcAddressSendingChain,transactionId, "0x"#canisterAddress, transactionNat, transferEvent.sendingChain, transferEvent.signature, transform);
-      };
-    };
 
     if(validTransaction == false){
       Debug.print("Transaction does not match the criteria");
@@ -187,43 +193,13 @@ module {
     };
 
     Debug.print("Transaction validaded, processing payment");
-
-    Debug.print("Checking if recipient chain requires WBTC");
-
-
-    let wbtcAddress: Text = switch(recipientChainId){
-      case("0x1f"){
-        Debug.print("Recipient chain is rsk");
-        "0";
-      };
-      case(_) {
-        Debug.print("Getting WBTC address for recipient chain "#recipientChainId);
-
-        let requestHeaders = [
-            { name = "Content-Type"; value = "application/json" },
-            { name = "Accept"; value = "application/json" },
-            { name = "chain-id"; value = recipientChainId },
-        ];
-        await utils.httpRequest(null, API_URL # "/getContractAddressWBTC", ?requestHeaders, "post", transform);
-      };
-    };
-
-    let isWBTC: Bool = switch(recipientChainId){
-      case("0x1f"){
-        Debug.print("Recipient chain does not requires WBTC");
-        false;
-      };
-      case(_){
-        Debug.print("Recipient chain requires WBTC");
-        true;
-      };
-    };
-
+    Debug.print("Checking WBTC address to receive: "#transferEvent.wantedERC20);
+    Debug.print("recipientChainId: "#recipientChainId);
     Debug.print("Sending payment");
 
     return await createAndSendTransaction(
       recipientChainId,
-      wbtcAddress,
+      transferEvent.wantedERC20,
       derivationPath,
       keyName,
       canisterAddress,

@@ -42,12 +42,16 @@ const EvmToEvm = ({
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
       setMessage("Verifying parameters to process evm payment");
+      const wbtcAddressWanted = chains.filter(item => {return item.chainId === Number(JSON.parse(chain).chainId)})[0].wbtcAddress;
+      const wbtcAddressSent = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
       resp = await main.swapEVM2EVM(
         {
           proofTxId: transaction.hash,
           invoiceId: "null",
           sendingChain: ethers.toBeHex(netId),
+          sentERC20: wbtcAddressSent ? wbtcAddressSent : "0",
           recipientChain: ethers.toBeHex(JSON.parse(chain).chainId),
+          wantedERC20: wbtcAddressWanted ? wbtcAddressWanted : "0",
           recipientAddress: evm_address,
           signature: signature,
           reward: "0"

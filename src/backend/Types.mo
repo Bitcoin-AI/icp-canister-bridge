@@ -71,6 +71,8 @@ module Types {
         sendingChain : Text;
         recipientAddress : Text;
         recipientChain : Text;
+        wantedERC20: Text; // The ERC20 that he wants to receive
+        sentERC20: Text; // The ERC20 that he is sending
         proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
         invoiceId : Text; // Only For LN cases
         signature : Text;
