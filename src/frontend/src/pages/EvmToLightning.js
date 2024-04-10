@@ -122,11 +122,11 @@ const EvmToLightning = ({
       {/* Content for EVM to Lightning */}
       {
       coinbase && netId &&
-      <div class={styles.step}>
+      <div className={styles.step}>
           <p>ChainId: {netId.toString()}</p>
       </div>
       }
-      <div class={styles.step}>
+      <div className={styles.step}>
       <p>Step 1: Send token to 0x{canisterAddr}</p>
       <label className={styles.label}>Amount in satoshis</label>
       <input
@@ -143,7 +143,7 @@ const EvmToLightning = ({
           <button className={styles.button} disabled>Wait current process</button>
       }
       </div>
-      <div class={styles.step}>
+      <div className={styles.step}>
       <p>Step 2: Input evm transaction hash and lightning invoice</p>
       <label className={styles.label}>Transaction Hash</label>
       <input

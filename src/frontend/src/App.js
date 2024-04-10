@@ -12,8 +12,8 @@ import Header from "./components/Header";
 import EvmToLightning from "./pages/EvmToLightning";
 import EvmToEvm from "./pages/EvmToEvm";
 import LightningToEvm from "./pages/LightningToEvm";
-import NostrEvents from "./pages/NostrEvents";
 import Petitions from "./pages/Petitions";
+import PetitionsLN from "./pages/PetitionsLN";
 
 
 const App = () => {
@@ -164,6 +164,14 @@ const App = () => {
         >
           Petitions EVM to EVM
         </button>
+        <button
+          className={activeTab === 'petitionsLN' ? styles.activeTab : ''}
+          onClick={() => {
+            setActiveTab('petitionsLN');
+          }}
+        >
+          Petitions between LN and EVM
+        </button>
       </div>
       {
         activeTab === 'rskToLight' ?
@@ -189,8 +197,17 @@ const App = () => {
             loadWeb3Modal={loadWeb3Modal}
             chains={chains}
         /> :
-        activeTab==='petitions' &&
+        activeTab==='petitions' ?
         <Petitions 
+            coinbase={coinbase}
+            netId={netId}
+            provider={provider}
+            canisterAddr={canisterAddr}
+            loadWeb3Modal={loadWeb3Modal}
+            chains={chains}
+        /> :
+        activeTab==='petitionsLN' &&
+        <PetitionsLN 
             coinbase={coinbase}
             netId={netId}
             provider={provider}
