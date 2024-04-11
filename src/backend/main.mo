@@ -243,8 +243,9 @@ actor {
 
     let transactionData = await utils.getValue(txDetails, "input");
 
-    let paymentRequest = petitionEvent.invoiceId; 
-    let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
+    let paymentRequest = petitionEvent.invoiceId;
+    Debug.print("Decoding payment request sent: "#petitionEvent.invoiceId);
+    let decodedPayReq = await LN.decodePayReq(petitionEvent.invoiceId, timestamp, transform);
     let payReqResponse = JSON.parse(decodedPayReq);
     let amountString = await utils.getValue(payReqResponse, "num_satoshis");
     let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
