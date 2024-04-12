@@ -174,47 +174,52 @@ const App = () => {
         </button>
       </div>
       {
-        activeTab === 'rskToLight' ?
-        <EvmToLightning 
-            coinbase={coinbase}
-            netId={netId}
-            provider={provider}
-            canisterAddr={canisterAddr}
-            loadWeb3Modal={loadWeb3Modal}
-            chains={chains}
-        /> :
-        activeTab === 'lightToRSK' ?
-        <LightningToEvm 
-            chains={chains}
-            coinbase={coinbase}
-        /> :
-        activeTab==='evmToEvm'?
-        <EvmToEvm 
-            coinbase={coinbase}
-            netId={netId}
-            provider={provider}
-            canisterAddr={canisterAddr}
-            loadWeb3Modal={loadWeb3Modal}
-            chains={chains}
-        /> :
-        activeTab==='petitions' ?
-        <Petitions 
-            coinbase={coinbase}
-            netId={netId}
-            provider={provider}
-            canisterAddr={canisterAddr}
-            loadWeb3Modal={loadWeb3Modal}
-            chains={chains}
-        /> :
-        activeTab==='petitionsLN' &&
-        <PetitionsLN 
-            coinbase={coinbase}
-            netId={netId}
-            provider={provider}
-            canisterAddr={canisterAddr}
-            loadWeb3Modal={loadWeb3Modal}
-            chains={chains}
-        /> 
+        canisterAddr ?
+        (
+          activeTab === 'rskToLight' ?
+          <EvmToLightning 
+              coinbase={coinbase}
+              netId={netId}
+              provider={provider}
+              canisterAddr={canisterAddr}
+              loadWeb3Modal={loadWeb3Modal}
+              chains={chains}
+          /> :
+          activeTab === 'lightToRSK' ?
+          <LightningToEvm 
+              chains={chains}
+              coinbase={coinbase}
+          /> :
+          activeTab==='evmToEvm'?
+          <EvmToEvm 
+              coinbase={coinbase}
+              netId={netId}
+              provider={provider}
+              canisterAddr={canisterAddr}
+              loadWeb3Modal={loadWeb3Modal}
+              chains={chains}
+          /> :
+          activeTab==='petitions' ?
+          <Petitions 
+              coinbase={coinbase}
+              netId={netId}
+              provider={provider}
+              canisterAddr={canisterAddr}
+              loadWeb3Modal={loadWeb3Modal}
+              chains={chains}
+          /> :
+          activeTab==='petitionsLN' &&
+          <PetitionsLN 
+              coinbase={coinbase}
+              netId={netId}
+              provider={provider}
+              canisterAddr={canisterAddr}
+              loadWeb3Modal={loadWeb3Modal}
+              chains={chains}
+          /> 
+        ) :
+        <div>Loading canister</div>
+
       }
 
     </div>

@@ -85,6 +85,7 @@ module Types {
         wantedChain : Text;
         proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
         invoiceId : Text; // Only For LN cases
+        petitionPaidInvoice : Text; // Only For LN to EVM cases
         signature : Text;
         reward : Text;
         wbtc: Bool;  // If he wants to send just WBTC from wbtc network or rootstock as native btc

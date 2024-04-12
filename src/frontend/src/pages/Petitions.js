@@ -82,7 +82,8 @@ const Petitions = ({
         resp = await main.petitionEVM2EVM(
           {
             proofTxId: transaction.hash,
-            invoiceId: "null",
+            invoiceId: "0",
+            petitionPaidInvoice: "0",
             sendingChain: ethers.toBeHex(netId),
             wantedChain: ethers.toBeHex(JSON.parse(chain).chainId),
             wantedAddress: evm_address.toLowerCase(),

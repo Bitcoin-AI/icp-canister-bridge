@@ -1,9 +1,12 @@
 import React, { useState,useEffect,useRef } from "react";
 
 import { ethers } from 'ethers';
+import { decode } from 'light-bolt11-decoder';
+
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json';
 import { main } from "../../../declarations/main";
 import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
+
 const PetitionsLN = ({
   coinbase,
   netId,
@@ -21,6 +24,8 @@ const PetitionsLN = ({
 
 
   const [ln,setLN] = useState(false);
+  const [petitionPaidInvoice,setPetitionPaidInvoice] = useState();
+  const [petitionSolveInvoice,setPetitionSolveInvoice] = useState();
 
 
   const [r_hash, setPaymentHash] = useState('');
@@ -36,7 +41,6 @@ const PetitionsLN = ({
     console.log(decodedInput);
     return decodedInput.args;
   }
-
   const fetchPetitions = async () => {
     try {
       const mainPetitions = await main.getPetitions();
@@ -44,10 +48,13 @@ const PetitionsLN = ({
       let newPetitions = [];
       for(let mainPetition of mainPetitions){
         try{
-          if(mainPetition.proofTxId == "0"){
+          if(mainPetition.proofTxId == "0" && mainPetition.petitionPaidInvoice.indexOf('lntb') !== -1){
             mainPetition.transaction = {
               data: ""
             }
+            let decodedPetitionPaidInvoice = decode(mainPetition.petitionPaidInvoice);
+            console.log(decodedPetitionPaidInvoice)
+            mainPetition.decodedPetitionPaidInvoice = decodedPetitionPaidInvoice;
             newPetitions.push(mainPetition);
           } else {
             const wantedChain = chains.filter(item => item.chainId === Number(netId))[0];
@@ -69,7 +76,7 @@ const PetitionsLN = ({
       console.error('Failed to fetch petitions:', error);
     }
   }
-  const sendPetitionTxHash = async (solve) => {
+  const sendPetitionTxHash = async () => {
     setProcessing(true);
     try {
       let resp;
@@ -87,25 +94,6 @@ const PetitionsLN = ({
       let invoiceId;
       let sats;
 
-      if (typeof window.webln !== 'undefined') {
-        await window.webln.enable();
-        if(netId === 31){
-          sats = Number(transaction.value)/10**10
-        } else {
-          const decodedTxArgs = await decodeERC20Transfer(transaction.data);
-          console.log('Decoded transaction:', decodedTxArgs);
-
-          sats = Number(decodedTxArgs[1])/10**10
-        };
-        invoiceId = await webln.makeInvoice({
-          amount: sats,
-          defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
-        });
-        setMessage(`Sending invoice ${invoiceId.paymentRequest}`);
-      } else {
-        setMessage(`Pay invoice: ${invoiceId.paymentRequest} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
-      }
-
       //const signature = await signer.sign(`\x19Ethereum Signed Message:\n${transaction.hash}`);
       setMessage("Sign transaction hash");
       //const signature = await signer.sign(transaction.hash);
@@ -113,31 +101,59 @@ const PetitionsLN = ({
       const signature = await signer.signMessage(transaction.hash);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      setMessage("Verifying parameters to process evm payment");
-      if(solve){
-        resp = await main.solvePetitionEVM2EVM(
-          petitionToSolve.current.transaction.hash,
-          transaction.hash,
-          signature
-        );
+      if(netId === 31){
+        sats = Number(transaction.value)/10**10
       } else {
+        const decodedTxArgs = await decodeERC20Transfer(transaction.data);
+        console.log('Decoded transaction:', decodedTxArgs);
+
+        sats = Number(decodedTxArgs[1])/10**10
+      };
+      if(solve){
+        setMessage("Solving petition");
+        console.log(`petitionToSolve.current.petitionPaidInvoice ${petitionToSolve.current.petitionPaidInvoice}`);
+        console.log(`transaction.hash ${transaction.hash}`)
+        if (typeof window.webln !== 'undefined') {
+          await window.webln.enable();
+          setMessage("Create invoice to be paid");
+          invoiceId = await webln.makeInvoice({
+            amount: sats,
+            defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
+          });
+          setPetitionSolveInvoice(invoiceId.paymentRequest);
+          setMessage("Verifying parameters to process lightning payment");
+          console.log(`invoiceId.paymentRequest: ${invoiceId.paymentRequest}`)
+          resp = await main.solvePetitionLN2EVM(
+            petitionToSolve.current.petitionPaidInvoice,
+            invoiceId.paymentRequest,
+            transaction.hash,
+            signature,
+            new Date().getTime().toString()
+            );
+          setMessage(resp);
+        } else {
+          setMessage(`Pay invoice: ${invoiceId.paymentRequest} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
+        }
+
+      } else {
+        setMessage("Verifying parameters to add petition");
+
+        if (typeof window.webln !== 'undefined') {
+          await window.webln.enable();
+          invoiceId = await webln.makeInvoice({
+            amount: sats,
+            defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
+          });
+          setMessage(`Sending invoice ${invoiceId.paymentRequest}`);
+        } else {
+          setMessage(`Pay invoice: ${invoiceId.paymentRequest} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
+        }
         const wbtcAddressSent = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
-        console.log(          {
-          proofTxId: transaction.hash,
-          invoiceId: invoiceId.paymentRequest,
-          sendingChain: ethers.toBeHex(netId),
-          wantedChain: "0",
-          wantedAddress: "0",
-          signature: signature,
-          reward: '0',
-          wbtc: false,
-          wantedERC20: "0",
-          sentERC: wbtcAddressSent ? wbtcAddressSent : "0"
-        })
         resp = await main.petitionEVM2LN(
           {
             proofTxId: transaction.hash,
             invoiceId: invoiceId.paymentRequest,
+            petitionPaidInvoice: "0",
             sendingChain: ethers.toBeHex(netId),
             wantedChain: "0",
             wantedAddress: "0",
@@ -159,8 +175,7 @@ const PetitionsLN = ({
     }
     setProcessing(false);
   };
-
-  const sendToken = async (solve) => {
+  const sendToken = async () => {
       setProcessing(true);
       try{
         // Send the transaction
@@ -180,12 +195,19 @@ const PetitionsLN = ({
         let tx;
         let value;
         if(solve){
-          value = petitionToSolve.current.transaction.value;
+          if(petitionToSolve.current.transaction.value){
+            value = petitionToSolve.current.transaction.value;
+          };
           if(petitionToSolve.current.sentERC !== "0"){
             value = `0x${petitionToSolve.current.transaction.data.slice(74).replace(/^0+/, '')}`
           };
-          console.log(petitionToSolve.current.transaction.data)
+          if(petitionToSolve.current.decodedPetitionPaidInvoice?.sections[2]?.value){
+            // petitionToSolve.current.decodedPetitionPaidInvoice.sections[2].value is in millisatoshis
+            value = Number(petitionToSolve.current.decodedPetitionPaidInvoice.sections[2].value)*10**7;
+          };
         }
+
+
         if(Number(netId) === 31){
           tx = await signer.sendTransaction({
             to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
@@ -205,7 +227,6 @@ const PetitionsLN = ({
         setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setAmount(ethers.parseUnits(amount.toString(),18));
         setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
         setEvmTxHash(tx.hash);
       } catch(err){
@@ -225,6 +246,8 @@ const PetitionsLN = ({
       setMessage(resp);
       console.log(JSON.parse(resp))
       const invoice = JSON.parse(resp).payment_request;
+      setPetitionPaidInvoice(invoice);
+
       const base64PaymentHash = JSON.parse(resp).r_hash;
       setPaymentHash(base64PaymentHash);
       const r_hashUrl = base64PaymentHash.replace(/\+/g, '-').replace(/\//g, '_');
@@ -233,9 +256,9 @@ const PetitionsLN = ({
         setMessage(`Pay invoice ${invoice}`);
         const result = await window.webln.sendPayment(invoice);
         setMessage("Invoice paid, wait for service send evm transaction ...");
-        const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
-        console.log(invoiceCheckResp);
-        setMessage(invoiceCheckResp);
+        //const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
+        //console.log(invoiceCheckResp);
+        //setMessage(invoiceCheckResp);
       } else {
         setMessage(`Pay invoice: ${invoice} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
       }
@@ -245,8 +268,57 @@ const PetitionsLN = ({
     }
     setProcessing(false);
 
+  };
+  const payPetitionInvoice = async () => {
+    // Need to verify main.solvePetitionEVM2LN method to check if invoice has really been paid
+    try{
+      console.log(petitionToSolve.current)
+      const invoice = petitionToSolve.current.invoiceId;
+      const signer = await provider.getSigner();
+      const signature = await signer.signMessage(petitionToSolve.current.proofTxId);
+  
+      if (typeof window.webln !== 'undefined') {
+        await window.webln.enable();
+        setMessage(`Pay invoice ${invoice}`);
+        const result = await window.webln.sendPayment(invoice);
+        setMessage("Invoice paid, wait for service send evm transaction ...");
+        console.log(result);
+        const resp = await main.solvePetitionEVM2LN(
+          invoice,
+          petitionToSolve.current.proofTxId,
+          petitionToSolve.current.proofTxId,
+          signature,
+          coinbase,
+          new Date().getTime().toString()
+        );
+        //const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
+        //console.log(invoiceCheckResp);
+        //setMessage(invoiceCheckResp);
+      } else {
+        setMessage(`Pay invoice: ${invoice} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
+      }
+    } catch(err){
+      setMessage(err.message);
+      setTimeout(() => {
+        setMessage()
+      },2000)
+    }
+  };
+  const solveEVM2LNPetition = async() => {
+    setMessage("Sign");
+    console.log(petitionToSolve.current)
+    const signer = await provider.getSigner();
+    const signature = await signer.signMessage(petitionToSolve.current.proofTxId);
+    const resp = await main.solvePetitionEVM2LN(
+      petitionToSolve.current.invoiceId,
+      petitionToSolve.current.proofTxId,
+      petitionToSolve.current.proofTxId,
+      coinbase,
+      signature,
+      new Date().getTime().toString()
+      );
+    setMessage(resp)
   }
-
   
   const checkInvoice = async () => {
     setProcessing(true);
@@ -257,6 +329,7 @@ const PetitionsLN = ({
         {
           proofTxId: "0",
           invoiceId: "null",
+          petitionPaidInvoice: petitionPaidInvoice,
           sendingChain: "0",
           wantedChain: ethers.toBeHex(JSON.parse(chain).chainId),
           wantedAddress: evm_address.toLowerCase(),
@@ -275,7 +348,7 @@ const PetitionsLN = ({
       setMessage(`${err.message}`)
     }
     setProcessing(false);
-  }
+  };
   useEffect(() => {
     fetchPetitions();
   },[]);
@@ -349,7 +422,7 @@ const PetitionsLN = ({
             !coinbase ?
               <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
             !processing ?
-            <button className={styles.button} onClick={() => {sendToken(solve);}} >Send token</button> :
+            <button className={styles.button} onClick={sendToken} >Send token</button> :
             <button className={styles.button} disabled >Wait current process</button>
           }
         </div>
@@ -434,6 +507,13 @@ const PetitionsLN = ({
             <button className={styles.button} onClick={checkInvoice} disabled>Wait current process</button>
 
           }
+          {
+            petitionPaidInvoice &&
+            <>
+            <p>Invoice to be paid:</p>
+            <p style={{overflowX: "auto"}}>{petitionPaidInvoice}</p>
+            </>
+          }
           </div>
         </>
       }
@@ -446,22 +526,34 @@ const PetitionsLN = ({
             //if(Number(netId) !== Number(item.wantedChain)) return;
             return(
               <div>
-                <p>From: {item.sendingChain !== "0" ? item.sendingChain : item.sendingChain}</p>
+                <p>From: {item.sendingChain !== "0" ? item.sendingChain : "Bitcoin Lightning Network"}</p>
                 <p>To: {item.wantedChain !== "0" ? item.wantedChain : "Bitcoin Lightning Network"}</p>
                 {
                   item.proofTxId === "0" ?
+                  item.sendingChain !== "0" ?
+                  (
                     item.sendingChain === "0x1f" ?
                     <p>Amount: {(item.transaction?.value)?.toString()}</p> :
-                    <p>Amount: {Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)}</p> :
+                    <p>Amount: {Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)}</p> 
+                  ):
+                  item.petitionPaidInvoice?.indexOf("lntb") !== -1 &&
+                  <>
+                  <p style={{overflowX: 'auto'}}>{item.petitionPaidInvoice}</p>
+                  <p>Amount: {(Number(item.decodedPetitionPaidInvoice.sections[2].value)/1000).toString()} satoshis</p>
+                  </>:
+                  <>
                   <p style={{overflowX: 'auto'}}>{item.invoiceId}</p>
+                  <p>Amount: {(Number(decode(item.invoiceId).sections[2].value)/1000).toString()} satoshis</p>
+
+                  </>
                 }
                 <p>Reward: {item.reward}</p>
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
                     if(item.invoiceId.indexOf("lntb") !== -1){
-                      //sendToken(solve);
+                      payPetitionInvoice();
                     } else {
-                      sendToken(solve);
+                      sendToken();
                     };
                     return;
                   }}>Initiate petition solving</button>
@@ -473,6 +565,40 @@ const PetitionsLN = ({
           })
         }
       </div>
+      {
+        petitionToSolve.current && 
+        (
+          petitionToSolve.current?.petitionPaidInvoice !== "0" ?
+          <>
+          <div className={styles.step}>
+              <p>Input evm transaction hash</p>
+              <label className={styles.label}>Transaction Hash</label>
+              <input
+                className={styles.input}
+                value={evm_txHash}
+                onChange={(ev) => setEvmTxHash(ev.target.value)}
+                placeholder="Transaction Hash"
+              />
+          </div>
+          <div className={styles.step}>
+          {
+            !processing ?
+            <button className={styles.button} onClick={() => {sendPetitionTxHash(solve);}}>Finalize petition</button> :
+            <button className={styles.button} disabled >Wait current process</button>
+          }
+          </div>
+          </> : 
+          <>
+          {
+            !processing ?
+            <button className={styles.button} onClick={solveEVM2LNPetition}>Get Payment</button>:
+            <button className={styles.button} onClick={solveEVM2LNPetition} disabled>Wait current process</button>
+  
+          }
+          </>
+        )
+
+      }
     </div>
 
   }
