@@ -1,5 +1,6 @@
 import React, { useState,useEffect,useRef } from "react";
-
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPencilAlt, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json';
 import { main } from "../../../declarations/main";
@@ -23,6 +24,7 @@ const Petitions = ({
   const [solve,setSolvePetition] = useState(false);
   const petitionToSolve = useRef();
   const [petitions,setPetitions] = useState([]);
+  const [EXPLORER_BASEURL,setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
 
 
   const fetchPetitions = async () => {
@@ -147,10 +149,10 @@ const Petitions = ({
         }
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
-        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+        setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
         setEvmTxHash(tx.hash);
       } catch(err){
         console.log(err)
@@ -188,21 +190,21 @@ const Petitions = ({
   <>
   <div className={styles.tabs}>
     <button
-        className={!solve ? styles.activeTab : ''}
-        onClick={() => {
-          setSolvePetition(false);
-        }}
-      >
-        Create Petitions
-      </button>
-      <button
-        className={solve ? styles.activeTab : ''}
-        onClick={() => {
-          setSolvePetition(true);
-        }}
-      >
-        Solve Petitions
-      </button>
+      className={!solve ? styles.activeTab : ''}
+      onClick={() => {
+        setSolvePetition(false);
+      }}
+    >
+      <FontAwesomeIcon icon={faPencilAlt} /> Create Petitions
+    </button>
+    <button
+      className={solve ? styles.activeTab : ''}
+      onClick={() => {
+        setSolvePetition(true);
+      }}
+    >
+      <FontAwesomeIcon icon={faCheck} /> Solve Petitions
+    </button>
   </div>
   {
     !solve ?
@@ -279,7 +281,7 @@ const Petitions = ({
           petitions.map(item => {
             //if(Number(netId) !== Number(item.wantedChain)) return;
             return(
-              <div>
+              <div key={item.proofTxId}>
                 <p>From chain: {item.sendingChain}</p>
                 <p>To chain: {item.wantedChain}</p>
                 <p>Amount: {

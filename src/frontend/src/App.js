@@ -1,5 +1,9 @@
 import React, { useState, useEffect,useCallback } from "react";
 import { ethers } from 'ethers';
+import { HashRouter as Router, Route, Routes,Navigate,Link } from 'react-router-dom';
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBolt,faLightbulb, faExchangeAlt, faPaperPlane, faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import { main } from "../../declarations/main";
 
 import useWeb3Modal from "./hooks/useWeb3Modal";
@@ -131,96 +135,149 @@ const App = () => {
         fetchNodeInfo={fetchNodeInfo}
         rskBalance={rskBalance}
       />
-      <div className={styles.tabs}>
-        <button
-          className={activeTab === 'rskToLight' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('rskToLight');
-          }}
-        >
-          EVM to Lightning
-        </button>
-        <button
-          className={activeTab === 'lightToRSK' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('lightToRSK');
-          }}
-        >
-          Lightning to EVM
-        </button>
-        <button
-          className={activeTab === 'evmToEvm' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('evmToEvm');
-          }}
-        >
-          EVM to EVM
-        </button>
-        <button
-          className={activeTab === 'petitions' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('petitions');
-          }}
-        >
-          Petitions EVM to EVM
-        </button>
-        <button
-          className={activeTab === 'petitionsLN' ? styles.activeTab : ''}
-          onClick={() => {
-            setActiveTab('petitionsLN');
-          }}
-        >
-          Petitions between LN and EVM
-        </button>
-      </div>
-      {
-        canisterAddr ?
-        (
-          activeTab === 'rskToLight' ?
-          <EvmToLightning 
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-          /> :
-          activeTab === 'lightToRSK' ?
-          <LightningToEvm 
-              chains={chains}
-              coinbase={coinbase}
-          /> :
-          activeTab==='evmToEvm'?
-          <EvmToEvm 
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-          /> :
-          activeTab==='petitions' ?
-          <Petitions 
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-          /> :
-          activeTab==='petitionsLN' &&
-          <PetitionsLN 
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-          /> 
-        ) :
-        <div>Loading canister</div>
 
-      }
+      <Router>
+          <div className={styles.tabs}>
+            <Link to='/'>
+              <button
+                className={activeTab === 'rskToLight' ? styles.activeTab : ''}
+                onClick={() => {
+                  setActiveTab('rskToLight');
+                }}
+              >
+                <FontAwesomeIcon icon={faBolt} /> EVM to Lightning
+              </button>
+            </Link>
+            <Link to='/lightningToEvm'>
+              <button
+                className={activeTab === 'lightToRSK' ? styles.activeTab : ''}
+                onClick={() => {
+                  setActiveTab('lightToRSK');
+                }}
+              >
+                <FontAwesomeIcon icon={faExchangeAlt} /> Lightning to EVM
+              </button>
+            </Link>
+            <Link to="/evmToEvm">
+              <button
+                className={activeTab === 'evmToEvm' ? styles.activeTab : ''}
+                onClick={() => {
+                  setActiveTab('evmToEvm');
+                }}
+              >
+                <FontAwesomeIcon icon={faExchangeAlt} /> EVM to EVM
+              </button>
+            </Link>
+            <Link to='/petitionsEvm'>
+              <button
+                className={activeTab === 'petitions' ? styles.activeTab : ''}
+                onClick={() => {
+                  setActiveTab('petitions');
+                }}
+              >
+                <FontAwesomeIcon icon={faPaperPlane} /> Petitions EVM to EVM
+              </button>
+            </Link>
+            <Link to="/petitionsLN">
+              <button
+                className={activeTab === 'petitionsLN' ? styles.activeTab : ''}
+                onClick={() => {
+                  setActiveTab('petitionsLN');
+                }}
+              >
+                <FontAwesomeIcon icon={faBullhorn} /> Petitions between LN and EVM
+              </button>
+            </Link>
+          </div>
+          {
+            !canisterAddr &&
+            <p>Loading Canister ...</p>
+          }
+          <Routes>
+            <Route path="/" element={
+              <>
+              {
+                canisterAddr && 
+                <EvmToLightning 
+                  coinbase={coinbase}
+                  netId={netId}
+                  provider={provider}
+                  canisterAddr={canisterAddr}
+                  loadWeb3Modal={loadWeb3Modal}
+                  chains={chains}
+                /> 
+              }
+              </>
+
+            } 
+
+            />
+            <Route path="/lightningToEvm" element={
+              <>
+              {
+                canisterAddr && 
+                <LightningToEvm 
+                  chains={chains}
+                  coinbase={coinbase}
+                />
+              }
+              </>
+            }
+            />
+            <Route path="/evmToEvm" element={
+              <>
+              {
+                canisterAddr &&
+                <EvmToEvm 
+                  coinbase={coinbase}
+                  netId={netId}
+                  provider={provider}
+                  canisterAddr={canisterAddr}
+                  loadWeb3Modal={loadWeb3Modal}
+                  chains={chains}          
+                />
+              }
+              </>
+            } 
+
+            />
+            <Route path="/petitionsEvm" element={
+              <>
+              {
+                canisterAddr &&
+                <Petitions
+                  coinbase={coinbase}
+                  netId={netId}
+                  provider={provider}
+                  canisterAddr={canisterAddr}
+                  loadWeb3Modal={loadWeb3Modal}
+                  chains={chains}
+                />
+              }
+              </>
+            } 
+            />
+            <Route path="/petitionsLN" element={
+              <>
+              {
+                canisterAddr &&
+                <PetitionsLN 
+                  coinbase={coinbase}
+                  netId={netId}
+                  provider={provider}
+                  canisterAddr={canisterAddr}
+                  loadWeb3Modal={loadWeb3Modal}
+                  chains={chains}
+                />
+              }
+              </>
+            } 
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+
+          </Routes>
+      </Router>
+
 
     </div>
   );

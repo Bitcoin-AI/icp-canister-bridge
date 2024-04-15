@@ -19,7 +19,8 @@ const EvmToEvm = ({
   const [evm_address, setEvmAddr] = useState('');
   const [chain,setChain] = useState();
   const [amount,setAmount] = useState();
-  
+  const [EXPLORER_BASEURL,setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
+
   const sendTxHash = async () => {
     setProcessing(true);
     try {
@@ -91,10 +92,10 @@ const EvmToEvm = ({
 
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
-        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+        setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
         setEvmTxHash(tx.hash);
       } catch(err){
         console.log(err)
@@ -106,10 +107,24 @@ const EvmToEvm = ({
       setProcessing(false);
   };
   useEffect(() => {
+    if(netId === 31){
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  },[netId]);
+  useEffect(() => {
     if (coinbase) {
       setEvmAddr(coinbase);
     }
   }, [coinbase]);
+  useEffect(() => {
+    if(netId === 31){
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  },[netId]);
   useEffect(() => {
     if(chains){
       const initialChain = JSON.stringify(
@@ -145,7 +160,7 @@ const EvmToEvm = ({
       >
       {
         chains.map(item => {
-          return(<option value={JSON.stringify(
+          return(<option key={item.chainId} value={JSON.stringify(
             {
               rpc: item.rpc.filter(rpcUrl => {
                 if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;

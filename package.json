@@ -20,6 +20,9 @@
     "@dfinity/agent": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/principal": "^0.19.2",
+    "@fortawesome/fontawesome-svg-core": "^6.5.2",
+    "@fortawesome/free-solid-svg-icons": "^6.5.2",
+    "@fortawesome/react-fontawesome": "^0.2.0",
     "bitcoinjs-lib": "^6.1.5",
     "css-loader": "^6.8.1",
     "ethers": "^6.7.1",
@@ -27,6 +30,7 @@
     "nostr-tools": "^1.16.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
     "request": "^2.88.2",
     "web3modal": "^1.9.12"
   },

@@ -1,5 +1,7 @@
 import React, { useState,useEffect,useRef } from "react";
 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPencilAlt, faCheck} from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { decode } from 'light-bolt11-decoder';
 
@@ -32,7 +34,7 @@ const PetitionsLN = ({
   const [solve,setSolvePetition] = useState(false);
   const petitionToSolve = useRef();
   const [petitions,setPetitions] = useState([]);
-
+  const [EXPLORER_BASEURL,setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
   // Function to decode ERC20 transfer transaction
   const decodeERC20Transfer = async (txInput) => {
     const iface = new ethers.Interface(ERC20ABI);
@@ -224,10 +226,10 @@ const PetitionsLN = ({
         }
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
-        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+        setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
         setEvmTxHash(tx.hash);
       } catch(err){
         console.log(err)
@@ -371,25 +373,32 @@ const PetitionsLN = ({
       setEvmAddr(coinbase);
     }
   }, [coinbase]);
+  useEffect(() => {
+    if(netId === 31){
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  },[netId]);
   return(
   <>
   <div className={styles.tabs}>
     <button
-        className={!solve ? styles.activeTab : ''}
-        onClick={() => {
-          setSolvePetition(false);
-        }}
-      >
-        Create Petitions
-      </button>
-      <button
-        className={solve ? styles.activeTab : ''}
-        onClick={() => {
-          setSolvePetition(true);
-        }}
-      >
-        Solve Petitions
-      </button>
+      className={!solve ? styles.activeTab : ''}
+      onClick={() => {
+        setSolvePetition(false);
+      }}
+    >
+      <FontAwesomeIcon icon={faPencilAlt} /> Create Petitions
+    </button>
+    <button
+      className={solve ? styles.activeTab : ''}
+      onClick={() => {
+        setSolvePetition(true);
+      }}
+    >
+      <FontAwesomeIcon icon={faCheck} /> Solve Petitions
+    </button>
   </div>
   {
     !solve ?
@@ -400,8 +409,9 @@ const PetitionsLN = ({
             className={styles.input}
             type="select"
             onChange={(ev) => {setLN(!ln)}}
+            defaultValue={false}
           >
-            <option value={false} selected>EVM</option>
+            <option value={false}>EVM</option>
             <option value={true}>Lightning</option>
           </select>
       </div>
@@ -525,7 +535,7 @@ const PetitionsLN = ({
           petitions.map(item => {
             //if(Number(netId) !== Number(item.wantedChain)) return;
             return(
-              <div>
+              <div key={item.proofTxId !== "0" ? item.proofTxId : item.petitionPaidInvoice}>
                 <p>From: {item.sendingChain !== "0" ? item.sendingChain : "Bitcoin Lightning Network"}</p>
                 <p>To: {item.wantedChain !== "0" ? item.wantedChain : "Bitcoin Lightning Network"}</p>
                 {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
@@ -17,7 +17,15 @@ const EvmToLightning = ({
   const [evm_txHash,setEvmTxHash] = useState();
   const [userInvoice,setUserInvoice] = useState();
   const [amount, setAmount] = useState('');
+  const [EXPLORER_BASEURL,setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
 
+  const decodeERC20Transfer = async (txInput) => {
+    const iface = new ethers.Interface(ERC20ABI);
+    const decodedInput = await iface.parseTransaction({ data: txInput });
+    console.log(`Tx decoded`);
+    console.log(decodedInput);
+    return decodedInput.args;
+  }
   const sendInvoiceAndTxHash = async () => {
       setProcessing(true);
       try {
@@ -35,9 +43,15 @@ const EvmToLightning = ({
         if (typeof window.webln !== 'undefined') {
           await window.webln.enable();
           setMessage("Preparing invoice");
-  
-          const sats = Number(transaction.value)/10**10;
-          const invoice = await webln.makeInvoice({
+          let sats;
+          if(netId === 31){
+            sats = Number(transaction.value)/10**10
+          } else {
+            const decodedTxArgs = await decodeERC20Transfer(transaction.data);
+            console.log('Decoded transaction:', decodedTxArgs);
+    
+            sats = Number(decodedTxArgs[1])/10**10
+          };          const invoice = await webln.makeInvoice({
             amount: sats,
             defaultMemo: `Chain ${ethers.toBeHex(netId)} - Tx Hash ${transaction.hash}`
           });
@@ -101,10 +115,10 @@ const EvmToLightning = ({
         }
         console.log("Transaction sent:", tx.hash);
         // Use explorers based on chainlist
-        setMessage(<>Tx sent: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a></>);
+        setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`https://explorer.testnet.rsk.co/tx/${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
         setEvmTxHash(tx.hash);
       } catch(err){
         console.log(err)
@@ -115,7 +129,13 @@ const EvmToLightning = ({
       }
       setProcessing(false);
   };
-
+  useEffect(() => {
+    if(netId === 31){
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  },[netId]);
   return(
   <>
   <div>
