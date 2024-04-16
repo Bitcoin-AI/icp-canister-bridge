@@ -23,6 +23,7 @@ const PetitionsLN = ({
   const [evm_address, setEvmAddr] = useState('');
   const [chain,setChain] = useState();
   const [amount,setAmount] = useState();
+  const [currentPetitionToSolve,setCurrentPetitionToSolve] = useState(null);
 
 
   const [ln,setLN] = useState(false);
@@ -103,7 +104,7 @@ const PetitionsLN = ({
       const signature = await signer.signMessage(transaction.hash);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      if(netId === 31){
+      if(Number(netId) === 31){
         sats = Number(transaction.value)/10**10
       } else {
         const decodedTxArgs = await decodeERC20Transfer(transaction.data);
@@ -167,11 +168,15 @@ const PetitionsLN = ({
           },
           new Date().getTime().toString()
         );
-        setTimeout(() => {
-          fetchPetitions();
-        },1000);
+
       }
       setMessage(resp);
+      setTimeout(() => {
+        fetchPetitions();
+      },1000);
+      setTimeout(() => {
+        setMessage();
+      },5000);
     } catch (err) {
       setMessage(err.message);
     }
@@ -234,11 +239,15 @@ const PetitionsLN = ({
       } catch(err){
         console.log(err)
         setMessage(err.message);
-        setTimeout(() => {
-          setMessage()
-        },5000);
-      }
+
+      };
+      setTimeout(() => {
+        setMessage()
+      },5000);
       setProcessing(false);
+      setTimeout(() => {
+        fetchPetitions();
+      },1000);
   };
   const getInvoice = async () => {
     setProcessing(true);
@@ -290,15 +299,18 @@ const PetitionsLN = ({
           petitionToSolve.current.proofTxId,
           petitionToSolve.current.proofTxId,
           signature,
-          coinbase,
+          coinbase.toLowerCase(),
           new Date().getTime().toString()
         );
         //const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
         //console.log(invoiceCheckResp);
-        //setMessage(invoiceCheckResp);
+        setMessage(resp);
+        setTimeout(() => {
+          fetchPetitions();
+        },1000);
       } else {
         setMessage(`Pay invoice: ${invoice} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
-      }
+      };
     } catch(err){
       setMessage(err.message);
       setTimeout(() => {
@@ -311,15 +323,20 @@ const PetitionsLN = ({
     console.log(petitionToSolve.current)
     const signer = await provider.getSigner();
     const signature = await signer.signMessage(petitionToSolve.current.proofTxId);
+    setMessage("Checking parameters and processing evm payment ...");
+
     const resp = await main.solvePetitionEVM2LN(
       petitionToSolve.current.invoiceId,
       petitionToSolve.current.proofTxId,
       petitionToSolve.current.proofTxId,
-      coinbase,
       signature,
+      coinbase.toLowerCase(),
       new Date().getTime().toString()
-      );
-    setMessage(resp)
+    );
+    setMessage(resp);
+    setTimeout(() => {
+      fetchPetitions();
+    },1000);
   }
   
   const checkInvoice = async () => {
@@ -346,6 +363,9 @@ const PetitionsLN = ({
       );
       //const parsed = JSON.parse(resp);
       setMessage(resp);
+      setTimeout(() => {
+        fetchPetitions();
+      },1000);
     } catch (err) {
       setMessage(`${err.message}`)
     }
@@ -380,6 +400,11 @@ const PetitionsLN = ({
       setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
     }
   },[netId]);
+  useEffect(() => {
+    if(currentPetitionToSolve){
+      petitionToSolve.current = currentPetitionToSolve;
+    }
+  },[currentPetitionToSolve]);
   return(
   <>
   <div className={styles.tabs}>
@@ -411,8 +436,8 @@ const PetitionsLN = ({
             onChange={(ev) => {setLN(!ln)}}
             defaultValue={false}
           >
-            <option value={false}>EVM</option>
-            <option value={true}>Lightning</option>
+            <option value={false}>EVM to Lightning</option>
+            <option value={true}>Lightning to EVM</option>
           </select>
       </div>
       {
@@ -533,7 +558,9 @@ const PetitionsLN = ({
         <h2>Petitions</h2>
         {
           petitions.map(item => {
+            if(item.sendingChain !== "0" && item.wantedChain !== "0") return;
             //if(Number(netId) !== Number(item.wantedChain)) return;
+            //if(item.proofTxId && item.wantedChain !== "0" && Number(netId) !== Number(item.wantedChain)) return;
             return(
               <div key={item.proofTxId !== "0" ? item.proofTxId : item.petitionPaidInvoice}>
                 <p>From: {item.sendingChain !== "0" ? item.sendingChain : "Bitcoin Lightning Network"}</p>
@@ -543,8 +570,8 @@ const PetitionsLN = ({
                   item.sendingChain !== "0" ?
                   (
                     item.sendingChain === "0x1f" ?
-                    <p>Amount: {(item.transaction?.value)?.toString()}</p> :
-                    <p>Amount: {Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)}</p> 
+                    <p>Amount: {(Number(item.transaction.value)/10**10)?.toString()} satoshis of rbtc</p> :
+                    <p>Amount: {(Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)/10**10).toString()} satoshis of wbtc</p> 
                   ):
                   item.petitionPaidInvoice?.indexOf("lntb") !== -1 &&
                   <>
@@ -558,8 +585,16 @@ const PetitionsLN = ({
                   </>
                 }
                 <p>Reward: {item.reward}</p>
+                {
+                  currentPetitionToSolve &&
+                  (
+                    JSON.stringify(currentPetitionToSolve) === JSON.stringify(item) &&
+                    <p><b>Petition Selected</b></p>
+                  )
+                }
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
+                    setCurrentPetitionToSolve(item);
                     if(item.invoiceId.indexOf("lntb") !== -1){
                       payPetitionInvoice();
                     } else {
@@ -567,9 +602,12 @@ const PetitionsLN = ({
                     };
                     return;
                   }}>Initiate petition solving</button>
-                <button className={styles.button} onClick={async () => {
-                    petitionToSolve.current = item;
+                {
+                  !currentPetitionToSolve &&
+                  <button className={styles.button} onClick={async () => {
+                    setCurrentPetitionToSolve(item);
                   }}>Select Petition</button>
+                }
               </div>
             );
           })

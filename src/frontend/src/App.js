@@ -2,8 +2,6 @@ import React, { useState, useEffect,useCallback } from "react";
 import { ethers } from 'ethers';
 import { HashRouter as Router, Route, Routes,Navigate,Link } from 'react-router-dom';
 
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBolt,faLightbulb, faExchangeAlt, faPaperPlane, faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import { main } from "../../declarations/main";
 
 import useWeb3Modal from "./hooks/useWeb3Modal";
@@ -11,6 +9,7 @@ import useWeb3Modal from "./hooks/useWeb3Modal";
 import styles from './RSKLightningBridge.module.css';  // Import the CSS module
 
 import Header from "./components/Header";
+import MainMenu from "./components/MainMenu";
 
 
 import EvmToLightning from "./pages/EvmToLightning";
@@ -22,6 +21,7 @@ import PetitionsLN from "./pages/PetitionsLN";
 
 const App = () => {
   // State hooks
+
   const [activeTab, setActiveTab] = useState('rskToLight');
   const [rskBalance, setUserBalance] = useState();
 
@@ -56,7 +56,7 @@ const App = () => {
             return(rpc)
           }
         });
-        if(rpc.length > 0){
+        if(rpc.length > 0 && (Number(item.chainId) === 31 || Number(item.chainId) === 11155111)){
           console.log(item)
           if(wbtcAddresses[item.chainId.toString()]){
             rpcNodes.push({
@@ -80,7 +80,7 @@ const App = () => {
     if (coinbase && netId && provider) {
       try {
         let balance;
-        if(netId === 31){
+        if(Number(netId) === 31){
           balance = await provider.getBalance(coinbase);
         } else {
           const wbtcAddress = wbtcAddresses[netId.toString()];
@@ -110,7 +110,8 @@ const App = () => {
     main.getEvmAddr().then(addr => {
       setCanisterAddr(addr);
     })
-  },[])
+  },[]);
+
 
   const fetchNodeInfo = async () => {
     try{
@@ -137,58 +138,7 @@ const App = () => {
       />
 
       <Router>
-          <div className={styles.tabs}>
-            <Link to='/'>
-              <button
-                className={activeTab === 'rskToLight' ? styles.activeTab : ''}
-                onClick={() => {
-                  setActiveTab('rskToLight');
-                }}
-              >
-                <FontAwesomeIcon icon={faBolt} /> EVM to Lightning
-              </button>
-            </Link>
-            <Link to='/lightningToEvm'>
-              <button
-                className={activeTab === 'lightToRSK' ? styles.activeTab : ''}
-                onClick={() => {
-                  setActiveTab('lightToRSK');
-                }}
-              >
-                <FontAwesomeIcon icon={faExchangeAlt} /> Lightning to EVM
-              </button>
-            </Link>
-            <Link to="/evmToEvm">
-              <button
-                className={activeTab === 'evmToEvm' ? styles.activeTab : ''}
-                onClick={() => {
-                  setActiveTab('evmToEvm');
-                }}
-              >
-                <FontAwesomeIcon icon={faExchangeAlt} /> EVM to EVM
-              </button>
-            </Link>
-            <Link to='/petitionsEvm'>
-              <button
-                className={activeTab === 'petitions' ? styles.activeTab : ''}
-                onClick={() => {
-                  setActiveTab('petitions');
-                }}
-              >
-                <FontAwesomeIcon icon={faPaperPlane} /> Petitions EVM to EVM
-              </button>
-            </Link>
-            <Link to="/petitionsLN">
-              <button
-                className={activeTab === 'petitionsLN' ? styles.activeTab : ''}
-                onClick={() => {
-                  setActiveTab('petitionsLN');
-                }}
-              >
-                <FontAwesomeIcon icon={faBullhorn} /> Petitions between LN and EVM
-              </button>
-            </Link>
-          </div>
+          <MainMenu />
           {
             !canisterAddr &&
             <p>Loading Canister ...</p>

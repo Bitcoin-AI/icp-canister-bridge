@@ -71,7 +71,7 @@ const Petitions = ({
       const signature = await signer.signMessage(transaction.hash);
       // Do eth tx and then call main.payInvoicesAccordingToEvents();
       //resp = await main.payInvoicesAccordingToEvents(new Date().getTime().toString());
-      setMessage("Verifying parameters to process evm payment");
+      setMessage("Verifying parameters to process petition request");
       if(solve){
         resp = await main.solvePetitionEVM2EVM(
           petitionToSolve.current.transaction.hash,
@@ -152,7 +152,7 @@ const Petitions = ({
         setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
         // Wait for the transaction to be mined
         await tx.wait();
-        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
+        setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, finalize petition</>);
         setEvmTxHash(tx.hash);
       } catch(err){
         console.log(err)
@@ -279,24 +279,35 @@ const Petitions = ({
         <h2>Petitions</h2>
         {
           petitions.map(item => {
-            //if(Number(netId) !== Number(item.wantedChain)) return;
+            if(Number(netId) !== Number(item.wantedChain)) return;
+            if(item.sendingChain === "0" || item.wantedChain === "0") return;
             return(
               <div key={item.proofTxId}>
                 <p>From chain: {item.sendingChain}</p>
                 <p>To chain: {item.wantedChain}</p>
-                <p>Amount: {
-                    item.sendingChain === "0x1f" ?
-                    (item.transaction?.value)?.toString() :
-                    Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)
-                    }</p>
+                {
+                  item.sendingChain === "0x1f" ?
+                  <p>Amount: {(Number(item.transaction.value)/10**10)?.toString()} satoshis of rbtc</p> :
+                  <p>Amount: {(Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`)/10**10).toString()} satoshis of wbtc</p> 
+                }
                 <p>Reward: {item.reward}</p>
+                {
+                  petitionToSolve.current &&
+                  (
+                    JSON.stringify(petitionToSolve.current) === JSON.stringify(item) &&
+                    <p><b>Petition Selected</b></p>
+                  )
+                }
                 <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
                     sendToken(solve);
                   }}>Initiate petition solving</button>
-                <button className={styles.button} onClick={async () => {
+                {
+                  !petitionToSolve.current &&
+                  <button className={styles.button} onClick={async () => {
                     petitionToSolve.current = item;
                   }}>Select Petition</button>
+                }
               </div>
             );
           })
