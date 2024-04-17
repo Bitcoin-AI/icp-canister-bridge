@@ -62,6 +62,7 @@ actor {
   let paidTransactions = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
   let petitions = HashMap.HashMap<Text, Types.PetitionEvent>(10, Text.equal, Text.hash);
+  let petitionUsed = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
@@ -114,6 +115,15 @@ actor {
     let invoicePaidUncleaned = await utils.getValue(parsedResponse, "payment_request");
     let invoicePaid = utils.subText(invoicePaidUncleaned,1,invoicePaidUncleaned.size()-1);
     Debug.print("Checking payment of invoice "#invoicePaid);
+    let isPetitionRegistered : Bool = switch (petitionUsed.get(invoicePaid)) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
+
+    if (isPetitionRegistered) {
+      return "Petition already registered";
+    };
     let amountSatoshi = await utils.getValue(parsedResponse, "value");
     Debug.print("Satoshis sent: "#amountSatoshi);
     let amount : Nat = switch (Nat.fromText(utils.subText(amountSatoshi, 1, amountSatoshi.size() - 1) # "0000000000")) {
@@ -130,6 +140,7 @@ actor {
     };    
     Debug.print("Creating petition with invoicePaid: "#invoicePaid);
     petitions.put(invoicePaid,petitionEvent);
+    petitionUsed.put(invoicePaid,true);
     Debug.print("Petition for LN to EVM transfer created successfully");
     return "Petition for LN to EVM transfer created successfully";
   };
@@ -239,7 +250,15 @@ actor {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let transactionId = petitionEvent.proofTxId;
+    let isPetitionRegistered : Bool = switch (petitionUsed.get(transactionId)) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
 
+    if (isPetitionRegistered) {
+      return "Petition already registered";
+    };
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
@@ -264,6 +283,7 @@ actor {
     if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
       if (receiverTransaction == "0x"#canisterAddress) {
         petitions.put(transactionId, petitionEvent);
+        petitionUsed.put(transactionId,true);
         Debug.print("Petition created successfully");
         Debug.print("isWBTC: "#Bool.toText(petitionEvent.wbtc));
         Debug.print("sendingChain: "#petitionEvent.sendingChain);
@@ -271,7 +291,7 @@ actor {
         Debug.print("wantedChain: "#petitionEvent.wantedChain);
         Debug.print("wantedERC20: "#petitionEvent.wantedERC20);
         Debug.print("sentERC20: "#petitionEvent.sentERC);
-
+        petitionUsed.put(transactionId,true);
         result := "Petition created successfully";
       } else {
         Debug.print("Bad transaction");
@@ -286,6 +306,7 @@ actor {
           if ("0x"#canisterAddress == address) {
             // Check if receiver of ERC20 is the canister
             petitions.put(transactionId, petitionEvent);
+            petitionUsed.put(transactionId,true);
             Debug.print("Petition for ERC20 transfer created successfully");
             result := "Petition for ERC20 transfer created successfully";
           } else {
@@ -424,7 +445,15 @@ actor {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let transactionId = petitionEvent.proofTxId;
+    let isPetitionRegistered : Bool = switch (petitionUsed.get(transactionId)) {
+      case (null) { false };
+      case (?true) { true };
+      case (?false) { false };
+    };
 
+    if (isPetitionRegistered) {
+      return "Petition already registered";
+    };
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, petitionEvent.sendingChain, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
@@ -440,6 +469,7 @@ actor {
     if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
       if (receiverTransaction == "0x"#canisterAddress) {
         petitions.put(transactionId, petitionEvent);
+        petitionUsed.put(transactionId,true);
         Debug.print("Petition created successfully");
         Debug.print("isWBTC: "#Bool.toText(petitionEvent.wbtc));
         Debug.print("sendingChain: "#petitionEvent.sendingChain);
@@ -462,6 +492,7 @@ actor {
           if ("0x"#canisterAddress == address) {
             // Check if receiver of ERC20 is the canister
             petitions.put(transactionId, petitionEvent);
+            petitionUsed.put(transactionId,true);
             Debug.print("Petition for ERC20 transfer created successfully");
             return "Petition for ERC20 transfer created successfully";
           } else {
