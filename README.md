@@ -213,7 +213,7 @@ Alternative Flows
 Exceptional Flows
 - If any of the parameters are invalid, the function will throw an exception.
 
-![Solve a Petition for EVM to LN Transfer](./imgs/evmToLnPetitionCreation.png)
+![Solve a Petition for EVM to LN Transfer](./imgs/evmToLnPetitionSolve.png)
 
 
 ## How to Use
