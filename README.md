@@ -102,7 +102,7 @@ Preconditions
 
 Postconditions
 - The function successfully checks the status of the LN invoice.
-- If the invoice is settled, a new petition is created and stored.
+- If the invoice is settled, a new petition is created and stored with parameters for evm transaction.
 - The function returns a success message indicating that the petition was created successfully.
 
 Normal Flow
@@ -133,7 +133,7 @@ Preconditions
 
 Postconditions
 - The function successfully validates the transaction details and the proof of the transaction.
-- If the transaction is valid, the function pays the `solvePetitionInvoice` and removes the petition from storage.
+- If the transaction is valid, the function pays the `solvePetitionInvoice` sent by user and removes the petition from storage.
 - The function returns a success message indicating that the transaction was valid and the payment was successful, or an error message if the transaction was invalid or the payment failed.
 
 Normal Flow
@@ -170,7 +170,7 @@ Postconditions
 
 Normal Flow
 1. The `petitionEVM2LN` function is called with the `petitionEvent` and `timestamp` parameters.
-2. The function retrieves the transaction details from the EVM.
+2. The function retrieves the transaction details from the EVM and Invoice sent.
 3. The function checks if the transaction is valid and directed to the canister's address.
 4. If the transaction is valid, a new petition is created and stored.
 5. The function returns a success message indicating that the petition was created successfully.
@@ -196,8 +196,8 @@ Preconditions
 - The `timestamp` parameter is a valid timestamp.
 
 Postconditions
-- The function successfully retrieves the transaction details from the EVM.
-- The function creates and sends a transaction to the `destAddress` using the Lightning Network.
+- The function successfully retrieves the transaction details from the the invoice paid.
+- The function creates and sends a transaction to the `destAddress` using the EVM.
 - The function returns a success message indicating that the transaction was successful.
 
 Normal Flow
@@ -212,8 +212,6 @@ Alternative Flows
 
 Exceptional Flows
 - If any of the parameters are invalid, the function will throw an exception.
-
-![Solve a Petition for EVM to LN Transfer](./imgs/evmToLnPetitionSolve.png)
 
 
 ## How to Use
