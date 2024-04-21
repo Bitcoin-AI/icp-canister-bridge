@@ -1,4 +1,4 @@
-# ICP Canister Bridge Project
+# ICP Canister Bridge Project SENFINA 
 
 ## Introduction
 The ICP Canister Bridge is a groundbreaking project that bridges the gap between the Ethereum Virtual Machine (EVM) compatible chains and the Lightning Network, using the Internet Computer Protocol (ICP) stack. This bridge is designed to facilitate seamless swaps of satoshis between the Lightning Network and EVM-compatible chains, providing a secure and efficient transactional framework.
