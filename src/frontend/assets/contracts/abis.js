@@ -1,7 +1,7 @@
-import bridgeAbi from "./abis/RSKBridgeLightning.json";
+import erc20Abi from "./abis/erc20Abi.json";
 
 const abis = {
-  bridge: bridgeAbi
+  erc20: erc20Abi
 };
 
 export default abis;

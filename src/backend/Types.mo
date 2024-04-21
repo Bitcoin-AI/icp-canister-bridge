@@ -1,3 +1,4 @@
+import Bool "mo:base/Bool";
 module Types {
 
     public type Timestamp = Nat64;
@@ -70,8 +71,26 @@ module Types {
         sendingChain : Text;
         recipientAddress : Text;
         recipientChain : Text;
+        wantedERC20: Text; // The ERC20 that he wants to receive
+        sentERC20: Text; // The ERC20 that he is sending
         proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
-        invoiceId: Text; // Only For LN cases
-        signature: Text;
+        invoiceId : Text; // Only For LN cases
+        signature : Text;
+        reward : Text;
     };
+
+    public type PetitionEvent = {
+        sendingChain : Text;
+        wantedAddress : Text;
+        wantedChain : Text;
+        proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+        invoiceId : Text; // Only For LN cases
+        petitionPaidInvoice : Text; // Only For LN to EVM cases
+        signature : Text;
+        reward : Text;
+        wbtc: Bool;  // If he wants to send just WBTC from wbtc network or rootstock as native btc
+        wantedERC20: Text; // The ERC20 that he wants to receive
+        sentERC: Text; // The ERC20 that he is sending
+    };
+
 };

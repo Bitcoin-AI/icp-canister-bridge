@@ -2,10 +2,6 @@ import {  useEffect,useState,useRef } from "react";
 import {
   SimplePool,
   nip19,
-  generatePrivateKey,
-  getPublicKey,
-  getEventHash,
-  getSignature
 } from 'nostr-tools';
 
 
