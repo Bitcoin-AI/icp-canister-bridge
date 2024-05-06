@@ -213,6 +213,91 @@ Alternative Flows
 Exceptional Flows
 - If any of the parameters are invalid, the function will throw an exception.
 
+### UseCase: Create a Petition for EVM to EVM Transfer
+
+Actor: User
+
+Preconditions
+- The user has enough RBTC or ERC20 tokens to make the transaction.
+
+Postconditions
+- The petition is registered in the system.
+
+Normal Flow
+1. User initiates a transaction on the EVM network.
+2. User calls the `petitionEVM2EVM` function with the transaction details.
+3. The function checks if the transaction has already been registered before.
+   - If the transaction has already been registered, the function returns "Petition already registered".
+   - If the transaction has not been registered, the function continues to the next step.
+4. The function retrieves the transaction details from the EVM network.
+5. The function checks if the transaction is a native coin transfer or an ERC20 token transfer.
+   - If the transaction is a native coin transfer (RBTC), the function checks if the transaction is sent to the canister's address.
+     - If the transaction is sent to the canister's address, the function registers the petition and returns "Petition created successfully".
+     - If the transaction is not sent to the canister's address, the function returns "Bad transaction".
+   - If the transaction is an ERC20 token transfer, the function decodes the transaction data to get the ERC20 token receiver's address.
+     - If the receiver's address is the canister's address, the function registers the petition and returns "Petition for ERC20 transfer created successfully".
+     - If the receiver's address is not the canister's address, the function returns "Bad ERC20 transaction".
+6. If there is an error decoding the ERC20 data, the function returns "Error decoding transaction data".
+
+
+Alternative Flows
+- If the transaction details are not valid, the function returns an error message.
+- If the transaction creation or sending fails, the function returns an error message.
+- If the petition was registered before, return "Petition already registered".
+
+Exceptional Flows
+- If any of the parameters are invalid, the function will throw an exception.
+
+![Create a Petition for EVM to EVM Transfer](./imgs/evmToEvmPetitionCreation.png)
+
+### UseCase: Solve a Petition for EVM to EVM Transfer
+
+Actor: User
+
+Preconditions
+- The user has enough RBTC or ERC20 tokens to make the transaction.
+- Valid petition registered in the system.
+  
+Postconditions
+- The petition is solved in the system.
+
+Normal Flow
+1. User sends transaction to petition creator (*consider change to canister address*)
+2. User calls the `solvePetitionEVM2EVM` function with the petition transaction ID, proof transaction ID, and signature.
+3. The function retrieves the petition using the petition transaction ID.
+   - If no petition is found, the function returns "No petition found for this transaction".
+4. The function validates the transaction parameters.
+5. The function checks if the transaction is valid.
+6. The function creates and sends a transaction.
+   - If the transaction is successful, the function removes the petition and returns "Petition solved successfully and reward transferred".
+   - If the transaction is not successful, the function returns "Failed to transfer reward".
+
+Exceptional Flows
+- If any of the parameters are invalid, the function will throw an exception.
+
+![Solve a Petition for EVM to EVM Transfer](./imgs/evmToEvmPetitionSolve.png)
+
+## Business Proposal 
+
+### Objective
+This business proposal outlines the strategic approach for capitalizing on liquidity through the ICP Canister Bridge Senfina, enhancing the bridge's utility, and fostering a robust economic environment across our EVM and LN balances.
+
+### Current Liquidity Captivation Strategy
+
+#### Exclusive Investment in Swaps
+
+To kickstart the ecosystem and ensure a stable liquidity base, we will initially act as the sole liquidity provider for all swaps conducted through the ICP Canister Bridge, winning a fee for using the system, which will be determined accordingly as market conditions.
+
+#### Petition-Based Swap Architecture: Incentivizing Liquidity Provision
+
+The petition-based swap architecture is designed to enhance liquidity provision within the ICP Canister Bridge ecosystem through a reward-driven process. This innovative approach ensures both the security of asset transfers and the active involvement of participants by offering tangible incentives for facilitating transactions. Here’s how we leverage this architecture to drive liquidity:
+
+**Formal Petition Process for Asset Transfers:** Users initiate asset transfers by creating formal petitions, which detail the specifics of the desired transaction. This formalization serves as a foundational step that ensures all transfer requests are well-documented and verified, thereby maintaining a high level of security and trust in the platform.
+Resolution Rewards: To motivate participants to actively engage in resolving these petitions, we offer rewards for each successfully completed swap. Participants who provide the necessary proofs and validate the transactions contribute directly to the liquidity of the platform and are compensated for their efforts.
+
+**Reward Mechanism:** The rewards for solving petitions could include a combination of transaction fees, a share of the assets transferred, or other financial incentives. This reward system is structured to attract and retain a community of active users who are incentivized to ensure the swift and secure processing of transactions.
+
+**Sustainable Liquidity Cycle:** By rewarding users who facilitate these transactions, we establish a continuous liquidity cycle. This system not only supports the operational functionality of the bridge but also fosters a dynamic environment where liquidity is constantly being supplied by community members incentivized by potential gain
 
 ## How to Use
 - Detailed user guides are available in the repository for initiating and managing cross-chain transactions.
