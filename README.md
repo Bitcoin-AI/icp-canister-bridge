@@ -41,7 +41,19 @@ The ICP Canister Bridge is a cornerstone of the ICP ecosystem, contributing to t
 Actor: User
 
 Preconditions:
-- The user has a valid TransferEvent.
+- The user has a valid TransferEvent, defined as:
+  ```
+   {
+        sendingChain : Text; // Chain that funds where sent from
+        recipientAddress : Text; // Recipient evm address
+        recipientChain : Text; // Chain to receive funds
+        wantedERC20: Text; // The ERC20 that he wants to receive, 0 if native
+        sentERC20: Text; // The ERC20 that he is sending, 0 if native
+        proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+        invoiceId : Text; // Only For LN cases, 0 for EVM to EVM
+        signature : Text; // Signature of the proofTxId done by user
+   }
+  ```
 - The user has a valid derivation path.
 - The user has a valid key name.
 
@@ -96,7 +108,22 @@ Actor: User
 
 Preconditions
 - The user or system has the necessary permissions to call the function.
-- The `petitionEvent` parameter is a valid petition event.
+- The `petitionEvent` parameter is a valid PetitionEvent, defined as:
+  ```
+   {
+        sendingChain : Text; // Chain that funds where sent from
+        wantedAddress : Text; // Recipient EVM address, 0 for LN cases
+        wantedChain : Text; // Chain to receive funds
+    proofTxId : Text; // This will be the transaction where users send the funds to the canister contract address
+       invoiceId : Text; // Only For LN cases
+       petitionPaidInvoice : Text; // Only For LN to EVM cases
+       signature : Text; // Signature of proofTxId done by user
+       reward : Text; // Amount wanted as reward (fee) for creating a petition and waiting to be solved
+       wbtc: Bool;  // If he wants to send just WBTC from wbtc network or rootstock as native btc
+       wantedERC20: Text; // The ERC20 that he wants to receive, 0 for none
+       sentERC: Text; // The ERC20 that he is sending, 0 for none
+   };
+  ```
 - The `payment_hash` parameter is a valid Lightning Network payment hash.
 - The `timestamp` parameter is a valid timestamp.
 
@@ -292,8 +319,9 @@ To kickstart the ecosystem and ensure a stable liquidity base, we will initially
 
 The petition-based swap architecture is designed to enhance liquidity provision within the ICP Canister Bridge ecosystem through a reward-driven process. This innovative approach ensures both the security of asset transfers and the active involvement of participants by offering tangible incentives for facilitating transactions. Here’s how we leverage this architecture to drive liquidity:
 
-**Formal Petition Process for Asset Transfers:** Users initiate asset transfers by creating formal petitions, which detail the specifics of the desired transaction. This formalization serves as a foundational step that ensures all transfer requests are well-documented and verified, thereby maintaining a high level of security and trust in the platform.
-Resolution Rewards: To motivate participants to actively engage in resolving these petitions, we offer rewards for each successfully completed swap. Participants who provide the necessary proofs and validate the transactions contribute directly to the liquidity of the platform and are compensated for their efforts.
+**Formal Petition Process for Asset Transfers:** Users initiate asset transfers by creating formal petitions, which detail the specifics of the desired transaction alongside a desired reward to be earned. This formalization serves as a foundational step that ensures all transfer requests are well-documented and verified, thereby maintaining a high level of security and trust in the platform.
+
+**Resolution Rewards:** To motivate participants to actively engage in creating these petitions, the creator defines and earns rewards for each successfully completed swap. Participants who provide the necessary proofs and validate the transactions contribute directly to the liquidity of the platform, petition solvers have their swap service performed while petition creators provide temporal liquidity to the system  and are compensated for their efforts and time.
 
 **Reward Mechanism:** The rewards for solving petitions could include a combination of transaction fees, a share of the assets transferred, or other financial incentives. This reward system is structured to attract and retain a community of active users who are incentivized to ensure the swift and secure processing of transactions.
 
