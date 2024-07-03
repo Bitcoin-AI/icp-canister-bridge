@@ -135,7 +135,7 @@ const Petitions = ({
         }
         if(Number(netId) === 31){
           tx = await signer.sendTransaction({
-            to: solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
+            to: `0x${canisterAddr}`,
             value: solve ? (value).toString() : ethers.parseUnits(amount.toString(),10)
           });
         } else {
@@ -143,7 +143,7 @@ const Petitions = ({
           const wbtcAddress = chains.filter(item => {return item.chainId === Number(netId)})[0].wbtcAddress;
           const tokenContract = new ethers.Contract(wbtcAddress, ERC20ABI, signer);
           tx = await tokenContract.transfer(
-            solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`,
+            `0x${canisterAddr}`,
             solve ? (value).toString() : ethers.parseUnits(amount.toString(),10)
           );
         }

@@ -569,7 +569,7 @@ actor {
         let isValidTransaction = await EVM.validateTransaction(
           petitionEvent.wantedERC20,
           proofTxId,
-          petitionEvent.wantedAddress, // Expected address
+          canisterAddress, // Expected address to be canister, after ok release payments
           transactionNat, // Expected amount
           petitionEvent.wantedChain,
           signature,
@@ -590,7 +590,31 @@ actor {
         Debug.print("Petition solve transaction being validated");
 
         if (isValidTransaction) {
+
           // if (reward > 0) {
+          // Send transaction to petition creator
+          let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
+            petitionEvent.wantedERC20,
+            petitionEvent.wantedERC20,
+            derivationPath,
+            keyName,
+            canisterAddress,
+            petitionEvent.wantedAddress,
+            reward + transactionNat,
+            publicKey,
+            transform,
+          );
+          let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
+          switch (isErrorPetitionCreator) {
+            case ("") {
+            
+              Debug.print("Petition creator received transfer");
+            };
+            case (errorValue) {
+              Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
+              return "Failed to transfer to petition creator";
+            };
+          };
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
             petitionEvent.sentERC,
@@ -598,7 +622,7 @@ actor {
             keyName,
             canisterAddress,
             transactionSenderCleaned,
-            reward + transactionNat,
+            transactionNat,
             publicKey,
             transform,
           );
@@ -616,6 +640,7 @@ actor {
               return "Failed to transfer reward";
             };
           };
+
           // } else {
           //   return "No reward available for this petition";
           // };
