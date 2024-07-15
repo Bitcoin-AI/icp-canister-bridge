@@ -121,7 +121,7 @@ const Petitions = ({
           return
         }
         //const bridgeWithSigner = bridge.connect(signer);
-        setMessage(`Sending token to ${solve ? petitionToSolve.current.wantedAddress : `0x${canisterAddr}`}`);
+        setMessage(`Sending token to ${`0x${canisterAddr}`}`);
         //const tx = await bridgeWithSigner.swapToLightningNetwork(amount * 10 ** 10, paymentRequest, { value: amount * 10 ** 10 });
         // Change for wbtc or rsk transaction based on ChainId
         let tx;

@@ -201,7 +201,7 @@ actor {
         let isValidTransaction = await EVM.validateTransaction(
           petitionEvent.wantedERC20,
           proofTxId,
-          petitionEvent.wantedAddress, // Expected address
+          "0x"#canisterAddress, // Expected address to be canister, after ok release payments
           transactionNat*10**10, // Expected amount
           petitionEvent.wantedChain,
           signature,
@@ -220,6 +220,29 @@ actor {
         Debug.print("Petition solve transaction being validated");
 
         if (isValidTransaction) {
+            // Pay petition creator
+                      let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
+            petitionEvent.wantedERC20,
+            petitionEvent.wantedERC20,
+            derivationPath,
+            keyName,
+            canisterAddress,
+            petitionEvent.wantedAddress,
+            reward + transactionNat,
+            publicKey,
+            transform,
+          );
+          let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
+          switch (isErrorPetitionCreator) {
+            case ("") {
+            
+              Debug.print("Petition creator received transfer");
+            };
+            case (errorValue) {
+              Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
+              return "Failed to transfer to petition creator";
+            };
+          };
             let paymentResult = await LN.payInvoice(solvePetitionInvoice, derivationPath, keyName, timestamp, transform);
             Debug.print(paymentResult);
             let paymenttxDetails = JSON.parse(paymentResult);
@@ -565,11 +588,12 @@ actor {
         Debug.print("petitionEvent.wantedAddress: "#petitionEvent.wantedAddress);
         Debug.print("transactionNat: "#Nat.toText(transactionNat));
         Debug.print("petitionEvent.wantedChain: "#petitionEvent.wantedChain);
+        Debug.print("Canister Address: "#canisterAddress);
 
         let isValidTransaction = await EVM.validateTransaction(
           petitionEvent.wantedERC20,
           proofTxId,
-          canisterAddress, // Expected address to be canister, after ok release payments
+          "0x"#canisterAddress, // Expected address to be canister, after ok release payments
           transactionNat, // Expected amount
           petitionEvent.wantedChain,
           signature,
