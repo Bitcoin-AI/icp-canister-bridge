@@ -221,8 +221,8 @@ actor {
 
         if (isValidTransaction) {
             // Pay petition creator
-                      let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
-            petitionEvent.wantedERC20,
+          let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
+            petitionEvent.wantedChain,
             petitionEvent.wantedERC20,
             derivationPath,
             keyName,
@@ -618,7 +618,7 @@ actor {
           // if (reward > 0) {
           // Send transaction to petition creator
           let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
-            petitionEvent.wantedERC20,
+            petitionEvent.wantedChain,
             petitionEvent.wantedERC20,
             derivationPath,
             keyName,
