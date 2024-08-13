@@ -266,7 +266,7 @@ const PetitionsLN = ({
         await window.webln.enable();
         setMessage(`Pay invoice ${invoice}`);
         const result = await window.webln.sendPayment(invoice);
-        setMessage("Invoice paid, wait for service send evm transaction ...");
+        setMessage("Invoice paid");
         //const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
         //console.log(invoiceCheckResp);
         //setMessage(invoiceCheckResp);
@@ -284,7 +284,12 @@ const PetitionsLN = ({
     // Need to verify main.solvePetitionEVM2LN method to check if invoice has really been paid
     try{
       console.log(petitionToSolve.current)
-      const invoice = petitionToSolve.current.invoiceId;
+      //const invoice = petitionToSolve.current.invoiceId;
+      setMessage("Getting invoice from service");
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address,new Date().getTime().toString());
+      setMessage(resp);
+      console.log(JSON.parse(resp))
+      const invoice = JSON.parse(resp).payment_request;
       const signer = await provider.getSigner();
       const signature = await signer.signMessage(petitionToSolve.current.proofTxId);
   

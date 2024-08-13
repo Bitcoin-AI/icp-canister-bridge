@@ -440,6 +440,19 @@ actor {
                     case (?value) { value };
                   };
                   // Release ln payment to petition creator first
+                  let paymentResult = await LN.payInvoice(petitionEvent.invoiceId, derivationPath, keyName, timestamp, transform);
+                  Debug.print(paymentResult);
+                  let paymenttxDetails = JSON.parse(paymentResult);
+                  let errorField = await utils.getValue(paymenttxDetails, "error");
+                  let resultField = await utils.getValue(paymenttxDetails, "result");
+                  let statusField = await utils.getValue(JSON.parse(resultField), "status");
+                  Debug.print(statusField);
+                  if (Text.contains(paymentResult, #text "SUCCEEDED")) {
+                    // Save
+                  } else {
+                    // Error
+                  };
+                  // Perform evm payment to petition solver
                   let transferResponse = await EVM.createAndSendTransaction(
                     petitionEvent.sendingChain,
                     petitionEvent.sentERC,
