@@ -228,7 +228,7 @@ actor {
             keyName,
             canisterAddress,
             petitionEvent.wantedAddress,
-            reward + transactionNat,
+            reward+(transactionNat*10**10),
             publicKey,
             transform,
           );
@@ -243,22 +243,22 @@ actor {
               return "Failed to transfer to petition creator";
             };
           };
-            let paymentResult = await LN.payInvoice(solvePetitionInvoice, derivationPath, keyName, timestamp, transform);
-            Debug.print(paymentResult);
-            let paymenttxDetails = JSON.parse(paymentResult);
-            let errorField = await utils.getValue(paymenttxDetails, "error");
-            let resultField = await utils.getValue(paymenttxDetails, "result");
-            let statusField = await utils.getValue(JSON.parse(resultField), "status");
-            Debug.print(statusField);
-            if (Text.contains(paymentResult, #text "SUCCEEDED")) {
-              Debug.print("Payment Result: Successful");
-              let _ = petitions.remove(petitionInvoiceId);
+          let paymentResult = await LN.payInvoice(solvePetitionInvoice, derivationPath, keyName, timestamp, transform);
+          Debug.print(paymentResult);
+          let paymenttxDetails = JSON.parse(paymentResult);
+          let errorField = await utils.getValue(paymenttxDetails, "error");
+          let resultField = await utils.getValue(paymenttxDetails, "result");
+          let statusField = await utils.getValue(JSON.parse(resultField), "status");
+          Debug.print(statusField);
+          if (Text.contains(paymentResult, #text "SUCCEEDED")) {
+            Debug.print("Payment Result: Successful");
+            let _ = petitions.remove(petitionInvoiceId);
 
-              result := "Payment Result: Successful";
-            } else {
-              Debug.print("Payment Result: Failed");
-              result := "Payment Result: Failed";
-            };
+            result := "Payment Result: Successful";
+          } else {
+            Debug.print("Payment Result: Failed");
+            result := "Payment Result: Failed";
+          };
         } else {
           Debug.print("Petition solve transaction failed");
 
@@ -409,10 +409,24 @@ actor {
             let paymentRequest = invoiceId;
 
             Debug.print(paymentRequest);
+            // Verify if payment has been done to canister
             let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
             let payReqResponse = JSON.parse(decodedPayReq);
             let amountString = await utils.getValue(payReqResponse, "num_satoshis");
             let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+            let payment_hash = await utils.getValue(payReqResponse, "payment_hash");
+            Debug.print("Payment Hash: " #payment_hash);
+
+            let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
+            let parsedResponse = JSON.parse(paymentCheckResponse);
+            let isSettled = await utils.getValue(parsedResponse, "settled");
+            let falseString : Text = Bool.toText(false);
+
+            if (isSettled == falseString) {
+              Debug.print("Invoice not settled, pay invoice and try again");
+              return "Invoice not settled, pay invoice and try again";
+            };
+
             Debug.print("Satoshis: " #amountString);
             Debug.print("cleanAmountString: " #cleanAmountString);
             let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
@@ -425,7 +439,7 @@ actor {
                     case (null) { 0 };
                     case (?value) { value };
                   };
-
+                  // Release ln payment to petition creator first
                   let transferResponse = await EVM.createAndSendTransaction(
                     petitionEvent.sendingChain,
                     petitionEvent.sentERC,
