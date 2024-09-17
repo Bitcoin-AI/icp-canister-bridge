@@ -27,6 +27,7 @@ actor {
   //let keyName = "test_key_1"; //This is for IC network
 
   let API_URL : Text = "https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app";
+  let falseString : Text = Bool.toText(false);
 
   public query func transform(raw : Types.TransformArgs) : async Types.CanisterHttpResponsePayload {
     let transformed : Types.CanisterHttpResponsePayload = {
@@ -63,6 +64,8 @@ actor {
 
   let petitions = HashMap.HashMap<Text, Types.PetitionEvent>(10, Text.equal, Text.hash);
   let petitionUsed = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
+
+  let solvePetitionCreatorPaid = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
 
   // From Lightning network to RSK blockchain
   public func generateInvoiceToSwapToRsk(amount : Nat, address : Text, time : Text) : async Text {
@@ -132,7 +135,6 @@ actor {
       case (?value) { value };
     };
     Debug.print(Nat.toText(amount));
-    let falseString : Text = Bool.toText(false);
 
     if (isSettled == falseString) {
       Debug.print("Invoice not settled, pay invoice and try again");
@@ -220,29 +222,41 @@ actor {
         Debug.print("Petition solve transaction being validated");
 
         if (isValidTransaction) {
+          // Check if petition creator has been paid
+          let petitionCreatorPaid : Bool = switch (solvePetitionCreatorPaid.get(petitionInvoiceId)) {
+            case (null) { false };
+            case (?true) { true };
+            case (?false) { false };
+          };
+          Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
+
+          if(petitionCreatorPaid == false){
+            Debug.print("Paying petition creator");
             // Pay petition creator
-          let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
-            petitionEvent.wantedChain,
-            petitionEvent.wantedERC20,
-            derivationPath,
-            keyName,
-            canisterAddress,
-            petitionEvent.wantedAddress,
-            reward+(transactionNat*10**10),
-            publicKey,
-            transform,
-          );
-          let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
-          switch (isErrorPetitionCreator) {
-            case ("") {
-            
-              Debug.print("Petition creator received transfer");
-            };
-            case (errorValue) {
-              Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
-              return "Failed to transfer to petition creator";
+            let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
+              petitionEvent.wantedChain,
+              petitionEvent.wantedERC20,
+              derivationPath,
+              keyName,
+              canisterAddress,
+              petitionEvent.wantedAddress,
+              reward+(transactionNat*10**10),
+              publicKey,
+              transform,
+            );
+            let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
+            switch (isErrorPetitionCreator) {
+              case ("") {
+                solvePetitionCreatorPaid.put(petitionInvoiceId,true);
+                Debug.print("Petition creator received transfer");
+              };
+              case (errorValue) {
+                Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
+                return "Failed to transfer to petition creator";
+              };
             };
           };
+
           let paymentResult = await LN.payInvoice(solvePetitionInvoice, derivationPath, keyName, timestamp, transform);
           Debug.print(paymentResult);
           let paymenttxDetails = JSON.parse(paymentResult);
@@ -420,7 +434,6 @@ actor {
             let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
             let parsedResponse = JSON.parse(paymentCheckResponse);
             let isSettled = await utils.getValue(parsedResponse, "settled");
-            let falseString : Text = Bool.toText(false);
 
             if (isSettled == falseString) {
               Debug.print("Invoice not settled, pay invoice and try again");
@@ -439,18 +452,38 @@ actor {
                     case (null) { 0 };
                     case (?value) { value };
                   };
-                  // Release ln payment to petition creator first
-                  let paymentResult = await LN.payInvoice(petitionEvent.invoiceId, derivationPath, keyName, timestamp, transform);
-                  Debug.print(paymentResult);
-                  let paymenttxDetails = JSON.parse(paymentResult);
-                  let errorField = await utils.getValue(paymenttxDetails, "error");
-                  let resultField = await utils.getValue(paymenttxDetails, "result");
-                  let statusField = await utils.getValue(JSON.parse(resultField), "status");
-                  Debug.print(statusField);
-                  if (Text.contains(paymentResult, #text "SUCCEEDED")) {
-                    // Save
-                  } else {
-                    // Error
+                  // Verify if petition creator has been paid before
+                  let petitionCreatorPaid : Bool = switch (solvePetitionCreatorPaid.get(petitionTxId)) {
+                    case (null) { false };
+                    case (?true) { true };
+                    case (?false) { false };
+                  };
+                  
+                  Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
+                  if(petitionCreatorPaid == false){
+                    Debug.print("Paying petition creator");
+                    // Release ln payment to petition creator
+                    let paymentResult = await LN.payInvoice(petitionEvent.invoiceId, derivationPath, keyName, timestamp, transform);
+                    Debug.print(paymentResult);
+                    let paymenttxDetails = JSON.parse(paymentResult);
+                    let errorField = await utils.getValue(paymenttxDetails, "error");
+                    let resultField = await utils.getValue(paymenttxDetails, "result");
+                    let statusField = await utils.getValue(JSON.parse(resultField), "status");
+                    let failureReason = await utils.getValue(JSON.parse(resultField), "failure_reason");
+
+                    Debug.print(statusField);
+                    // https://lightning.engineering/api-docs/api/lnd/router/send-payment-v2
+                    if (Text.contains(paymentResult, #text "SUCCEEDED")) {
+                      // Save
+                      solvePetitionCreatorPaid.put(petitionTxId,true);
+                      Debug.print("Petition creator paid");
+                    } else if(Text.contains(paymentResult, #text "FAILED")){
+                      Debug.print("Payment to creator failed: "#failureReason);
+                      // Error
+                      result := "Payment to creator failed: "#failureReason;
+                      return result;
+                    };
+  
                   };
                   // Perform evm payment to petition solver
                   let transferResponse = await EVM.createAndSendTransaction(
@@ -643,29 +676,41 @@ actor {
         if (isValidTransaction) {
 
           // if (reward > 0) {
+          // Verify if petition creator has been paid before
+          let petitionCreatorPaid : Bool = switch (solvePetitionCreatorPaid.get(petitionTxId)) {
+            case (null) { false };
+            case (?true) { true };
+            case (?false) { false };
+          };
+          
+          Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
+          if(petitionCreatorPaid == false){
           // Send transaction to petition creator
-          let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
-            petitionEvent.wantedChain,
-            petitionEvent.wantedERC20,
-            derivationPath,
-            keyName,
-            canisterAddress,
-            petitionEvent.wantedAddress,
-            reward + transactionNat,
-            publicKey,
-            transform,
-          );
-          let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
-          switch (isErrorPetitionCreator) {
-            case ("") {
-            
-              Debug.print("Petition creator received transfer");
-            };
-            case (errorValue) {
-              Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
-              return "Failed to transfer to petition creator";
+            Debug.print("Paying petition creator");
+            let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
+              petitionEvent.wantedChain,
+              petitionEvent.wantedERC20,
+              derivationPath,
+              keyName,
+              canisterAddress,
+              petitionEvent.wantedAddress,
+              reward + transactionNat,
+              publicKey,
+              transform,
+            );
+            let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
+            switch (isErrorPetitionCreator) {
+              case ("") {
+                solvePetitionCreatorPaid.put(petitionTxId,true);
+                Debug.print("Petition creator received transfer");
+              };
+              case (errorValue) {
+                Debug.print("Failed to transfer reward to creator due to error: " # errorValue);
+                return "Failed to transfer to petition creator";
+              };
             };
           };
+          // Send transaction to petiton solver
           let transferResponse = await EVM.createAndSendTransaction(
             petitionEvent.sendingChain,
             petitionEvent.sentERC,
@@ -723,7 +768,6 @@ actor {
       case (?value) { value };
     };
     Debug.print(Nat.toText(amount));
-    let falseString : Text = Bool.toText(false);
 
     if (isSettled == falseString) {
       return "Invoice not settled, pay invoice and try again";

@@ -1,184 +1,201 @@
-import React, { useState,useEffect } from "react";
-
+import React, { useState, useEffect } from "react";
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
-import styles from '../RSKLightningBridge.module.css';  // Import the CSS module
-const LightningToEvm = ({
-  chains,
-  coinbase
-}) => {
+import {
+  Box,
+  Button,
+  TextField,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Typography,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
+import { LoadingButton } from '@mui/lab';
+
+const LightningToEvm = ({ chains, coinbase }) => {
   const [message, setMessage] = useState('');
-  const [processing,setProcessing] = useState();
+  const [processing, setProcessing] = useState(false);
   const [amount, setAmount] = useState('');
   const [r_hash, setPaymentHash] = useState('');
-  const [invoiceToPay,setInvoiceToPay] = useState();
+  const [invoiceToPay, setInvoiceToPay] = useState('');
   const [evm_address, setEvmAddr] = useState('');
-  const [chain,setChain] = useState();
+  const [chain, setChain] = useState('');
+  const [alertSeverity, setAlertSeverity] = useState('info');
 
   const getInvoice = async () => {
     setProcessing(true);
     try {
-      setMessage("Getting invoice from service");
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address,new Date().getTime().toString());
-      setMessage(resp);
-      console.log(JSON.parse(resp))
-      const invoice = JSON.parse(resp).payment_request;
-      const base64PaymentHash = JSON.parse(resp).r_hash;
+      setMessage("Getting invoice from service...");
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address, new Date().getTime().toString());
+      const respJson = JSON.parse(resp);
+      const invoice = respJson.payment_request;
+      const base64PaymentHash = respJson.r_hash;
       setPaymentHash(base64PaymentHash);
       setInvoiceToPay(invoice);
       const r_hashUrl = base64PaymentHash.replace(/\+/g, '-').replace(/\//g, '_');
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();
-        setMessage(`Pay invoice ${invoice}`);
-        const result = await window.webln.sendPayment(invoice);
-        setMessage("Invoice paid, wait for service send evm transaction ...");
-        const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId),r_hashUrl,new Date().getTime().toString());
-        console.log(invoiceCheckResp);
+        setMessage(`Paying invoice...`);
+        await window.webln.sendPayment(invoice);
+        setMessage("Invoice paid, waiting for transaction...");
+        const invoiceCheckResp = await main.swapLN2EVM(ethers.toBeHex(JSON.parse(chain).chainId), r_hashUrl, new Date().getTime().toString());
         setMessage(invoiceCheckResp);
       } else {
-        setMessage(`Pay invoice: ${invoice} and go step2: checkInvoice with payment hash: ${r_hashUrl}`)
+        setMessage(`Please pay the invoice and proceed to Step 2.`);
       }
-      setProcessing(false);
+      setAlertSeverity('success');
     } catch (err) {
-      setMessage(`${err.message}`);
+      setMessage(`Error: ${err.message}`);
+      setAlertSeverity('error');
     }
     setProcessing(false);
-
-  }
+  };
 
   const checkInvoice = async () => {
     setProcessing(true);
     try {
-      setMessage("Processing evm transaction ...");
-      const wbtcAddressWanted = chains.filter(item => {return item.chainId === Number(JSON.parse(chain).chainId)})[0].wbtcAddress;
+      setMessage("Processing EVM transaction...");
+      const selectedChain = JSON.parse(chain);
+      const wbtcAddressWanted = chains.find(item => item.chainId === Number(selectedChain.chainId))?.wbtcAddress || "0";
 
       const resp = await main.swapLN2EVM(
-        ethers.toBeHex(JSON.parse(chain).chainId),
-        wbtcAddressWanted ? wbtcAddressWanted : "0",
+        ethers.toBeHex(selectedChain.chainId),
+        wbtcAddressWanted,
         r_hash.replace(/\+/g, '-').replace(/\//g, '_'),
         new Date().getTime().toString()
       );
-      //const parsed = JSON.parse(resp);
       setMessage(resp);
+      setAlertSeverity('success');
     } catch (err) {
-      setMessage(`${err.message}`)
+      setMessage(`Error: ${err.message}`);
+      setAlertSeverity('error');
     }
     setProcessing(false);
-  }
+  };
+
   useEffect(() => {
     if (coinbase) {
       setEvmAddr(coinbase);
     }
   }, [coinbase]);
+
   useEffect(() => {
-    if(chains){
-      const initialChain = JSON.stringify(
-        {
-          rpc: chains[0].rpc.filter(rpcUrl => {
-            if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
-          })[0],
-          chainId: chains[0].chainId,
-          name: chains[0].name
-        }
-      );
+    if (chains && chains.length > 0) {
+      const initialChain = JSON.stringify({
+        rpc: chains[0].rpc.find(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}")),
+        chainId: chains[0].chainId,
+        name: chains[0].name,
+      });
       setChain(initialChain);
     }
-  },[chains]);
-  return(
-  <>
-  <div>
-    {/* Content for Lightning to RSK */}
-    <div className={styles.step}>
-      <p>Step 1: Request an invoice to swap to EVM compatible chain</p>
-      <label className={styles.label}>Amount (satoshi)</label>
-      <input
-        className={styles.input}
-        value={amount}
-        onChange={(ev) => setAmount(ev.target.value)}
-        placeholder="Enter amount"
-      />
-      <label className={styles.label}>EVM Recipient Address</label>
-      <input
-        className={styles.input}
-        value={evm_address}
-        onChange={(ev) => setEvmAddr(ev.target.value)}
-        placeholder="Enter EVM address"
-      />
-      <label className={styles.label}>Select Destiny Chain</label>
-      <select
-        className={styles.input}
-        type="select"
-        onChange={(ev) => setChain(ev.target.value)}
-      >
-      {
-        chains.map(item => {
-          return(<option value={JSON.stringify(
-            {
-              rpc: item.rpc.filter(rpcUrl => {
-                if(!rpcUrl.includes("${INFURA_API_KEY}")) return rpcUrl;
-              })[0],
-              chainId: item.chainId,
-              name: item.name
-            }
-          )}>{item.name}</option>)
-        })
-      }
-      </select>
-      {
-        chain &&
-        <>
-        <p>Bridging to {JSON.parse(chain).name}</p>
-        <p>ChainId {JSON.parse(chain).chainId}</p>
-        </>
+  }, [chains]);
 
-      }
-      {
-      !processing ?
-      <button className={styles.button} onClick={getInvoice}>Get Invoice!</button> :
-      <button className={styles.button} onClick={getInvoice} disabled>Wait current process</button>
-      }
-      {
-        invoiceToPay &&
-        <>
-        <p>Invoice to be paid:</p>
-        <p style={{overflowX: "auto"}}>{invoiceToPay}</p>
-        </>
-      }
-    </div>
-    <div className={styles.step}>
-      <p>Step 2 {typeof(window.webln) !== 'undefined' && '(Optional)'}: Input r_hash from the invoice generated by the service after you pay it</p>
-      <input
-        className={styles.input}
-        value={r_hash}
-        onChange={(ev) => setPaymentHash(ev.target.value)}
-        placeholder="Enter r_hash"
-      />
-      {
-        !processing ?
-        <button className={styles.button} onClick={checkInvoice}>Check Invoice!</button>:
-        <button className={styles.button} onClick={checkInvoice} disabled>Wait current process</button>
+  return (
+    <Box sx={{ maxWidth: 600, margin: '0 auto', padding: 4 }}>
+      <Typography variant="h4" gutterBottom align="center">
+        Lightning to EVM Swap
+      </Typography>
 
-      }
-    </div>
-    {
-      /*
-      <div className={styles.step}>
-        <h3>Claim RBTC If you have been already bridged to RSK</h3>
-        {
-          !coinbase ?
-            <button className={styles.button} onClick={loadWeb3Modal}>Connect Wallet</button> :
-            !processing && bridge ?
-             <button className={styles.button} onClick={claimRBTC}>Claim RBTC</button> :
-             <button className={styles.button} onClick={claimRBTC} disabled>Wait current process</button>
-        }
-      </div>
-      */
-    }
-  </div>
-  <div style={{overflowX: "auto"}}>
-        <span className={styles.message}>{message}</span>
-  </div>
-  </>
+      {/* Step 1 */}
+      <Box sx={{ marginBottom: 6 }}>
+        <Typography variant="h6" gutterBottom>
+          Step 1: Request an Invoice
+        </Typography>
+        <TextField
+          label="Amount (satoshi)"
+          variant="outlined"
+          fullWidth
+          margin="normal"
+          value={amount}
+          onChange={(ev) => setAmount(ev.target.value)}
+          type="number"
+        />
+        <TextField
+          label="EVM Recipient Address"
+          variant="outlined"
+          fullWidth
+          margin="normal"
+          value={evm_address}
+          onChange={(ev) => setEvmAddr(ev.target.value)}
+        />
+        <FormControl variant="outlined" fullWidth margin="normal">
+          <InputLabel>Destination Chain</InputLabel>
+          <Select
+            label="Destination Chain"
+            value={chain}
+            onChange={(ev) => setChain(ev.target.value)}
+          >
+            {chains.map((item, index) => (
+              <MenuItem key={index} value={JSON.stringify({
+                rpc: item.rpc.find(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}")),
+                chainId: item.chainId,
+                name: item.name,
+              })}>
+                {item.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {chain && (
+          <Typography variant="body2" color="textSecondary">
+            Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
+          </Typography>
+        )}
+        <LoadingButton
+          variant="contained"
+          color="primary"
+          onClick={getInvoice}
+          loading={processing}
+          sx={{ marginTop: 3 }}
+          size="large"
+          fullWidth
+        >
+          Get Invoice
+        </LoadingButton>
+        {invoiceToPay && (
+          <Alert severity="info" sx={{ marginTop: 3, wordBreak: 'break-all' }}>
+            <strong>Invoice to be paid:</strong> {invoiceToPay}
+          </Alert>
+        )}
+      </Box>
+
+      {/* Step 2 */}
+      <Box sx={{ marginBottom: 6 }}>
+        <Typography variant="h6" gutterBottom>
+          Step 2: Input Payment Hash
+        </Typography>
+        <TextField
+          label="Payment Hash (r_hash)"
+          variant="outlined"
+          fullWidth
+          margin="normal"
+          value={r_hash}
+          onChange={(ev) => setPaymentHash(ev.target.value)}
+        />
+        <LoadingButton
+          variant="contained"
+          color="secondary"
+          onClick={checkInvoice}
+          loading={processing}
+          sx={{ marginTop: 3 }}
+          size="large"
+          fullWidth
+        >
+          Check Invoice
+        </LoadingButton>
+      </Box>
+
+      {/* Message Display */}
+      {message && (
+        <Alert severity={alertSeverity} sx={{ marginTop: 3, wordBreak: 'break-all' }}>
+          {message}
+        </Alert>
+      )}
+    </Box>
   );
 };
+
 export default LightningToEvm;
