@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, Link } from 'react-router-dom';
-import { Tabs, Tab, Box, Typography } from '@mui/material';
-//import { Bolt, SwapHoriz, Send, Campaign } from '@mui/icons-material';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBolt,faLightbulb, faExchangeAlt, faPaperPlane, faBullhorn } from '@fortawesome/free-solid-svg-icons';
 
 const MainMenu = () => {
   const location = useLocation();
@@ -11,66 +11,56 @@ const MainMenu = () => {
     setActiveTab(location.pathname);
   }, [location.pathname]);
 
-  const handleChange = (event, newValue) => {
+  const handleChange = (newValue) => {
     setActiveTab(newValue);
   };
 
   const tabs = [
     {
       label: 'EVM to Lightning',
-      //icon: <Bolt />,
+      icon: <FontAwesomeIcon icon={faBolt} />,
       path: '/',
     },
     {
       label: 'Lightning to EVM',
-      //icon: <SwapHoriz />,
+      icon: <FontAwesomeIcon icon={faLightbulb} />,
       path: '/lightningToEvm',
     },
     {
       label: 'EVM to EVM',
-      //icon: <SwapHoriz />,
+      icon: <FontAwesomeIcon icon={faExchangeAlt} />,
       path: '/evmToEvm',
     },
     {
       label: 'Petitions EVM to EVM',
-      //icon: <Send />,
+      icon: <FontAwesomeIcon icon={faPaperPlane} />,
       path: '/petitionsEvm',
     },
     {
       label: 'Petitions LN and EVM',
-      //icon: <Campaign />,
+      icon: <FontAwesomeIcon icon={faBullhorn} />,
       path: '/petitionsLN',
     },
   ];
 
   return (
-    <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
-      <Tabs
-        value={activeTab}
-        onChange={handleChange}
-        variant="scrollable"
-        scrollButtons
-        allowScrollButtonsMobile
-        indicatorColor="primary"
-        textColor="primary"
-        centered
-      >
+    <div className="w-full bg-gray-100 flex justify-center items-center">
+      <div className="flex overflow-x-auto space-x-4 p-4">
         {tabs.map((tab, index) => (
-          <Tab
+          <Link
             key={index}
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {tab.icon}
-                <Typography sx={{ marginLeft: 1 }}>{tab.label}</Typography>
-              </Box>
-            }
-            value={tab.path}
-            component={Link}
             to={tab.path}
-          />
+            className={`flex items-center px-4 py-2 rounded-lg ${
+              activeTab === tab.path ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+            }`}
+            onClick={() => handleChange(tab.path)}
+          >
+            {/* {tab.icon} */}
+            {tab.icon} <span className="ml-2">{tab.label}</span>
+          </Link>
         ))}
-      </Tabs>
-    </Box>
+      </div>
+    </div>
   );
 };
 

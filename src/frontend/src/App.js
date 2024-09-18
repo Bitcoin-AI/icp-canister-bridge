@@ -6,8 +6,6 @@ import { main } from "../../declarations/main";
 
 import useWeb3Modal from "./hooks/useWeb3Modal";
 
-import styles from './RSKLightningBridge.module.css';  // Import the CSS module
-
 import Header from "./components/Header";
 import MainMenu from "./components/MainMenu";
 
@@ -128,7 +126,7 @@ const App = () => {
   }
 
   return (
-    <div className={styles.container}>
+    <div className="min-h-screen bg-gray-100">
       <Header
         nodeInfo={nodeInfo}
         netId={netId}

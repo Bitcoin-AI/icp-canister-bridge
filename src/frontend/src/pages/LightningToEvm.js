@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
-import {
-  Box,
-  Button,
-  TextField,
-  Select,
-  MenuItem,
-  InputLabel,
-  FormControl,
-  Typography,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
-import { LoadingButton } from '@mui/lab';
 
 const LightningToEvm = ({ chains, coinbase }) => {
   const [message, setMessage] = useState('');
@@ -94,107 +81,89 @@ const LightningToEvm = ({ chains, coinbase }) => {
   }, [chains]);
 
   return (
-    <Box sx={{ maxWidth: 600, margin: '0 auto', padding: 4 }}>
-      <Typography variant="h4" gutterBottom align="center">
-        Lightning to EVM Swap
-      </Typography>
+    <div className="max-w-3xl mx-auto p-4">
+      <h1 className="text-2xl font-bold text-center mb-6">Lightning to EVM Swap</h1>
 
       {/* Step 1 */}
-      <Box sx={{ marginBottom: 6 }}>
-        <Typography variant="h6" gutterBottom>
-          Step 1: Request an Invoice
-        </Typography>
-        <TextField
-          label="Amount (satoshi)"
-          variant="outlined"
-          fullWidth
-          margin="normal"
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Step 1: Request an Invoice</h2>
+        <input
+          type="number"
+          placeholder="Amount (satoshi)"
           value={amount}
           onChange={(ev) => setAmount(ev.target.value)}
-          type="number"
+          className="w-full p-2 border border-gray-300 rounded mb-4"
         />
-        <TextField
-          label="EVM Recipient Address"
-          variant="outlined"
-          fullWidth
-          margin="normal"
+        <input
+          type="text"
+          placeholder="EVM Recipient Address"
           value={evm_address}
           onChange={(ev) => setEvmAddr(ev.target.value)}
+          className="w-full p-2 border border-gray-300 rounded mb-4"
         />
-        <FormControl variant="outlined" fullWidth margin="normal">
-          <InputLabel>Destination Chain</InputLabel>
-          <Select
-            label="Destination Chain"
-            value={chain}
-            onChange={(ev) => setChain(ev.target.value)}
-          >
-            {chains.map((item, index) => (
-              <MenuItem key={index} value={JSON.stringify({
+        <select
+          value={chain}
+          onChange={(ev) => setChain(ev.target.value)}
+          className="w-full p-2 border border-gray-300 rounded mb-4"
+        >
+          {chains.map((item, index) => (
+            <option
+              key={index}
+              value={JSON.stringify({
                 rpc: item.rpc.find(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}")),
                 chainId: item.chainId,
                 name: item.name,
-              })}>
-                {item.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+              })}
+            >
+              {item.name}
+            </option>
+          ))}
+        </select>
         {chain && (
-          <Typography variant="body2" color="textSecondary">
+          <p className="text-sm text-gray-600">
             Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
-          </Typography>
+          </p>
         )}
-        <LoadingButton
-          variant="contained"
-          color="primary"
+        <button
           onClick={getInvoice}
-          loading={processing}
-          sx={{ marginTop: 3 }}
-          size="large"
-          fullWidth
+          disabled={processing}
+          className={`w-full p-2 rounded mt-3 ${processing ? 'bg-gray-400' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
         >
-          Get Invoice
-        </LoadingButton>
+          {processing ? 'Loading...' : 'Get Invoice'}
+        </button>
         {invoiceToPay && (
-          <Alert severity="info" sx={{ marginTop: 3, wordBreak: 'break-all' }}>
+          <div className="bg-blue-100 text-blue-700 p-3 rounded mt-3 break-all">
             <strong>Invoice to be paid:</strong> {invoiceToPay}
-          </Alert>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Step 2 */}
-      <Box sx={{ marginBottom: 6 }}>
-        <Typography variant="h6" gutterBottom>
-          Step 2: Input Payment Hash
-        </Typography>
-        <TextField
-          label="Payment Hash (r_hash)"
-          variant="outlined"
-          fullWidth
-          margin="normal"
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Step 2: Input Payment Hash</h2>
+        <input
+          type="text"
+          placeholder="Payment Hash (r_hash)"
           value={r_hash}
           onChange={(ev) => setPaymentHash(ev.target.value)}
+          className="w-full p-2 border border-gray-300 rounded mb-4"
         />
-        <LoadingButton
-          variant="contained"
-          color="secondary"
+        <button
           onClick={checkInvoice}
-          loading={processing}
-          sx={{ marginTop: 3 }}
-          size="large"
-          fullWidth
+          disabled={processing}
+          className={`w-full p-2 rounded mt-3 ${processing ? 'bg-gray-400' : 'bg-green-500 text-white hover:bg-green-600'}`}
         >
-          Check Invoice
-        </LoadingButton>
-      </Box>
+          {processing ? 'Loading...' : 'Check Invoice'}
+        </button>
+      </div>
 
       {/* Message Display */}
       {message && (
-        <Alert severity={alertSeverity} sx={{ marginTop: 3, wordBreak: 'break-all' }}>
+        <div className={`p-3 rounded mt-3 break-all ${alertSeverity === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
           {message}
-        </Alert>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

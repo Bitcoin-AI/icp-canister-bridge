@@ -23,6 +23,9 @@ module.exports = {
   optimization: {
     minimize: !isDevelopment,
     minimizer: [new TerserPlugin()],
+    usedExports: true,
+    sideEffects: true, // or an array of file paths
+
   },
   resolve: {
     extensions: [".js", ".ts", ".jsx", ".tsx"],
@@ -41,7 +44,14 @@ module.exports = {
   module: {
     rules: [
       { test: /\.(js|ts)x?$/, loader: "ts-loader" },
-      { test: /\.css$/, use: ['style-loader','css-loader'] },
+      { 
+        test: /\.css$/, 
+        use: [
+          'style-loader', 
+          'css-loader', 
+          'postcss-loader' // Add PostCSS loader
+        ] 
+      },
       {
         test: /\.s[ac]ss$/i,
         use: [

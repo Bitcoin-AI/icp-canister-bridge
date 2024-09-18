@@ -1,19 +1,5 @@
 import React from "react";
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Box,
-  Container,
-  Paper,
-  Grid,
-  Avatar,
-  Tooltip,
-  IconButton,
-} from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-//import { AccountBalanceWallet, Refresh } from '@mui/icons-material';
+import '../input.css'; // Import the Tailwind CSS file
 
 const Header = ({
   nodeInfo,
@@ -22,101 +8,76 @@ const Header = ({
   fetchNodeInfo,
   rskBalance
 }) => {
-
-  const theme = useTheme();
-
   return (
     <>
       {/* AppBar Header */}
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            EVM Lightning Bridge
-          </Typography>
+      <header className="bg-gray-800 text-white shadow">
+        <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+          <h1 className="text-lg font-semibold">EVM Lightning Bridge</h1>
           {coinbase && (
-            <Tooltip title="Connected Wallet">
-              <Button color="inherit" >
+            <div className="relative" title="Connected Wallet">
+              <button className="text-white hover:underline">
                 {`${coinbase.substring(0, 6)}...${coinbase.substring(coinbase.length - 4)}`}
-              </Button>
-            </Tooltip>
+              </button>
+            </div>
           )}
-        </Toolbar>
-      </AppBar>
+        </div>
+      </header>
 
       {/* Main Content */}
-      <Container sx={{ mt: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Welcome to EVM Lightning Bridge!
-          </Typography>
-          <Typography variant="body1" gutterBottom>
-            Follow the steps below to bridge your assets.
-          </Typography>
+      <main className="container mx-auto px-4 mt-8">
+        <div className="bg-white shadow-lg p-6 rounded-lg">
+          <h2 className="text-2xl font-bold mb-4">Welcome to EVM Lightning Bridge!</h2>
+          <p className="mb-4">Follow the steps below to bridge your assets.</p>
 
           {/* Node Info Section */}
           {typeof window.webln !== 'undefined' && (
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h5" gutterBottom>
-                Lightning Node Information
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
+            <div className="mt-8">
+              <h3 className="text-xl font-bold mb-4">Lightning Node Information</h3>
+              <button
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 onClick={fetchNodeInfo}
               >
                 Fetch Node Info
-              </Button>
+              </button>
               {nodeInfo && (
-                <Paper elevation={2} sx={{ mt: 2, p: 2 }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item>
-                      <Avatar>{nodeInfo.node.alias.charAt(0)}</Avatar>
-                    </Grid>
-                    <Grid item xs>
-                      <Typography variant="h6">{nodeInfo.node.alias}</Typography>
-                      <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                        Pubkey: {nodeInfo.node.pubkey}
-                      </Typography>
-                      <Typography variant="body2">
-                        Balance: {nodeInfo.balance} sats
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <div className="bg-gray-100 p-4 rounded-lg shadow-md mt-4">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center mr-4">
+                      <span className="text-xl font-bold">{nodeInfo.node.alias.charAt(0)}</span>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold">{nodeInfo.node.alias}</h4>
+                      <p className="text-sm break-all">Pubkey: {nodeInfo.node.pubkey}</p>
+                      <p className="text-sm">Balance: {nodeInfo.balance} sats</p>
+                    </div>
+                  </div>
+                </div>
               )}
-            </Box>
+            </div>
           )}
 
           {/* EVM Info Section */}
           {coinbase && (
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h5" gutterBottom>
-                EVM Connection
-              </Typography>
-              <Paper elevation={2} sx={{ mt: 2, p: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body1">
-                      <strong>Address:</strong><br />
-                      {coinbase}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body1">
-                      <strong>Chain ID:</strong> {netId.toString()}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body1">
-                      <strong>Balance:</strong> {Math.round(rskBalance / 10 ** 10)} satoshis of {netId === 31 ? "RBTC" : "WBTC"}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Box>
+            <div className="mt-8">
+              <h3 className="text-xl font-bold mb-4">EVM Connection</h3>
+              <div className="bg-gray-100 p-4 rounded-lg shadow-md mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-base"><strong>Address:</strong><br />{coinbase}</p>
+                  </div>
+                  <div>
+                    <p className="text-base"><strong>Chain ID:</strong> {netId.toString()}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-base"><strong>Balance:</strong> {Math.round(rskBalance / 10 ** 10)} satoshis of {netId === 31 ? "RBTC" : "WBTC"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
-        </Paper>
-      </Container>
+        </div>
+      </main>
     </>
   );
 };
