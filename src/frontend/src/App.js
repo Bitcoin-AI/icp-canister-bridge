@@ -1,15 +1,16 @@
 import React, { useState, useEffect,useCallback } from "react";
 import { ethers } from 'ethers';
-import { HashRouter as Router, Route, Routes,Navigate,Link } from 'react-router-dom';
+import { HashRouter as Router, Route, Routes,Navigate } from 'react-router-dom';
 
 import { main } from "../../declarations/main";
 
 import useWeb3Modal from "./hooks/useWeb3Modal";
 
 import Header from "./components/Header";
-import MainMenu from "./components/MainMenu";
+import Info from "./components/Info";
+import Footer from "./components/Footer";
 
-
+import HomePage from "./pages/HomePage";
 import EvmToLightning from "./pages/EvmToLightning";
 import EvmToEvm from "./pages/EvmToEvm";
 import LightningToEvm from "./pages/LightningToEvm";
@@ -18,6 +19,7 @@ import PetitionsLN from "./pages/PetitionsLN";
 
 
 const App = () => {
+
   // State hooks
 
   const [activeTab, setActiveTab] = useState('rskToLight');
@@ -126,26 +128,29 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Header
-        nodeInfo={nodeInfo}
-        netId={netId}
-        coinbase={coinbase}
-        fetchNodeInfo={fetchNodeInfo}
-        rskBalance={rskBalance}
-      />
+    <div className="flex flex-col min-h-screen bg-gray-100">
 
       <Router>
-          <MainMenu />
-          {
-            !canisterAddr &&
-            <p>Loading Canister ...</p>
-          }
+          <Header
+            coinbase={coinbase}
+          />
           <Routes>
-            <Route path="/" element={
+            <Route path="/" element={<HomePage />} />
+            <Route path="/info" element={
+              <Info
+                nodeInfo={nodeInfo}
+                netId={netId}
+                coinbase={coinbase}
+                fetchNodeInfo={fetchNodeInfo}
+                rskBalance={rskBalance}
+              />
+            } 
+            />
+            <Route path="/evmToLightning" element={
               <>
               {
-                canisterAddr && 
+                canisterAddr ? 
+                <>
                 <EvmToLightning 
                   coinbase={coinbase}
                   netId={netId}
@@ -153,7 +158,9 @@ const App = () => {
                   canisterAddr={canisterAddr}
                   loadWeb3Modal={loadWeb3Modal}
                   chains={chains}
-                /> 
+                />
+                </> :
+                <p className="flex-grow" >Loading Canister ...</p>
               }
               </>
 
@@ -163,11 +170,12 @@ const App = () => {
             <Route path="/lightningToEvm" element={
               <>
               {
-                canisterAddr && 
+                canisterAddr ? 
                 <LightningToEvm 
                   chains={chains}
                   coinbase={coinbase}
-                />
+                /> :
+                <p className="flex-grow" >Loading Canister ...</p>
               }
               </>
             }
@@ -175,7 +183,7 @@ const App = () => {
             <Route path="/evmToEvm" element={
               <>
               {
-                canisterAddr &&
+                canisterAddr ?
                 <EvmToEvm 
                   coinbase={coinbase}
                   netId={netId}
@@ -183,7 +191,8 @@ const App = () => {
                   canisterAddr={canisterAddr}
                   loadWeb3Modal={loadWeb3Modal}
                   chains={chains}          
-                />
+                /> :
+                <p className="flex-grow" >Loading Canister ...</p>
               }
               </>
             } 
@@ -192,7 +201,7 @@ const App = () => {
             <Route path="/petitionsEvm" element={
               <>
               {
-                canisterAddr &&
+                canisterAddr ?
                 <Petitions
                   coinbase={coinbase}
                   netId={netId}
@@ -200,7 +209,8 @@ const App = () => {
                   canisterAddr={canisterAddr}
                   loadWeb3Modal={loadWeb3Modal}
                   chains={chains}
-                />
+                /> :
+                <p className="flex-grow" >Loading Canister ...</p>
               }
               </>
             } 
@@ -208,7 +218,7 @@ const App = () => {
             <Route path="/petitionsLN" element={
               <>
               {
-                canisterAddr &&
+                canisterAddr ?
                 <PetitionsLN 
                   coinbase={coinbase}
                   netId={netId}
@@ -216,7 +226,8 @@ const App = () => {
                   canisterAddr={canisterAddr}
                   loadWeb3Modal={loadWeb3Modal}
                   chains={chains}
-                />
+                /> :
+                <p className="flex-grow" >Loading Canister ...</p>
               }
               </>
             } 
@@ -225,8 +236,7 @@ const App = () => {
 
           </Routes>
       </Router>
-
-
+      <Footer />
     </div>
   );
 
