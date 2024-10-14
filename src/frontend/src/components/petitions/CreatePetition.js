@@ -14,7 +14,8 @@ const CreatePetition = ({
     amount,
     coinbase,
     processing,
-    loadWeb3Modal
+    loadWeb3Modal,
+    solve
 }) => {
   return (
     <div className="w-full">

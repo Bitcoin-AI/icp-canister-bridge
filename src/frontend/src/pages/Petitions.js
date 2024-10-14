@@ -212,6 +212,7 @@ const Petitions = ({
           coinbase={coinbase}
           processing={processing}
           loadWeb3Modal={loadWeb3Modal}
+          solve={solve}
         /> :
         <SolvePetitions
           petitions={petitions}
