@@ -2,7 +2,7 @@ import React from 'react';
 
 const HomePage = () => {
   return (
-    <div className="flex-grow bg-gray-100 flex flex-col items-center justify-center">
+    <div className="w-full p-4">
       <h4 className="text-2xl font-bold text-center mb-6">Senfina</h4>
       <div className="w-full max-w-4xl mt-8">
         <h2 className="text-2xl font-bold mb-4">Welcome to Senfina</h2>

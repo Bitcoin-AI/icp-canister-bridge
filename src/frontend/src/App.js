@@ -134,107 +134,109 @@ const App = () => {
           <Header
             coinbase={coinbase}
           />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/info" element={
-              <Info
-                nodeInfo={nodeInfo}
-                netId={netId}
-                coinbase={coinbase}
-                fetchNodeInfo={fetchNodeInfo}
-                rskBalance={rskBalance}
-              />
-            } 
-            />
-            <Route path="/evmToLightning" element={
-              <>
-              {
-                canisterAddr ? 
-                <>
-                <EvmToLightning 
-                  coinbase={coinbase}
+          <div className="flex-grow self-center w-6/12		">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/info" element={
+                <Info
+                  nodeInfo={nodeInfo}
                   netId={netId}
-                  provider={provider}
-                  canisterAddr={canisterAddr}
-                  loadWeb3Modal={loadWeb3Modal}
-                  chains={chains}
+                  coinbase={coinbase}
+                  fetchNodeInfo={fetchNodeInfo}
+                  rskBalance={rskBalance}
                 />
-                </> :
-                <p className="flex-grow" >Loading Canister ...</p>
-              }
-              </>
+              } 
+              />
+              <Route path="/evmToLightning" element={
+                <>
+                {
+                  canisterAddr ? 
+                  <>
+                  <EvmToLightning 
+                    coinbase={coinbase}
+                    netId={netId}
+                    provider={provider}
+                    canisterAddr={canisterAddr}
+                    loadWeb3Modal={loadWeb3Modal}
+                    chains={chains}
+                  />
+                  </> :
+                  <p className="flex-grow" >Loading Canister ...</p>
+                }
+                </>
 
-            } 
+              } 
 
-            />
-            <Route path="/lightningToEvm" element={
-              <>
-              {
-                canisterAddr ? 
-                <LightningToEvm 
-                  chains={chains}
-                  coinbase={coinbase}
-                /> :
-                <p className="flex-grow" >Loading Canister ...</p>
+              />
+              <Route path="/lightningToEvm" element={
+                <>
+                {
+                  canisterAddr ? 
+                  <LightningToEvm 
+                    chains={chains}
+                    coinbase={coinbase}
+                  /> :
+                  <p className="flex-grow" >Loading Canister ...</p>
+                }
+                </>
               }
-              </>
-            }
-            />
-            <Route path="/evmToEvm" element={
-              <>
-              {
-                canisterAddr ?
-                <EvmToEvm 
-                  coinbase={coinbase}
-                  netId={netId}
-                  provider={provider}
-                  canisterAddr={canisterAddr}
-                  loadWeb3Modal={loadWeb3Modal}
-                  chains={chains}          
-                /> :
-                <p className="flex-grow" >Loading Canister ...</p>
-              }
-              </>
-            } 
+              />
+              <Route path="/evmToEvm" element={
+                <>
+                {
+                  canisterAddr ?
+                  <EvmToEvm 
+                    coinbase={coinbase}
+                    netId={netId}
+                    provider={provider}
+                    canisterAddr={canisterAddr}
+                    loadWeb3Modal={loadWeb3Modal}
+                    chains={chains}          
+                  /> :
+                  <p className="flex-grow" >Loading Canister ...</p>
+                }
+                </>
+              } 
 
-            />
-            <Route path="/petitionsEvm" element={
-              <>
-              {
-                canisterAddr ?
-                <Petitions
-                  coinbase={coinbase}
-                  netId={netId}
-                  provider={provider}
-                  canisterAddr={canisterAddr}
-                  loadWeb3Modal={loadWeb3Modal}
-                  chains={chains}
-                /> :
-                <p className="flex-grow" >Loading Canister ...</p>
-              }
-              </>
-            } 
-            />
-            <Route path="/petitionsLN" element={
-              <>
-              {
-                canisterAddr ?
-                <PetitionsLN 
-                  coinbase={coinbase}
-                  netId={netId}
-                  provider={provider}
-                  canisterAddr={canisterAddr}
-                  loadWeb3Modal={loadWeb3Modal}
-                  chains={chains}
-                /> :
-                <p className="flex-grow" >Loading Canister ...</p>
-              }
-              </>
-            } 
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
+              />
+              <Route path="/petitionsEvm" element={
+                <>
+                {
+                  canisterAddr ?
+                  <Petitions
+                    coinbase={coinbase}
+                    netId={netId}
+                    provider={provider}
+                    canisterAddr={canisterAddr}
+                    loadWeb3Modal={loadWeb3Modal}
+                    chains={chains}
+                  /> :
+                  <p className="flex-grow" >Loading Canister ...</p>
+                }
+                </>
+              } 
+              />
+              <Route path="/petitionsLN" element={
+                <>
+                {
+                  canisterAddr ?
+                  <PetitionsLN 
+                    coinbase={coinbase}
+                    netId={netId}
+                    provider={provider}
+                    canisterAddr={canisterAddr}
+                    loadWeb3Modal={loadWeb3Modal}
+                    chains={chains}
+                  /> :
+                  <p className="flex-grow" >Loading Canister ...</p>
+                }
+                </>
+              } 
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
 
-          </Routes>
+            </Routes>
+          </div>
       </Router>
       <Footer />
     </div>

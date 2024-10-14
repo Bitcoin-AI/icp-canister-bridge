@@ -6,6 +6,10 @@ import { decode } from 'light-bolt11-decoder';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json';
 import { main } from "../../../declarations/main";
 
+import CreatePetitionLN from '../components/petitions/CreatePetitionLN';
+import SolvePetitionsLN from '../components/petitions/SolvePetitionsLN';
+
+
 const PetitionsLN = ({
   coinbase,
   netId,
@@ -163,6 +167,7 @@ const PetitionsLN = ({
       }
       const signer = await provider.getSigner();
       if (solve && !(Number(petitionToSolve.current.wantedChain) === Number(netId))) {
+        setProcessing(false);
         alert("Wrong network");
         return;
       }
@@ -362,7 +367,7 @@ const PetitionsLN = ({
   }, [currentPetitionToSolve]);
 
   return (
-    <div className="flex-grow max-w-3xl mx-auto p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">PetitionsLN</h1>
 
       <div className="flex space-x-4 mb-6">
@@ -386,215 +391,39 @@ const PetitionsLN = ({
 
       {
         !solve ?
-          <div className="mb-6">
-            <div className="mb-4">
-              <select
-                className="w-full p-2 border border-gray-300 rounded mb-4"
-                onChange={(ev) => { setLN(!ln) }}
-                defaultValue={false}
-              >
-                <option value={false}>EVM to Lightning</option>
-                <option value={true}>Lightning to EVM</option>
-              </select>
-            </div>
-            {
-              !ln ?
-                <>
-                  <div className="mb-4">
-                    <p>Send token to 0x{canisterAddr}</p>
-                    <p>Sending from chainId {netId?.toString()}</p>
-                    <label className="block mb-2">Amount in satoshis</label>
-                    <input
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      value={amount}
-                      onChange={(ev) => setAmount(ev.target.value)}
-                      placeholder="Satoshis"
-                    />
-                    {
-                      !coinbase ?
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={loadWeb3Modal}>Connect Wallet</button> :
-                        !processing ?
-                          <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={sendToken}>Send token</button> :
-                          <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-                    }
-                  </div>
-                  <div className="mb-4">
-                    <p>Input evm transaction hash</p>
-                    <label className="block mb-2">Transaction Hash</label>
-                    <input
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      value={evm_txHash}
-                      onChange={(ev) => setEvmTxHash(ev.target.value)}
-                      placeholder="Transaction Hash"
-                    />
-                  </div>
-                  <div className="mb-4">
-                    {
-                      !processing ?
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={() => { sendPetitionTxHash(solve); }}>Finalize petition</button> :
-                        <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-                    }
-                  </div>
-                </> :
-                <>
-                  <div className="mb-4">
-                    <p>Step 1: Request an invoice to swap to EVM compatible chain</p>
-                    <label className="block mb-2">Amount (satoshi)</label>
-                    <input
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      value={amount}
-                      onChange={(ev) => setAmount(ev.target.value)}
-                      placeholder="Enter amount"
-                    />
-                    <label className="block mb-2">EVM Recipient Address</label>
-                    <input
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      value={evm_address}
-                      onChange={(ev) => setEvmAddr(ev.target.value)}
-                      placeholder="Enter EVM address"
-                    />
-                    <label className="block mb-2">Select Destiny Chain</label>
-                    <select
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      onChange={(ev) => setChain(ev.target.value)}
-                    >
-                      {
-                        chains.map(item => (
-                          <option value={JSON.stringify(
-                            {
-                              rpc: item.rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"))[0],
-                              chainId: item.chainId,
-                              name: item.name
-                            }
-                          )}>{item.name}</option>
-                        ))
-                      }
-                    </select>
-                    {
-                      chain &&
-                      <>
-                        <p>Bridging to {JSON.parse(chain).name}</p>
-                        <p>ChainId {JSON.parse(chain).chainId}</p>
-                      </>
-                    }
-                    {
-                      !processing ?
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={getInvoice}>Get Invoice!</button> :
-                        <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" onClick={getInvoice} disabled>Wait current process</button>
-                    }
-                    <p>Step 2 {typeof (window.webln) !== 'undefined' && '(Optional)'}: Input r_hash from the invoice generated by the service after you pay it</p>
-                    <input
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                      value={r_hash}
-                      onChange={(ev) => setPaymentHash(ev.target.value)}
-                      placeholder="Enter r_hash"
-                    />
-                    {
-                      !processing ?
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={checkInvoice}>Check Invoice!</button> :
-                        <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" onClick={checkInvoice} disabled>Wait current process</button>
-                    }
-                    {
-                      petitionPaidInvoice &&
-                      <>
-                        <p>Invoice to be paid:</p>
-                        <p style={{ overflowX: "auto" }}>{petitionPaidInvoice}</p>
-                      </>
-                    }
-                  </div>
-                </>
-            }
-          </div> :
-          <div className="mb-6">
-            <div className="mb-4">
-              <h2>Petitions</h2>
-              {
-                petitions.map(item => {
-                  if (item.sendingChain !== "0" && item.wantedChain !== "0") return;
-                  return (
-                    <div key={item.proofTxId !== "0" ? item.proofTxId : item.petitionPaidInvoice} className="mb-4">
-                      <p>From: {item.sendingChain !== "0" ? item.sendingChain : "Bitcoin Lightning Network"}</p>
-                      <p>To: {item.wantedChain !== "0" ? item.wantedChain : "Bitcoin Lightning Network"}</p>
-                      {
-                        item.proofTxId === "0" ?
-                          item.sendingChain !== "0" ?
-                            (
-                              item.sendingChain === "0x1f" ?
-                                <p>Amount: {(Number(item.transaction.value) / 10 ** 10)?.toString()} satoshis of rbtc</p> :
-                                <p>Amount: {(Number(`0x${item.transaction.data.slice(74).replace(/^0+/, '')}`) / 10 ** 10).toString()} satoshis of wbtc</p>
-                            ) :
-                            item.petitionPaidInvoice?.indexOf("lntb") !== -1 &&
-                            <>
-                              <p style={{ overflowX: 'auto' }}>{item.petitionPaidInvoice}</p>
-                              <p>Amount: {(Number(item.decodedPetitionPaidInvoice.sections[2].value) / 1000).toString()} satoshis</p>
-                            </> :
-                            <>
-                              <p style={{ overflowX: 'auto' }}>{item.invoiceId}</p>
-                              <p>Amount: {(Number(decode(item.invoiceId).sections[2].value) / 1000).toString()} satoshis</p>
-                            </>
-                      }
-                      <p>Reward: {item.reward}</p>
-                      {
-                        currentPetitionToSolve &&
-                        (
-                          JSON.stringify(currentPetitionToSolve) === JSON.stringify(item) &&
-                          <p><b>Petition Selected</b></p>
-                        )
-                      }
-                      <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={async () => {
-                        petitionToSolve.current = item;
-                        setCurrentPetitionToSolve(item);
-                        if (item.invoiceId.indexOf("lntb") !== -1) {
-                          payPetitionInvoice();
-                        } else {
-                          sendToken();
-                        };
-                        return;
-                      }}>Initiate petition solving</button>
-                      {
-                        !currentPetitionToSolve &&
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={async () => {
-                          setCurrentPetitionToSolve(item);
-                        }}>Select Petition</button>
-                      }
-                    </div>
-                  );
-                })
-              }
-            </div>
-            {
-              petitionToSolve.current &&
-              (
-                petitionToSolve.current?.petitionPaidInvoice !== "0" ?
-                  <>
-                    <div className="mb-4">
-                      <p>Input evm transaction hash</p>
-                      <label className="block mb-2">Transaction Hash</label>
-                      <input
-                        className="w-full p-2 border border-gray-300 rounded mb-4"
-                        value={evm_txHash}
-                        onChange={(ev) => setEvmTxHash(ev.target.value)}
-                        placeholder="Transaction Hash"
-                      />
-                    </div>
-                    <div className="mb-4">
-                      {
-                        !processing ?
-                          <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={() => { sendPetitionTxHash(solve); }}>Finalize petition</button> :
-                          <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-                      }
-                    </div>
-                  </> :
-                  <>
-                    {
-                      !processing ?
-                        <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={solveEVM2LNPetition}>Get Payment</button> :
-                        <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" onClick={solveEVM2LNPetition} disabled>Wait current process</button>
-                    }
-                  </>
-              )
-            }
-          </div>
+          <CreatePetitionLN
+            canisterAddr={canisterAddr}
+            chain={chain}
+            chains={chains}
+            setChain={setChain}
+            setEvmAddr={setEvmAddr}
+            setAmount={setAmount}
+            sendToken={sendToken}
+            netId={netId}
+            evm_address={evm_address}
+            amount={amount}
+            coinbase={coinbase}
+            processing={processing}
+            loadWeb3Modal={loadWeb3Modal}
+            sendPetitionTxHash={sendPetitionTxHash}
+            ln={ln}
+            setLN={setLN}
+            evm_txHash={evm_txHash}
+            getInvoice={getInvoice}
+            r_hash={r_hash}
+            checkInvoice={checkInvoice}
+          /> :
+          <SolvePetitionsLN
+            petitions={petitions}
+            petitionToSolve={petitionToSolve}
+            setCurrentPetitionToSolve={setCurrentPetitionToSolve}
+            currentPetitionToSolve={currentPetitionToSolve}
+            evm_txHash={evm_txHash}
+            netId={netId}
+            sendToken={sendToken}
+            solve={solve}
+            processing={processing}
+          />
       }
 
       {message && (
