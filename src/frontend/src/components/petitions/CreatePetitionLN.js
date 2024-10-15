@@ -18,13 +18,14 @@ const CreatePetitionLN = ({
     ln,
     loadWeb3Modal,
     sendPetitionTxHash,
+    setEvmTxHash,
     solve,
     petitionPaidInvoice,
     evm_txHash,
     getInvoice,
     r_hash,
     checkInvoice
-}) => {
+  }) => {
   return (
     <div className="mb-6">
         <div className="mb-4">

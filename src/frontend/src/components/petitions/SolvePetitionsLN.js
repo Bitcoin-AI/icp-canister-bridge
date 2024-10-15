@@ -1,15 +1,19 @@
 
 import React from 'react';
 
+import { decode } from 'light-bolt11-decoder';
+
 const SolvePetitionsLN = ({
     sendToken,
-    netId,
     petitions,
+    payPetitionInvoice,
     petitionToSolve,
     currentPetitionToSolve,
+    solveEVM2LNPetition,
     setCurrentPetitionToSolve,
     evm_txHash,
     solve,
+    setAmount,
     processing
 }) => {
   return (
@@ -53,7 +57,8 @@ const SolvePetitionsLN = ({
                 petitionToSolve.current = item;
                 setCurrentPetitionToSolve(item);
                 if (item.invoiceId.indexOf("lntb") !== -1) {
-                  payPetitionInvoice();
+                  const amt = (Number(decode(item.invoiceId).sections[2].value) / 1000).toString();
+                  payPetitionInvoice(amt);
                 } else {
                   sendToken();
                 };

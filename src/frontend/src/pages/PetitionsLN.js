@@ -145,8 +145,8 @@ const PetitionsLN = ({
           },
           new Date().getTime().toString()
         );
+        setMessage(resp);
       }
-      setMessage(resp);
       setTimeout(() => {
         fetchPetitions();
       }, 1000);
@@ -242,10 +242,10 @@ const PetitionsLN = ({
     setProcessing(false);
   };
 
-  const payPetitionInvoice = async () => {
+  const payPetitionInvoice = async (amt) => {
     try {
       setMessage("Getting invoice from service");
-      const resp = await main.generateInvoiceToSwapToRsk(Number(amount), evm_address, new Date().getTime().toString());
+      const resp = await main.generateInvoiceToSwapToRsk(Number(amt), evm_address, new Date().getTime().toString());
       setMessage(resp);
       const invoice = JSON.parse(resp).payment_request;
       const signer = await provider.getSigner();
@@ -409,6 +409,7 @@ const PetitionsLN = ({
             ln={ln}
             setLN={setLN}
             evm_txHash={evm_txHash}
+            setEvmTxHash={setEvmTxHash}
             getInvoice={getInvoice}
             r_hash={r_hash}
             checkInvoice={checkInvoice}
@@ -416,6 +417,7 @@ const PetitionsLN = ({
           <SolvePetitionsLN
             petitions={petitions}
             petitionToSolve={petitionToSolve}
+            solveEVM2LNPetition={solveEVM2LNPetition}
             setCurrentPetitionToSolve={setCurrentPetitionToSolve}
             currentPetitionToSolve={currentPetitionToSolve}
             evm_txHash={evm_txHash}
@@ -423,6 +425,8 @@ const PetitionsLN = ({
             sendToken={sendToken}
             solve={solve}
             processing={processing}
+            setAmount={setAmount}
+            payPetitionInvoice={payPetitionInvoice}
           />
       }
 
