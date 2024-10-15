@@ -7,6 +7,7 @@ const SolvePetitionsLN = ({
     sendToken,
     petitions,
     payPetitionInvoice,
+    sendPetitionTxHash,
     petitionToSolve,
     currentPetitionToSolve,
     solveEVM2LNPetition,

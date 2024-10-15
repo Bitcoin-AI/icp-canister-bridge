@@ -404,6 +404,7 @@ const PetitionsLN = () => {
             petitionToSolve={petitionToSolve}
             solveEVM2LNPetition={solveEVM2LNPetition}
             setCurrentPetitionToSolve={setCurrentPetitionToSolve}
+            sendPetitionTxHash={sendPetitionTxHash}
             currentPetitionToSolve={currentPetitionToSolve}
             netId={netId}
             sendToken={sendToken}
