@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 
+import TransactionsList from "../components/TransactionsList";
+
 const EvmToEvm = ({
   coinbase,
   netId,
@@ -79,9 +81,19 @@ const EvmToEvm = ({
       }
       console.log("Transaction sent:", tx.hash);
       setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
+      const  previousSwaps = localStorage.getItem('EvmToEvm_previousSwaps') ? JSON.parse(localStorage.getItem('EvmToEvm_previousSwaps')) : [];
+      console.log(previousSwaps)
+      previousSwaps.unshift(JSON.stringify({
+        txHash: tx.hash,
+        netId: tx.chainId.toString(),
+        chain: tx.chain
+      }));
+      console.log(previousSwaps)
+      localStorage.setItem('EvmToEvm_previousSwaps',JSON.stringify(previousSwaps));
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
       setEvmTxHash(tx.hash);
+
     } catch (err) {
       console.log(err)
       setMessage(err.message);
@@ -93,7 +105,7 @@ const EvmToEvm = ({
   };
 
   useEffect(() => {
-    if (netId === 31) {
+    if (Number(netId) === 31) {
       setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
     } else {
       setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
@@ -201,6 +213,11 @@ const EvmToEvm = ({
           {message}
         </div>
       )}
+      <TransactionsList 
+        name={'EvmToEvm'}
+        netId={netId}
+        setEvmTxHash={setEvmTxHash}
+      />
     </div>
   );
 };

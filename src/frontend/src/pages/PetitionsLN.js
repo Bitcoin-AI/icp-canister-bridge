@@ -353,7 +353,7 @@ const PetitionsLN = ({
   }, [coinbase]);
 
   useEffect(() => {
-    if (netId === 31) {
+    if (Number(netId) === 31) {
       setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
     } else {
       setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");

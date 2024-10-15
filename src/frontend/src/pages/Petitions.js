@@ -173,6 +173,14 @@ const Petitions = ({
     }
   }, [coinbase]);
 
+  useEffect(() => {
+    if (Number(netId) === 31) {
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  }, [netId]);
+
   return (
     <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">Petitions</h1>
