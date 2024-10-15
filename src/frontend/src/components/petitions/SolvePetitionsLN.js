@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, {useContext} from 'react';
 
 import { decode } from 'light-bolt11-decoder';
+import { AppContext } from '../../AppContext';
 
 const SolvePetitionsLN = ({
     sendToken,
@@ -11,11 +11,16 @@ const SolvePetitionsLN = ({
     currentPetitionToSolve,
     solveEVM2LNPetition,
     setCurrentPetitionToSolve,
-    evm_txHash,
-    solve,
-    setAmount,
-    processing
+    solve
 }) => {
+
+
+  const { 
+    processing,
+    evm_txHash,
+    setEvmTxHash,
+  } = useContext(AppContext);
+
   return (
     <div className="mb-6">
     <div className="mb-4">

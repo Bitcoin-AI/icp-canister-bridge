@@ -1,13 +1,16 @@
 
-import React from 'react';
+import React, {useContext} from 'react';
+
+import { AppContext } from '../../AppContext';
 
 const SolvePetitions = ({
     sendToken,
-    netId,
     petitions,
     petitionToSolve,
     solve
 }) => {
+  const { netId } = useContext(AppContext);
+  
   return (
     <div className="mb-6">
         <div className="mb-4">

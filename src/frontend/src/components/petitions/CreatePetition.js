@@ -1,22 +1,31 @@
 
-import React from 'react';
+import React, {useContext} from 'react';
+
+import { AppContext } from '../../AppContext';
+
 
 const CreatePetition = ({
     chain,
-    chains,
     setChain,
-    setEvmAddr,
+    amount,
     setAmount,
     sendToken,
-    netId,
-    evm_address,
-    canisterAddr,
-    amount,
-    coinbase,
-    processing,
-    loadWeb3Modal,
     solve
 }) => {
+
+
+
+  const { 
+    coinbase,
+    netId,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    processing,
+    evm_address,
+    setEvmAddr,
+  } = useContext(AppContext);
+
   return (
     <div className="w-full">
         <div className="mb-4">
@@ -51,11 +60,10 @@ const CreatePetition = ({
             }
         </select>
         {
-            chain &&
-            <>
-            <p>Bridging to {JSON.parse(chain).name}</p>
-            <p>ChainId {JSON.parse(chain).chainId}</p>
-            </>
+          chain &&
+          <p className="text-sm text-gray-600">
+            Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
+          </p>
         }
         </div>
         <div className="mb-4">

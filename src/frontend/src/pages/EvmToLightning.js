@@ -1,30 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext,useState } from "react";
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 
-const EvmToLightning = ({
-  coinbase,
-  netId,
-  provider,
-  canisterAddr,
-  loadWeb3Modal,
-  chains
-}) => {
+import { AppContext } from '../AppContext';
+
+
+const EvmToLightning = () => {
+
+  const { 
+    netId,
+    coinbase,
+    provider,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    EXPLORER_BASEURL,
+    evm_txHash,
+    setEvmTxHash,
+    processing,
+    setProcessing,
+    decodeERC20Transfer
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState();
-  const [evm_txHash, setEvmTxHash] = useState();
   const [userInvoice, setUserInvoice] = useState();
   const [amount, setAmount] = useState('');
-  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
-
-  const decodeERC20Transfer = async (txInput) => {
-    const iface = new ethers.Interface(ERC20ABI);
-    const decodedInput = await iface.parseTransaction({ data: txInput });
-    console.log(`Tx decoded`);
-    console.log(decodedInput);
-    return decodedInput.args;
-  }
 
   const sendInvoiceAndTxHash = async () => {
     setProcessing(true);
@@ -121,14 +122,6 @@ const EvmToLightning = ({
     setProcessing(false);
   };
 
-  useEffect(() => {
-    if (Number(netId) === 31) {
-      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
-    } else {
-      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
-    }
-  }, [netId]);
-
   return (
     <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">EVM to Lightning Swap</h1>
@@ -155,7 +148,7 @@ const EvmToLightning = ({
 
       {/* Step 2 */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 2: Input evm transaction hash and lightning invoice</h2>
+        <h2 className="text-xl font-semibold mb-4">Step 2: Input evm transaction hash, sign it and send lightning invoice</h2>
         <label className="block mb-2">Transaction Hash</label>
         <input
           type="text"

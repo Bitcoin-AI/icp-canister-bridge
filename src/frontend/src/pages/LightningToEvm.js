@@ -1,14 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext,useState, useEffect } from "react";
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
 
-const LightningToEvm = ({ chains, coinbase }) => {
+import { AppContext } from '../AppContext';
+
+
+const LightningToEvm = () => {
+
+  const { 
+    chains,
+    processing,
+    setProcessing,
+    evm_address,
+    setEvmAddr,
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState(false);
   const [amount, setAmount] = useState('');
   const [r_hash, setPaymentHash] = useState('');
   const [invoiceToPay, setInvoiceToPay] = useState('');
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState('');
   const [alertSeverity, setAlertSeverity] = useState('info');
 
@@ -62,12 +72,6 @@ const LightningToEvm = ({ chains, coinbase }) => {
     }
     setProcessing(false);
   };
-
-  useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
 
   useEffect(() => {
     if (chains && chains.length > 0) {

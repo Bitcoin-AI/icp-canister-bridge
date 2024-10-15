@@ -1,25 +1,33 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 
+import { AppContext } from '../AppContext';
+
 import TransactionsList from "../components/TransactionsList";
 
-const EvmToEvm = ({
-  coinbase,
-  netId,
-  provider,
-  canisterAddr,
-  loadWeb3Modal,
-  chains
-}) => {
+const EvmToEvm = () => {
+
+  const { 
+    netId,
+    coinbase,
+    provider,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    EXPLORER_BASEURL,
+    evm_address,
+    setEvmAddr,
+    evm_txHash,
+    setEvmTxHash,
+    processing,
+    setProcessing,
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState();
-  const [evm_txHash, setEvmTxHash] = useState();
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState();
   const [amount, setAmount] = useState();
-  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
 
   const sendTxHash = async () => {
     setProcessing(true);
@@ -69,6 +77,7 @@ const EvmToEvm = ({
       const signer = await provider.getSigner();
       setMessage(`Sending token to ${canisterAddr}`);
       let tx;
+      setEvmTxHash();
       if (Number(netId) === 31) {
         tx = await signer.sendTransaction({
           to: `0x${canisterAddr}`,
@@ -90,10 +99,10 @@ const EvmToEvm = ({
       }));
       console.log(previousSwaps)
       localStorage.setItem('EvmToEvm_previousSwaps',JSON.stringify(previousSwaps));
+      setEvmTxHash(tx.hash);
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
-      setEvmTxHash(tx.hash);
-
+      sendTxHash();
     } catch (err) {
       console.log(err)
       setMessage(err.message);
@@ -103,20 +112,6 @@ const EvmToEvm = ({
     }
     setProcessing(false);
   };
-
-  useEffect(() => {
-    if (Number(netId) === 31) {
-      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
-    } else {
-      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
-    }
-  }, [netId]);
-
-  useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
 
   useEffect(() => {
     if (chains) {
@@ -164,10 +159,9 @@ const EvmToEvm = ({
         </select>
         {
           chain &&
-          <>
-            <p>Bridging to {JSON.parse(chain).name}</p>
-            <p>ChainId {JSON.parse(chain).chainId}</p>
-          </>
+          <p className="text-sm text-gray-600">
+            Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
+          </p>
         }
       </div>
 
@@ -191,21 +185,24 @@ const EvmToEvm = ({
       </div>
 
       {/* Step 3 */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 3: Input evm transaction hash</h2>
-        <label className="block mb-2">Transaction Hash</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={evm_txHash}
-          onChange={(ev) => setEvmTxHash(ev.target.value)}
-          placeholder="Transaction Hash"
-        />
-        {
-          !processing ?
-            <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={sendTxHash}>Finalize swap</button> :
-            <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-        }
-      </div>
+      {
+        evm_txHash &&
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-4">Step 3: Input evm transaction hash</h2>
+          <label className="block mb-2">Transaction Hash</label>
+          <input
+            className="w-full p-2 border border-gray-300 rounded mb-4"
+            value={evm_txHash}
+            onChange={(ev) => setEvmTxHash(ev.target.value)}
+            placeholder="Transaction Hash"
+          />
+          {
+            !processing ?
+              <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={sendTxHash}>Finalize swap</button> :
+              <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
+          }
+        </div>
+      }
 
       {/* Message Display */}
       {message && (

@@ -1,31 +1,36 @@
+import React, {useContext} from 'react';
 
-import React from 'react';
+import { AppContext } from '../../AppContext';
 
 const CreatePetitionLN = ({
     chain,
-    chains,
     setChain,
-    setEvmAddr,
     setAmount,
     sendToken,
-    netId,
-    evm_address,
-    canisterAddr,
     amount,
-    coinbase,
-    processing,
     setLN,
     ln,
-    loadWeb3Modal,
     sendPetitionTxHash,
-    setEvmTxHash,
     solve,
     petitionPaidInvoice,
-    evm_txHash,
     getInvoice,
     r_hash,
     checkInvoice
   }) => {
+
+  const { 
+    coinbase,
+    netId,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    processing,
+    evm_txHash,
+    setEvmTxHash,
+    evm_address,
+    setEvmAddr,
+  } = useContext(AppContext);
+  
   return (
     <div className="mb-6">
         <div className="mb-4">
@@ -113,10 +118,9 @@ const CreatePetitionLN = ({
                 </select>
                 {
                 chain &&
-                <>
-                    <p>Bridging to {JSON.parse(chain).name}</p>
-                    <p>ChainId {JSON.parse(chain).chainId}</p>
-                </>
+                <p className="text-sm text-gray-600">
+                    Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
+                </p>
                 }
                 {
                 !processing ?

@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext,useEffect, useState } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronUp,faChevronDown ,faCopy} from '@fortawesome/free-solid-svg-icons';
+import { AppContext } from '../AppContext';
 
 const TransactionsList = ({
-    name,
-    netId,
-    setEvmTxHash
+    name
 }) => {
+
+  const { netId,setEvmTxHash } = useContext(AppContext);
+
   const [previousSwaps,setPreviousSwaps] = useState([]);
   const [successSwaps,setSuccessSwaps] = useState([]);
   const [pendingSwaps,setPendingSwaps] = useState([]);
@@ -53,7 +55,7 @@ const TransactionsList = ({
         }`}
       >
       <div className="space-x-4 w-full">
-        <ul className="space-y-4">
+            <ul className="space-y-4">
             {
                 previousSwaps?.map(item => {
                     const swap = JSON.parse(item);

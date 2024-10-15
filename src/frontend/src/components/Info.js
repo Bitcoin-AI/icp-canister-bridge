@@ -1,12 +1,18 @@
-import React from "react";
+import React,{useContext} from "react";
 
-const Info = ({
-  nodeInfo,
-  netId,
-  coinbase,
-  fetchNodeInfo,
-  rskBalance
-}) => {
+import { AppContext } from '../AppContext';
+
+const Info = () => {
+
+
+  const {
+    nodeInfo,
+    netId,
+    coinbase,
+    fetchNodeInfo,
+    rskBalance
+  } = useContext(AppContext);
+
   return (
     <>
       {/* Main Content */}

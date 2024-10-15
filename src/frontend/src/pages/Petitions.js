@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPencilAlt, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
+
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json';
 import { main } from "../../../declarations/main";
 
@@ -9,25 +10,30 @@ import { main } from "../../../declarations/main";
 import CreatePetition from "../components/petitions/CreatePetition";
 import SolvePetitions from "../components/petitions/SolvePetitions";
 
+import { AppContext } from '../AppContext';
 
-const Petitions = ({
-  coinbase,
-  netId,
-  provider,
-  canisterAddr,
-  loadWeb3Modal,
-  chains
-}) => {
+const Petitions = () => {
+
+  const { 
+    netId,
+    provider,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    processing,
+    setProcessing,
+    evm_address,
+    evm_txHash,
+    setEvmTxHash,
+    EXPLORER_BASEURL
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState();
-  const [evm_txHash, setEvmTxHash] = useState();
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState();
   const [amount, setAmount] = useState();
   const [solve, setSolvePetition] = useState(false);
   const petitionToSolve = useRef();
   const [petitions, setPetitions] = useState([]);
-  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
 
   const fetchPetitions = async () => {
     try {
@@ -167,20 +173,6 @@ const Petitions = ({
     }
   }, [chains]);
 
-  useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
-
-  useEffect(() => {
-    if (Number(netId) === 31) {
-      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
-    } else {
-      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
-    }
-  }, [netId]);
-
   return (
     <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">Petitions</h1>
@@ -207,49 +199,43 @@ const Petitions = ({
       {
         !solve ?
         <CreatePetition
-          canisterAddr={canisterAddr}
           chain={chain}
-          chains={chains}
           setChain={setChain}
-          setEvmAddr={setEvmAddr}
           setAmount={setAmount}
           sendToken={sendToken}
-          netId={netId}
-          evm_address={evm_address}
           amount={amount}
-          coinbase={coinbase}
-          processing={processing}
-          loadWeb3Modal={loadWeb3Modal}
           solve={solve}
         /> :
         <SolvePetitions
           petitions={petitions}
           petitionToSolve={petitionToSolve}
-          netId={netId}
           sendToken={sendToken}
           solve={solve}
         />
       }
 
-      <div className="mb-6">
-        <div className="mb-4">
-          <p>Input evm transaction hash</p>
-          <label className="block mb-2">Transaction Hash</label>
-          <input
-            className="w-full p-2 border border-gray-300 rounded mb-4"
-            value={evm_txHash}
-            onChange={(ev) => setEvmTxHash(ev.target.value)}
-            placeholder="Transaction Hash"
-          />
+      {
+        evm_txHash &&
+        <div className="mb-6">
+          <div className="mb-4">
+            <p>Input evm transaction hash</p>
+            <label className="block mb-2">Transaction Hash</label>
+            <input
+              className="w-full p-2 border border-gray-300 rounded mb-4"
+              value={evm_txHash}
+              onChange={(ev) => setEvmTxHash(ev.target.value)}
+              placeholder="Transaction Hash"
+            />
+          </div>
+          <div className="mb-4">
+            {
+              !processing ?
+                <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={() => { sendPetitionTxHash(solve); }}>Finalize petition</button> :
+                <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
+            }
+          </div>
         </div>
-        <div className="mb-4">
-          {
-            !processing ?
-              <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={() => { sendPetitionTxHash(solve); }}>Finalize petition</button> :
-              <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-          }
-        </div>
-      </div>
+      }
 
       {message && (
         <div className="p-3 rounded mt-3 break-all bg-blue-100 text-blue-700">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPencilAlt, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
@@ -9,19 +9,27 @@ import { main } from "../../../declarations/main";
 import CreatePetitionLN from '../components/petitions/CreatePetitionLN';
 import SolvePetitionsLN from '../components/petitions/SolvePetitionsLN';
 
+import { AppContext } from '../AppContext';
 
-const PetitionsLN = ({
-  coinbase,
-  netId,
-  provider,
-  canisterAddr,
-  loadWeb3Modal,
-  chains
-}) => {
+
+const PetitionsLN = () => {
+
+
+  const { 
+    coinbase,
+    netId,
+    provider,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    setProcessing,
+    evm_address,
+    evm_txHash,
+    setEvmTxHash,
+    EXPLORER_BASEURL
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState();
-  const [evm_txHash, setEvmTxHash] = useState();
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState();
   const [amount, setAmount] = useState();
   const [currentPetitionToSolve, setCurrentPetitionToSolve] = useState(null);
@@ -32,7 +40,6 @@ const PetitionsLN = ({
   const [solve, setSolvePetition] = useState(false);
   const petitionToSolve = useRef();
   const [petitions, setPetitions] = useState([]);
-  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
 
   const decodeERC20Transfer = async (txInput) => {
     const iface = new ethers.Interface(ERC20ABI);
@@ -347,20 +354,6 @@ const PetitionsLN = ({
   }, [chains]);
 
   useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
-
-  useEffect(() => {
-    if (Number(netId) === 31) {
-      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
-    } else {
-      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
-    }
-  }, [netId]);
-
-  useEffect(() => {
     if (currentPetitionToSolve) {
       petitionToSolve.current = currentPetitionToSolve;
     }
@@ -392,24 +385,16 @@ const PetitionsLN = ({
       {
         !solve ?
           <CreatePetitionLN
-            canisterAddr={canisterAddr}
             chain={chain}
-            chains={chains}
             setChain={setChain}
-            setEvmAddr={setEvmAddr}
             setAmount={setAmount}
             sendToken={sendToken}
-            netId={netId}
-            evm_address={evm_address}
             amount={amount}
-            coinbase={coinbase}
-            processing={processing}
-            loadWeb3Modal={loadWeb3Modal}
             sendPetitionTxHash={sendPetitionTxHash}
             ln={ln}
+            solve={solve}
             setLN={setLN}
-            evm_txHash={evm_txHash}
-            setEvmTxHash={setEvmTxHash}
+            petitionPaidInvoice={petitionPaidInvoice}
             getInvoice={getInvoice}
             r_hash={r_hash}
             checkInvoice={checkInvoice}
@@ -420,11 +405,9 @@ const PetitionsLN = ({
             solveEVM2LNPetition={solveEVM2LNPetition}
             setCurrentPetitionToSolve={setCurrentPetitionToSolve}
             currentPetitionToSolve={currentPetitionToSolve}
-            evm_txHash={evm_txHash}
             netId={netId}
             sendToken={sendToken}
             solve={solve}
-            processing={processing}
             setAmount={setAmount}
             payPetitionInvoice={payPetitionInvoice}
           />

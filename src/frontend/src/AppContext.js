@@ -1,38 +1,29 @@
-import React, { useContext, useState, useEffect,useCallback } from "react";
+// AppContext.js
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import { ethers } from 'ethers';
-import { HashRouter as Router, Route, Routes,Navigate } from 'react-router-dom';
-
 import { main } from "../../declarations/main";
-
 import useWeb3Modal from "./hooks/useWeb3Modal";
 
-import Header from "./components/Header";
-import Info from "./components/Info";
-import Footer from "./components/Footer";
+const AppContext = createContext();
 
-import HomePage from "./pages/HomePage";
-import EvmToLightning from "./pages/EvmToLightning";
-import EvmToEvm from "./pages/EvmToEvm";
-import LightningToEvm from "./pages/LightningToEvm";
-import Petitions from "./pages/Petitions";
-import PetitionsLN from "./pages/PetitionsLN";
-import { AppContext } from './AppContext';
-
-
-const App = () => {
-
+const AppProvider = ({ children }) => {
   // State hooks
-  const { netId } = useContext(AppContext);
-
+  const [activeTab, setActiveTab] = useState('rskToLight');
   const [rskBalance, setUserBalance] = useState();
+  const [nodeInfo, setNodeInfo] = useState();
+  const [chains, setChains] = useState([]);
+  const [canisterAddr, setCanisterAddr] = useState();
 
-  const [nodeInfo,setNodeInfo] = useState();
+  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
+  const [evm_address, setEvmAddr] = useState('');
 
-  const [chains,setChains] = useState([]);
+  const [evm_txHash, setEvmTxHash] = useState();
 
-  const [canisterAddr,setCanisterAddr] = useState();
+  const [processing, setProcessing] = useState();
+
 
   const {
+    netId,
     coinbase,
     provider,
     loadWeb3Modal
@@ -72,10 +63,6 @@ const App = () => {
     });
   }, []);
 
-
-
-
-
   const fetchUserBalance = useCallback(async () => {
     if (coinbase && netId && provider) {
       try {
@@ -90,100 +77,72 @@ const App = () => {
         setUserBalance(balance.toString());
       } catch (error) {
         setUserBalance("0");
-
         console.error("Error fetching user balance:", error);
       }
     }
-  }, [coinbase, netId,provider]);
+  }, [coinbase, netId, provider]);
+
+  const decodeERC20Transfer = async (txInput) => {
+    const iface = new ethers.Interface(ERC20ABI);
+    const decodedInput = await iface.parseTransaction({ data: txInput });
+    console.log(`Tx decoded`);
+    console.log(decodedInput);
+    return decodedInput.args;
+  }
 
   useEffect(() => {
     fetchUserBalance(); // Fetch balance immediately when component mounts or coinbase/bridge changes
-
     const intervalId = setInterval(fetchUserBalance, 30000); // Fetch balance every 30 seconds
-
-
     return () => clearInterval(intervalId); // Clear interval on component unmount
   }, [fetchUserBalance]);
-  
 
   useEffect(() => {
     main.getEvmAddr().then(addr => {
       setCanisterAddr(addr);
     })
-  },[]);
-
+  }, []);
 
   const fetchNodeInfo = async () => {
-    try{
+    try {
       await window.webln.enable();
       const newInfo = await window.webln.getInfo();
       const newBalance = await window.webln.getBalance();
       setNodeInfo({
         node: newInfo.node,
         balance: newBalance.balance
-      })
-    } catch(err){
-      console.log(err)
+      });
+    } catch (err) {
+      console.log(err);
     }
-  }
+  };
+  useEffect(() => {
+    if (Number(netId) === 31) {
+      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
+    } else {
+      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    }
+  }, [netId]);
 
-
+  useEffect(() => {
+    if (coinbase) {
+      setEvmAddr(coinbase);
+    }
+  }, [coinbase]);
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
-      <Header
-        coinbase={coinbase}
-      />
-      {
-        canisterAddr ?
-        <div className="flex-grow self-center w-6/12		">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/info" element={
-            <Info
-              nodeInfo={nodeInfo}
-              netId={netId}
-              coinbase={coinbase}
-              fetchNodeInfo={fetchNodeInfo}
-              rskBalance={rskBalance}
-            />
-          } 
-          />
-          <Route path="/evmToLightning" element={<EvmToLightning/>} />
-          <Route path="/lightningToEvm" element={<LightningToEvm/>} />
-          <Route path="/evmToEvm" element={<EvmToEvm/>} 
-          />
-          <Route path="/petitionsEvm" element={
-            <Petitions
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-            />
-          } 
-          />
-          <Route path="/petitionsLN" element={
-            <PetitionsLN 
-              coinbase={coinbase}
-              netId={netId}
-              provider={provider}
-              canisterAddr={canisterAddr}
-              loadWeb3Modal={loadWeb3Modal}
-              chains={chains}
-            /> 
-          } 
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div> :
-      <p className="flex-grow" >Loading Canister ...</p>
-      }
-
-      <Footer />
-    </div>
+    <AppContext.Provider value={{
+      activeTab, setActiveTab,
+      rskBalance, setUserBalance,
+      nodeInfo, setNodeInfo,
+      chains, setChains,
+      canisterAddr, setCanisterAddr,
+      netId, coinbase, provider, loadWeb3Modal,
+      fetchUserBalance, fetchNodeInfo,EXPLORER_BASEURL,
+      setExplorerBaseUrl,evm_address,setEvmAddr,evm_txHash,
+      setEvmTxHash,processing,setProcessing,decodeERC20Transfer
+    }}>
+      {children}
+    </AppContext.Provider>
   );
-
 };
 
-export default App;
+export { AppContext, AppProvider };
