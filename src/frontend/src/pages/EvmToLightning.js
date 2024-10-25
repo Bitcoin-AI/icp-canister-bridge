@@ -1,5 +1,11 @@
 import React, { useContext,useState } from "react";
 import { ethers } from 'ethers';
+import { InfoCircledIcon } from "@radix-ui/react-icons";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../components/ui/Alert"
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 
@@ -179,10 +185,15 @@ const EvmToLightning = () => {
 
       {/* Message Display */}
       {message && (
-        <div className="p-3 rounded mt-3 break-all bg-blue-100 text-blue-700">
-          {message}
-        </div>
+        <Alert variant="info">
+          <InfoCircledIcon className="h-4 w-4" />
+          <AlertTitle>Info</AlertTitle>
+          <AlertDescription>
+            {message}
+          </AlertDescription>
+        </Alert>
       )}
+
     </div>
   );
 };

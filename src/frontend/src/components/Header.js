@@ -4,6 +4,12 @@ import { AppContext } from '../AppContext';
 
 import MainMenu from "./MainMenu";
 
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "./ui/Avatar";
+
 const Header = () => {
 
   const {
@@ -15,6 +21,10 @@ const Header = () => {
       <div className="container mx-auto px-4 py-2 flex justify-between items-center">
         <h1 className="text-lg font-semibold">Senfina</h1>
         <MainMenu />
+        <Avatar>
+          <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+          <AvatarFallback>CN</AvatarFallback>
+        </Avatar>
         {coinbase && (
           <div className="relative" title="Connected Wallet">
             <button className="text-white hover:underline">
