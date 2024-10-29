@@ -1,7 +1,14 @@
 import React,{useContext} from "react";
 
 import { AppContext } from '../AppContext';
-
+import UserDashboard from './userDashboard/UserDashboard';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/Card"
 const Info = () => {
 
 
@@ -16,7 +23,6 @@ const Info = () => {
   return (
     <>
       {/* Main Content */}
-      <main className="flex-grow flex flex-col container mx-auto px-4 mt-8">
         <div className="bg-white shadow-lg p-6 rounded-lg">
           {/* Node Info Section */}
           {typeof window.webln !== 'undefined' && (
@@ -50,22 +56,42 @@ const Info = () => {
             <div className="mt-8">
               <h3 className="text-xl font-bold mb-4">EVM Connection</h3>
               <div className="bg-gray-100 p-4 rounded-lg shadow-md mt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-base"><strong>Address:</strong><br />{coinbase}</p>
-                  </div>
-                  <div>
-                    <p className="text-base"><strong>Chain ID:</strong> {netId.toString()}</p>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <p className="text-base"><strong>Balance:</strong> {Math.round(rskBalance / 10 ** 10)} satoshis of {netId === 31 ? "RBTC" : "WBTC"}</p>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader>
+                        <CardTitle>Address</CardTitle>
+                        <CardDescription></CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p>{`${coinbase.substring(0, 6)}...${coinbase.substring(coinbase.length - 4)}`}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                        <CardTitle>Chain ID</CardTitle>
+                        <CardDescription></CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p>{netId.toString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                        <CardTitle>Balance</CardTitle>
+                        <CardDescription></CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p>{Math.round(rskBalance / 10 ** 10)} satoshis of {netId === 31 ? "RBTC" : "WBTC"}</p>
+                    </CardContent>
+                  </Card>
+
                 </div>
               </div>
             </div>
           )}
         </div>
-      </main>
+        <UserDashboard />
+
     </>
   );
 };
