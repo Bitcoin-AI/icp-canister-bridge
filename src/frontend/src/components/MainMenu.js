@@ -22,19 +22,9 @@ const MainMenu = () => {
       path: '/',
     },
     {
-      label: 'EVM to Lightning',
-      icon: <FontAwesomeIcon icon={faBolt} />,
-      path: '/evmToLightning',
-    },
-    {
-      label: 'Lightning to EVM',
-      icon: <FontAwesomeIcon icon={faLightbulb} />,
-      path: '/lightningToEvm',
-    },
-    {
-      label: 'EVM to EVM',
+      label: 'Swap',
       icon: <FontAwesomeIcon icon={faExchangeAlt} />,
-      path: '/evmToEvm',
+      path: '/swap',
     },
     {
       label: 'Petitions EVM to EVM',

@@ -7,6 +7,8 @@ import Info from "./components/Info";
 import Footer from "./components/Footer";
 
 import HomePage from "./pages/HomePage";
+import Swap from "./pages/Swap";
+
 import EvmToLightning from "./pages/EvmToLightning";
 import EvmToEvm from "./pages/EvmToEvm";
 import LightningToEvm from "./pages/LightningToEvm";
@@ -29,9 +31,10 @@ const App = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/info" element={<Info/>}  />
-          <Route path="/evmToLightning" element={<EvmToLightning/>} />
-          <Route path="/lightningToEvm" element={<LightningToEvm/>} />
-          <Route path="/evmToEvm" element={<EvmToEvm/>} />
+          <Route path="/swap" element={<Swap/>} />
+          <Route path="/swap/evmToLightning" element={<EvmToLightning/>} />
+          <Route path="/swap/lightningToEvm" element={<LightningToEvm/>} />
+          <Route path="/swap/evmToEvm" element={<EvmToEvm/>} />
           <Route path="/petitionsEvm" element={<Petitions />} />
           <Route path="/petitionsLN" element={<PetitionsLN />} />
           <Route path="*" element={<Navigate to="/" replace />} />

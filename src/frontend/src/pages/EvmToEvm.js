@@ -1,4 +1,6 @@
 import React, { useContext, useState, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
+
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
@@ -8,6 +10,7 @@ import { AppContext } from '../AppContext';
 import TransactionsList from "../components/TransactionsList";
 
 const EvmToEvm = () => {
+  const [searchParams] = useSearchParams();
 
   const { 
     netId,
@@ -27,7 +30,9 @@ const EvmToEvm = () => {
 
   const [message, setMessage] = useState('');
   const [chain, setChain] = useState();
-  const [amount, setAmount] = useState();
+  const [amount, setAmount] = useState('');
+  const [originChain, setOriginChain] = useState('');
+  const [destinyChain, setDestinyChain] = useState('');
 
   const sendTxHash = async () => {
     setProcessing(true);
@@ -114,17 +119,18 @@ const EvmToEvm = () => {
   };
 
   useEffect(() => {
-    if (chains) {
-      const initialChain = JSON.stringify(
-        {
-          rpc: chains[0].rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"))[0],
-          chainId: chains[0].chainId,
-          name: chains[0].name
-        }
-      );
-      setChain(initialChain);
+    const urlAmount = searchParams.get('amount');
+    const urlDestinyChain = searchParams.get('destinyChain');
+    const urlOriginChain = searchParams.get('originChain');
+    setAmount(urlAmount);
+    setDestinyChain(urlDestinyChain);
+    setOriginChain(urlOriginChain);
+    if(urlOriginChain && coinbase && netId){
+      if(Number(JSON.parse(urlOriginChain).chainId) !== Number(netId)){
+        alert("wrong network, making metamask change network")
+      }
     }
-  }, [chains]);
+  },[]);
 
   return (
     <div className="w-full p-4">
@@ -132,49 +138,25 @@ const EvmToEvm = () => {
 
       {/* Step 1 */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 1: Select recipient and EVM compatible chain</h2>
-        <label className="block mb-2">EVM Recipient Address</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={evm_address}
-          onChange={(ev) => setEvmAddr(ev.target.value)}
-          placeholder="Enter EVM address"
-        />
-        <label className="block mb-2">Select Destiny Chain</label>
-        <select
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          onChange={(ev) => setChain(ev.target.value)}
-        >
-          {
-            chains.map(item => (
-              <option key={item.chainId} value={JSON.stringify(
-                {
-                  rpc: item.rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"))[0],
-                  chainId: item.chainId,
-                  name: item.name
-                }
-              )}>{item.name}</option>
-            ))
-          }
-        </select>
+        <h2 className="text-xl font-semibold mb-4">Step 1: Send token to 0x{canisterAddr}</h2>
         {
-          chain &&
-          <p className="text-sm text-gray-600">
-            Bridging to <strong>{JSON.parse(chain).name}</strong> (Chain ID: {JSON.parse(chain).chainId})
-          </p>
+        originChain &&
+        <p className="text-sm text-gray-600">
+            Bridging from <strong>{JSON.parse(originChain).name}</strong> (Chain ID: {JSON.parse(originChain).chainId})
+        </p>
         }
-      </div>
-
-      {/* Step 2 */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 2: Send token to 0x{canisterAddr}</h2>
-        <label className="block mb-2">Amount in satoshis</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={amount}
-          onChange={(ev) => setAmount(ev.target.value)}
-          placeholder="Satoshis"
-        />
+        {
+        destinyChain &&
+        <p className="text-sm text-gray-600">
+            Bridging to <strong>{JSON.parse(destinyChain).name}</strong> (Chain ID: {JSON.parse(destinyChain).chainId})
+        </p>
+        }
+        {
+        amount &&
+        <p className="text-sm text-gray-600">
+            Amount: {amount} satoshis
+        </p>
+        }
         {
           !coinbase ?
             <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={loadWeb3Modal}>Connect Wallet</button> :

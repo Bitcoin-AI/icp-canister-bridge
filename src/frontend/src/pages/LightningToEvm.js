@@ -1,4 +1,6 @@
 import React, { useContext,useState, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
+
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
 
@@ -6,6 +8,7 @@ import { AppContext } from '../AppContext';
 
 
 const LightningToEvm = () => {
+  const [searchParams] = useSearchParams();
 
   const { 
     chains,
@@ -17,6 +20,9 @@ const LightningToEvm = () => {
 
   const [message, setMessage] = useState('');
   const [amount, setAmount] = useState('');
+  const [originChain, setOriginChain] = useState('');
+  const [destinyChain, setDestinyChain] = useState('');
+  
   const [r_hash, setPaymentHash] = useState('');
   const [invoiceToPay, setInvoiceToPay] = useState('');
   const [chain, setChain] = useState('');
@@ -74,15 +80,13 @@ const LightningToEvm = () => {
   };
 
   useEffect(() => {
-    if (chains && chains.length > 0) {
-      const initialChain = JSON.stringify({
-        rpc: chains[0].rpc.find(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}")),
-        chainId: chains[0].chainId,
-        name: chains[0].name,
-      });
-      setChain(initialChain);
-    }
-  }, [chains]);
+    const urlAmount = searchParams.get('amount');
+    const urlDestinyChain = searchParams.get('destinyChain');
+    const urlOriginChain = searchParams.get('originChain');
+    setAmount(urlAmount);
+    setDestinyChain(urlDestinyChain);
+    setOriginChain(urlOriginChain);
+  },[]);
 
   return (
     <div className="w-full p-4">
