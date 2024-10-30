@@ -1,5 +1,6 @@
 import React, { useContext, useState, useEffect } from "react";
 import { useSearchParams } from 'react-router-dom';
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
@@ -8,7 +9,11 @@ import { main } from "../../../declarations/main";
 import { AppContext } from '../AppContext';
 
 import TransactionsList from "../components/TransactionsList";
-
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../components/ui/Alert"
 const EvmToEvm = () => {
   const [searchParams] = useSearchParams();
 
@@ -107,7 +112,6 @@ const EvmToEvm = () => {
       setEvmTxHash(tx.hash);
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
-      sendTxHash();
     } catch (err) {
       console.log(err)
       setMessage(err.message);
@@ -124,6 +128,7 @@ const EvmToEvm = () => {
     const urlOriginChain = searchParams.get('originChain');
     setAmount(urlAmount);
     setDestinyChain(urlDestinyChain);
+    setChain(urlDestinyChain);
     setOriginChain(urlOriginChain);
     if(urlOriginChain && coinbase && netId){
       if(Number(JSON.parse(urlOriginChain).chainId) !== Number(netId)){
@@ -170,7 +175,7 @@ const EvmToEvm = () => {
       {
         evm_txHash &&
         <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-4">Step 3: Input evm transaction hash</h2>
+          <h2 className="text-xl font-semibold mb-4">Step 2: Input evm transaction hash</h2>
           <label className="block mb-2">Transaction Hash</label>
           <input
             className="w-full p-2 border border-gray-300 rounded mb-4"
@@ -188,9 +193,13 @@ const EvmToEvm = () => {
 
       {/* Message Display */}
       {message && (
-        <div className="p-3 rounded mt-3 break-all bg-blue-100 text-blue-700">
-          {message}
-        </div>
+        <Alert variant="info">
+          <InfoCircledIcon className="h-4 w-4" />
+          <AlertTitle>Info</AlertTitle>
+          <AlertDescription>
+            {message}
+          </AlertDescription>
+        </Alert>
       )}
       <TransactionsList 
         name={'EvmToEvm'}

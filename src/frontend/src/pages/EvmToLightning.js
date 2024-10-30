@@ -51,7 +51,6 @@ const EvmToLightning = () => {
         }, 5000);
         return;
       }
-      alert("alby")
 
       if (typeof window.webln !== 'undefined') {
         await window.webln.enable();

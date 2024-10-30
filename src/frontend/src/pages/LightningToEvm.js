@@ -1,11 +1,16 @@
 import React, { useContext,useState, useEffect } from "react";
 import { useSearchParams } from 'react-router-dom';
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
 
 import { AppContext } from '../AppContext';
-
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../components/ui/Alert"
 
 const LightningToEvm = () => {
   const [searchParams] = useSearchParams();
@@ -85,6 +90,7 @@ const LightningToEvm = () => {
     const urlOriginChain = searchParams.get('originChain');
     setAmount(urlAmount);
     setDestinyChain(urlDestinyChain);
+    setChain(urlDestinyChain);
     setOriginChain(urlOriginChain);
   },[]);
 
@@ -164,7 +170,6 @@ const LightningToEvm = () => {
           {processing ? 'Loading...' : 'Check Invoice'}
         </button>
       </div>
-
       {/* Message Display */}
       {message && (
         <div className={`p-3 rounded mt-3 break-all ${alertSeverity === 'success' ? 'bg-green-100 text-green-700' : alertSeverity === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-gray-700'}`}>
