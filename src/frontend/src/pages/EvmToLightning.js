@@ -35,7 +35,7 @@ const EvmToLightning = () => {
   const [userInvoice, setUserInvoice] = useState();
   const [amount, setAmount] = useState('');
   const [originChain, setOriginChain] = useState('');
-  const [destinyChain, setDestinyChain] = useState('');
+  const [destinationChain, setDestinationChain] = useState('');
 
   const sendInvoiceAndTxHash = async () => {
     setProcessing(true);
@@ -142,10 +142,10 @@ const EvmToLightning = () => {
 
   useEffect(() => {
     const urlAmount = searchParams.get('amount');
-    const urlDestinyChain = searchParams.get('destinyChain');
+    const urlDestinationChain = searchParams.get('destinationChain');
     const urlOriginChain = searchParams.get('originChain');
     setAmount(urlAmount);
-    setDestinyChain(urlDestinyChain);
+    setDestinationChain(urlDestinationChain);
     setOriginChain(urlOriginChain);
     if(urlOriginChain && coinbase && netId){
       if(Number(JSON.parse(urlOriginChain).chainId) !== Number(netId)){
@@ -167,9 +167,9 @@ const EvmToLightning = () => {
         </p>
         }
         {
-        destinyChain &&
+        destinationChain &&
         <p className="text-sm text-gray-600">
-            Bridging to <strong>{JSON.parse(destinyChain).name}</strong> (Chain ID: {JSON.parse(destinyChain).chainId})
+            Bridging to <strong>{JSON.parse(destinationChain).name}</strong> (Chain ID: {JSON.parse(destinationChain).chainId})
         </p>
         }
         {

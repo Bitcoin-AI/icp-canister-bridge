@@ -1,6 +1,8 @@
 // AppContext.js
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { ethers } from 'ethers';
+import axios from 'axios';
+
 import { main } from "../../declarations/main";
 import useWeb3Modal from "./hooks/useWeb3Modal";
 
@@ -63,24 +65,33 @@ const AppProvider = ({ children }) => {
     });
   }, []);
 
-  const fetchUserBalance = useCallback(async () => {
-    if (coinbase && netId && provider) {
+  const fetchBalance = async (address,provider,netId) => {
+    if (address && netId && provider) {
       try {
         let balance;
         if(Number(netId) === 31){
-          balance = await provider.getBalance(coinbase);
+          balance = await provider.getBalance(address);
         } else {
           const wbtcAddress = wbtcAddresses[netId.toString()];
           const erc20Contract = new ethers.Contract(wbtcAddress, ['function balanceOf(address) view returns (uint)'], provider);
-          balance = await erc20Contract.balanceOf(coinbase);
+          balance = await erc20Contract.balanceOf(address);
         }
-        setUserBalance(balance.toString());
+        return(balance.toString());
       } catch (error) {
-        setUserBalance("0");
+        return("0");
         console.error("Error fetching user balance:", error);
       }
     }
-  }, [coinbase, netId, provider]);
+  };
+
+  const fetchLNBalance = async() => {
+    try{
+      const lnBalance = await axios.get('https://icp-macaroon-bridge-cdppi36oeq-uc.a.run.app/v1/balance/channels');
+      return(lnBalance)
+    } catch(err){
+      console.error(err)
+    }
+  }
 
   const decodeERC20Transfer = async (txInput) => {
     const iface = new ethers.Interface(ERC20ABI);
@@ -91,16 +102,24 @@ const AppProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    fetchUserBalance(); // Fetch balance immediately when component mounts or coinbase/bridge changes
-    const intervalId = setInterval(fetchUserBalance, 30000); // Fetch balance every 30 seconds
-    return () => clearInterval(intervalId); // Clear interval on component unmount
-  }, [fetchUserBalance]);
+    if(coinbase && provider && netId){
+      fetchBalance(coinbase,provider,netId).then(balance => {
+        setUserBalance(balance)
+      }); // Fetch balance immediately when component mounts or coinbase/bridge changes
+      const intervalId = setInterval(async () => {
+        const balance = await fetchBalance(coinbase,provider,netId);
+        setUserBalance(balance);
+      }, 30000); // Fetch balance every 30 seconds
+      return () => clearInterval(intervalId); // Clear interval on component unmount
+    }
+  }, [fetchBalance,coinbase,provider,netId]);
 
   useEffect(() => {
     main.getEvmAddr().then(addr => {
       setCanisterAddr(addr);
     })
   }, []);
+  
 
   const fetchNodeInfo = async () => {
     try {
@@ -131,12 +150,12 @@ const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       activeTab, setActiveTab,
-      rskBalance, setUserBalance,
+      rskBalance, setUserBalance,fetchBalance,
       nodeInfo, setNodeInfo,
       chains, setChains,
       canisterAddr, setCanisterAddr,
       netId, coinbase, provider, loadWeb3Modal,
-      fetchUserBalance, fetchNodeInfo,EXPLORER_BASEURL,
+      fetchNodeInfo,fetchLNBalance,EXPLORER_BASEURL,
       setExplorerBaseUrl,evm_address,setEvmAddr,evm_txHash,
       setEvmTxHash,processing,setProcessing,decodeERC20Transfer
     }}>

@@ -1,5 +1,6 @@
 import React, { useContext, useState, useEffect } from "react";
 import { Link } from 'react-router-dom';
+import { ethers } from "ethers";
 
 
 import { AppContext } from '../AppContext';
@@ -26,15 +27,52 @@ import { Input } from "../components/ui/Input"
 
 const Swap = () => {
 
+
+
   const { 
     chains,
+    fetchBalance,
+    fetchLNBalance,
+    coinbase,
+    canisterAddr
   } = useContext(AppContext);
 
   const [originChain, setOriginChain] = useState();
-  const [destinyChain, setDestinyChain] = useState();
+  const [originUserBalance, setOriginUserBalance] = useState();
+  const [destinationChain, setDestinationChain] = useState();
+  const [canisterBalance,setCanisterBalance] = useState();
 
   const [amount, setAmount] = useState();
 
+  useEffect(() => {
+    if(coinbase && originChain){
+      const netId = JSON.parse(originChain).chainId;
+      const rpc = JSON.parse(originChain).rpc;
+      const chainProvider = new ethers.JsonRpcProvider(rpc);
+      fetchBalance(coinbase,chainProvider,netId).then(balance => {
+        setOriginUserBalance(balance);
+      })
+    }
+  },[originChain,coinbase]);
+
+  useEffect(() => {
+    if(canisterAddr && destinationChain){
+      const netId = JSON.parse(destinationChain).chainId;
+      const rpc = JSON.parse(destinationChain).rpc;
+      const chainProvider = new ethers.JsonRpcProvider(rpc);
+      if(chainProvider && rpc && netId){
+        fetchBalance(`0x${canisterAddr}`,chainProvider,netId).then(balance => {
+            setCanisterBalance((Number(balance)/10**10).toString());
+          });
+      } else {
+        fetchLNBalance().then(response => {
+            setCanisterBalance(response.data.balance)
+        });
+      }
+
+
+    }
+  },[canisterAddr,destinationChain]);
 
   return (
     <div className="flex items-center justify-center">
@@ -47,7 +85,7 @@ const Swap = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>Origin Chain</CardTitle>
-                    <CardDescription></CardDescription>
+                    <CardDescription>{originChain?.name}</CardDescription>
                 </CardHeader>
                 <CardContent>
                 <Select onValueChange={(value) => setOriginChain(value)}>
@@ -79,13 +117,13 @@ const Swap = () => {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Destiny Chain</CardTitle>
+                    <CardTitle>Destination Chain</CardTitle>
                     <CardDescription></CardDescription>
                 </CardHeader>
                 <CardContent>
-                <Select className="w-full" onValueChange={(value) => setDestinyChain(value)}>
+                <Select className="w-full" onValueChange={(value) => setDestinationChain(value)}>
                     <SelectTrigger>
-                        <SelectValue placeholder="Destiny Chain" />
+                        <SelectValue placeholder="Destination Chain" />
                     </SelectTrigger>
                     <SelectContent>
                     {
@@ -132,9 +170,9 @@ const Swap = () => {
                 </p>
                 }
                 {
-                destinyChain &&
+                destinationChain &&
                 <p className="text-sm text-gray-600">
-                    Bridging to <strong>{JSON.parse(destinyChain).name}</strong> (Chain ID: {JSON.parse(destinyChain).chainId})
+                    Bridging to <strong>{JSON.parse(destinationChain).name}</strong> (Chain ID: {JSON.parse(destinationChain).chainId})
                 </p>
                 }
                 {
@@ -144,27 +182,42 @@ const Swap = () => {
                 </p>
                 }
                 {
-                    amount > 0 && destinyChain && originChain &&
+                canisterBalance && 
+                <p className="text-sm text-gray-600" >
+                   <strong>Total Liquidity on Destination ({JSON.parse(destinationChain).name}) : {canisterBalance.toString()} satoshis</strong>
+                </p>
+                } 
+                {
+                    amount > 0 && destinationChain && originChain && originUserBalance && canisterBalance &&
                     (
                         <>
                         {
-                        JSON.parse(destinyChain).name === "Lightning" &&
-                        <Link to={`/swap/evmToLightning?amount=${amount}&destinyChain=${destinyChain}&originChain=${originChain}`}>
-                            <Button variant="info" size="lg">Perform EVM to Lightning swap</Button>
-                        </Link>
+                            (amount > Number(originUserBalance) || amount > Number(canisterBalance)) ?
+                            <div>
+                                <Button variant="destructive" size="lg">Invalid Amount</Button>
+                            </div> :
+                            <>
+                            {
+                            JSON.parse(destinationChain).name === "Lightning" &&
+                            <Link to={`/swap/evmToLightning?amount=${amount}&destinationChain=${destinationChain}&originChain=${originChain}`}>
+                                <Button variant="info" size="lg">Perform EVM to Lightning swap</Button>
+                            </Link>
+                            }
+                            {
+                            JSON.parse(originChain).name === "Lightning" && JSON.parse(destinationChain).name !== "Lightning" &&
+                            <Link to={`/swap/lightningToEvm?amount=${amount}&destinationChain=${destinationChain}&originChain=${originChain}`}>
+                                <Button variant="info" size="lg">Perform Lightning to EVM swap</Button>
+                            </Link>
+                            }
+                            {
+                            JSON.parse(originChain).name !== "Lightning" && JSON.parse(destinationChain).name !== "Lightning" &&
+                            <Link to={`/swap/evmToEvm?amount=${amount}&destinationChain=${destinationChain}&originChain=${originChain}`}>
+                                <Button variant="info" size="lg">Perform EVM to EVM swap</Button>
+                            </Link>
+                            }
+                            </>
                         }
-                        {
-                        JSON.parse(originChain).name === "Lightning" && JSON.parse(destinyChain).name !== "Lightning" &&
-                        <Link to={`/swap/lightningToEvm?amount=${amount}&destinyChain=${destinyChain}&originChain=${originChain}`}>
-                            <Button variant="info" size="lg">Perform Lightning to EVM swap</Button>
-                        </Link>
-                        }
-                        {
-                        JSON.parse(originChain).name !== "Lightning" && JSON.parse(destinyChain).name !== "Lightning" &&
-                        <Link to={`/swap/evmToEvm?amount=${amount}&destinyChain=${destinyChain}&originChain=${originChain}`}>
-                            <Button variant="info" size="lg">Perform EVM to EVM swap</Button>
-                        </Link>
-                        }
+
                         </>
 
                     )

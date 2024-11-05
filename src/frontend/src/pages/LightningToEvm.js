@@ -26,7 +26,7 @@ const LightningToEvm = () => {
   const [message, setMessage] = useState('');
   const [amount, setAmount] = useState('');
   const [originChain, setOriginChain] = useState('');
-  const [destinyChain, setDestinyChain] = useState('');
+  const [destinationChain, setDestinationChain] = useState('');
   
   const [r_hash, setPaymentHash] = useState('');
   const [invoiceToPay, setInvoiceToPay] = useState('');
@@ -86,11 +86,11 @@ const LightningToEvm = () => {
 
   useEffect(() => {
     const urlAmount = searchParams.get('amount');
-    const urlDestinyChain = searchParams.get('destinyChain');
+    const urlDestinationChain = searchParams.get('destinationChain');
     const urlOriginChain = searchParams.get('originChain');
     setAmount(urlAmount);
-    setDestinyChain(urlDestinyChain);
-    setChain(urlDestinyChain);
+    setDestinationChain(urlDestinationChain);
+    setChain(urlDestinationChain);
     setOriginChain(urlOriginChain);
   },[]);
 
