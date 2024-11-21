@@ -22,6 +22,23 @@ import Types "Types";
 
 actor {
 
+  //  Add liquidty variables
+
+  type ChainId = Text;
+  type PrincipalIdText = Text;
+  var totalLiquidityLN : Nat = 0;
+  let totalLiquidityEVM = HashMap.HashMap<ChainId, Nat>(10, Text.equal, Text.hash);
+
+  let feePercentage : Nat = 1; // 1%
+
+  let liquidityProvidersLN = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash);
+  let liquidityProvidersEVM = HashMap.HashMap<ChainId, HashMap.HashMap<PrincipalIdText, Nat>>(10, Text.equal, Text.hash);
+
+  let providerFeesLN = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash);
+  let providerFeesEVM = HashMap.HashMap<ChainId, HashMap.HashMap<PrincipalIdText, Nat>>(10, Text.equal, Text.hash);
+
+  var totalAccumulatedFeesLN : Nat = 0;
+
   let keyName = "dfx_test_key"; // this is for local network
 
   //let keyName = "test_key_1"; //This is for IC network
@@ -92,9 +109,78 @@ actor {
       return "Transaction/ Invoice is already paid";
     };
 
-    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await EVM.swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath, keyName, transform);
+    // Fetch the transaction details from the sending chain
+    let resultTxDetails = await EVM.getTransactionDetails(transactionId, transferEvent.sendingChain, transform);
+    let txDetails = JSON.parse(resultTxDetails);
 
+    let transactionAmount = await utils.getValue(txDetails, "value");
+    let transactionData = await utils.getValue(txDetails, "input");
+
+    var transactionNat : Nat = 0;
+
+    if (transferEvent.sentERC == "0") {
+      // Comparison uses '=='
+      // Native token transfer
+      let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
+      transactionNat := Nat64.toNat(transactionAmountNat64); // Correct conversion
+    } else {
+      // ERC20 transfer
+      let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+      switch (decodedDataResult) {
+        case (#ok((_, amountNat))) {
+          transactionNat := amountNat; // Correct case assignment
+        };
+        case (#err(errMsg)) {
+          Debug.print("Error decoding ERC20 data: " # errMsg); // Debug message
+          return "Error decoding transaction data"; // Error handling
+        };
+      };
+    };
+
+    let feeAmount = calculateFee(transactionNat);
+    let amountAfterFee = transactionNat - feeAmount;
+
+    // Accumulate the fee for the  wanted chain (the chain the funds are going to)
+    let chainId = transferEvent.wantedChain;
+
+    let currentAccumulatedFees = totalAccumulatedFeesEVM.get(chainId);
+    let newAccumulatedFees = switch (currentAccumulatedFees) {
+      case (null) { feeAmount };
+      case (?existingAmount) { existingAmount + feeAmount };
+    };
+    totalAccumulatedFeesEVM.put(chainId, newAccumulatedFees);
+
+    // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
+
+    // Now, perform the swap with amountAfterFee
+    // We'll need to create and send a transaction to the desired chain with amountAfterFee
+
+    // Get the canister's EVM address
+    let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
+
+    // Get the public key
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    // Prepare the transfer parameters
+    let sendingChainId = transferEvent.wantedChain; // The chain we're sending to
+    let destinationAddress = transferEvent.wantedAddress;
+    let tokenAddress = transferEvent.wantedERC20; // The token to send; "0" for native coin
+
+    // Create and send the transaction
+    let transferResponse = await EVM.createAndSendTransaction(
+      sendingChainId,
+      tokenAddress,
+      derivationPath,
+      keyName,
+      canisterAddress,
+      destinationAddress,
+      amountAfterFee,
+      publicKey,
+      transform,
+    );
+
+
+    //Handle the error
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
 
     switch (isError) {
@@ -109,15 +195,15 @@ actor {
     return sendTxResponse;
   };
 
-  public shared (msg) func petitionLN2EVM(petitionEvent : Types.PetitionEvent,payment_hash: Text,timestamp : Text) : async Text {
+  public shared (msg) func petitionLN2EVM(petitionEvent : Types.PetitionEvent, payment_hash : Text, timestamp : Text) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
     let parsedResponse = JSON.parse(paymentCheckResponse);
     let isSettled = await utils.getValue(parsedResponse, "settled");
     let invoicePaidUncleaned = await utils.getValue(parsedResponse, "payment_request");
-    let invoicePaid = utils.subText(invoicePaidUncleaned,1,invoicePaidUncleaned.size()-1);
-    Debug.print("Checking payment of invoice "#invoicePaid);
+    let invoicePaid = utils.subText(invoicePaidUncleaned, 1, invoicePaidUncleaned.size() -1);
+    Debug.print("Checking payment of invoice " #invoicePaid);
     let isPetitionRegistered : Bool = switch (petitionUsed.get(invoicePaid)) {
       case (null) { false };
       case (?true) { true };
@@ -128,7 +214,7 @@ actor {
       return "Petition already registered";
     };
     let amountSatoshi = await utils.getValue(parsedResponse, "value");
-    Debug.print("Satoshis sent: "#amountSatoshi);
+    Debug.print("Satoshis sent: " #amountSatoshi);
     let amount : Nat = switch (Nat.fromText(utils.subText(amountSatoshi, 1, amountSatoshi.size() - 1) # "0000000000")) {
 
       case (null) { 0 };
@@ -139,32 +225,33 @@ actor {
     if (isSettled == falseString) {
       Debug.print("Invoice not settled, pay invoice and try again");
       return "Invoice not settled, pay invoice and try again";
-    };    
-    Debug.print("Creating petition with invoicePaid: "#invoicePaid);
-    petitions.put(invoicePaid,petitionEvent);
-    petitionUsed.put(invoicePaid,true);
+    };
+    Debug.print("Creating petition with invoicePaid: " #invoicePaid);
+    petitions.put(invoicePaid, petitionEvent);
+    petitionUsed.put(invoicePaid, true);
     Debug.print("Petition for LN to EVM transfer created successfully");
     return "Petition for LN to EVM transfer created successfully";
   };
 
   public shared (msg) func solvePetitionLN2EVM(
     petitionInvoiceId : Text,
-    solvePetitionInvoice: Text,
+    solvePetitionInvoice : Text,
     proofTxId : Text,
     signature : Text,
-    timestamp: Text) : async Text {
+    timestamp : Text,
+  ) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
     let petition = petitions.get(petitionInvoiceId);
-    var result: Text = "";
+    var result : Text = "";
     switch (petition) {
       case (null) {
         result := "No petition found for this transaction";
       };
       case (?petitionEvent) {
-        let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
+        let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
 
         let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
         let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
@@ -173,38 +260,37 @@ actor {
         };
         Debug.print("Checking LN petiton event to be solved");
 
-
         let decodedPayReq = await LN.decodePayReq(petitionInvoiceId, timestamp, transform);
         let payReqResponse = JSON.parse(decodedPayReq);
         let amountString = await utils.getValue(payReqResponse, "num_satoshis");
         let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-        let transactionNat: Nat = switch (Nat.fromText(cleanAmountString)) {
-          case (null) { 0 };  // Handle the case where the value is null
-          case (?value) { value };  // Extract the Nat value if it is not null
+        let transactionNat : Nat = switch (Nat.fromText(cleanAmountString)) {
+          case (null) { 0 }; // Handle the case where the value is null
+          case (?value) { value }; // Extract the Nat value if it is not null
         };
-        Debug.print("Amount that needs to be sent: "#Nat.toText(transactionNat)#" satoshis");
-        Debug.print("Converted to wei: "#Nat.toText(transactionNat*10**10));
-        let isWBTC: Bool = switch(petitionEvent.wantedChain){
-          case("0x1f"){
+        Debug.print("Amount that needs to be sent: " #Nat.toText(transactionNat) # " satoshis");
+        Debug.print("Converted to wei: " #Nat.toText(transactionNat * 10 ** 10));
+        let isWBTC : Bool = switch (petitionEvent.wantedChain) {
+          case ("0x1f") {
             false;
           };
-          case(_){
+          case (_) {
             true;
           };
         };
         Debug.print("Validating transaction with parameters");
-        Debug.print("isWBTC: "#Bool.toText(isWBTC));
-        Debug.print("petitionEvent.wantedERC20: "#petitionEvent.wantedERC20);
-        Debug.print("proofTxId: "#proofTxId);
-        Debug.print("petitionEvent.wantedAddress: "#petitionEvent.wantedAddress);
-        Debug.print("transactionNat: "#Nat.toText(transactionNat*10**10));
-        Debug.print("petitionEvent.wantedChain: "#petitionEvent.wantedChain);
+        Debug.print("isWBTC: " #Bool.toText(isWBTC));
+        Debug.print("petitionEvent.wantedERC20: " #petitionEvent.wantedERC20);
+        Debug.print("proofTxId: " #proofTxId);
+        Debug.print("petitionEvent.wantedAddress: " #petitionEvent.wantedAddress);
+        Debug.print("transactionNat: " #Nat.toText(transactionNat * 10 ** 10));
+        Debug.print("petitionEvent.wantedChain: " #petitionEvent.wantedChain);
 
         let isValidTransaction = await EVM.validateTransaction(
           petitionEvent.wantedERC20,
           proofTxId,
-          "0x"#canisterAddress, // Expected address to be canister, after ok release payments
-          transactionNat*10**10, // Expected amount
+          "0x" #canisterAddress, // Expected address to be canister, after ok release payments
+          transactionNat * 10 ** 10, // Expected amount
           petitionEvent.wantedChain,
           signature,
           transform,
@@ -228,9 +314,9 @@ actor {
             case (?true) { true };
             case (?false) { false };
           };
-          Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
+          Debug.print("Petiton creator paid before: " #Bool.toText(petitionCreatorPaid));
 
-          if(petitionCreatorPaid == false){
+          if (petitionCreatorPaid == false) {
             Debug.print("Paying petition creator");
             // Pay petition creator
             let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
@@ -240,14 +326,14 @@ actor {
               keyName,
               canisterAddress,
               petitionEvent.wantedAddress,
-              reward+(transactionNat*10**10),
+              reward +(transactionNat * 10 ** 10),
               publicKey,
               transform,
             );
             let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
             switch (isErrorPetitionCreator) {
               case ("") {
-                solvePetitionCreatorPaid.put(petitionInvoiceId,true);
+                solvePetitionCreatorPaid.put(petitionInvoiceId, true);
                 Debug.print("Petition creator received transfer");
               };
               case (errorValue) {
@@ -283,7 +369,7 @@ actor {
     return result;
   };
 
-  public shared (msg) func petitionEVM2LN(petitionEvent : Types.PetitionEvent,timestamp: Text) : async Text {
+  public shared (msg) func petitionEVM2LN(petitionEvent : Types.PetitionEvent, timestamp : Text) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let transactionId = petitionEvent.proofTxId;
@@ -303,32 +389,32 @@ actor {
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
     // let transactionData = await utils.getValue(txDetails, "to");
-    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
+    let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
 
     let transactionData = await utils.getValue(txDetails, "input");
 
     let paymentRequest = petitionEvent.invoiceId;
-    Debug.print("Decoding payment request sent: "#petitionEvent.invoiceId);
+    Debug.print("Decoding payment request sent: " #petitionEvent.invoiceId);
     let decodedPayReq = await LN.decodePayReq(petitionEvent.invoiceId, timestamp, transform);
     let payReqResponse = JSON.parse(decodedPayReq);
     let amountString = await utils.getValue(payReqResponse, "num_satoshis");
     let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
     Debug.print("Satoshis: " #amountString);
-    var result: Text = "";
+    var result : Text = "";
 
     // If there is no sentERC20 it is considered that he sent native coin, or if he is sending wbtc
     if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
-      if (receiverTransaction == "0x"#canisterAddress) {
+      if (receiverTransaction == "0x" #canisterAddress) {
         petitions.put(transactionId, petitionEvent);
-        petitionUsed.put(transactionId,true);
+        petitionUsed.put(transactionId, true);
         Debug.print("Petition created successfully");
-        Debug.print("isWBTC: "#Bool.toText(petitionEvent.wbtc));
-        Debug.print("sendingChain: "#petitionEvent.sendingChain);
-        Debug.print("wantedAddress: "#petitionEvent.wantedAddress);
-        Debug.print("wantedChain: "#petitionEvent.wantedChain);
-        Debug.print("wantedERC20: "#petitionEvent.wantedERC20);
-        Debug.print("sentERC20: "#petitionEvent.sentERC);
-        petitionUsed.put(transactionId,true);
+        Debug.print("isWBTC: " #Bool.toText(petitionEvent.wbtc));
+        Debug.print("sendingChain: " #petitionEvent.sendingChain);
+        Debug.print("wantedAddress: " #petitionEvent.wantedAddress);
+        Debug.print("wantedChain: " #petitionEvent.wantedChain);
+        Debug.print("wantedERC20: " #petitionEvent.wantedERC20);
+        Debug.print("sentERC20: " #petitionEvent.sentERC);
+        petitionUsed.put(transactionId, true);
         result := "Petition created successfully";
       } else {
         Debug.print("Bad transaction");
@@ -338,12 +424,12 @@ actor {
       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
       switch (decodedDataResult) {
         case (#ok((address, _))) {
-          Debug.print("Canister Address: "#canisterAddress);
-          Debug.print("ERC20 transfer data address: "#address);
-          if ("0x"#canisterAddress == address) {
+          Debug.print("Canister Address: " #canisterAddress);
+          Debug.print("ERC20 transfer data address: " #address);
+          if ("0x" #canisterAddress == address) {
             // Check if receiver of ERC20 is the canister
             petitions.put(transactionId, petitionEvent);
-            petitionUsed.put(transactionId,true);
+            petitionUsed.put(transactionId, true);
             Debug.print("Petition for ERC20 transfer created successfully");
             result := "Petition for ERC20 transfer created successfully";
           } else {
@@ -362,26 +448,27 @@ actor {
 
   public shared (msg) func solvePetitionEVM2LN(
     invoiceId : Text,
-    petitionTxId:Text,
+    petitionTxId : Text,
     proofTxId : Text,
     signature : Text,
-    destAddress: Text,
-    timestamp: Text) : async Text {
+    destAddress : Text,
+    timestamp : Text,
+  ) : async Text {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
-    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
+    let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
 
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let signerAddress = utils.publicKeyToAddress(publicKey);
     Debug.print(signerAddress);
     let petitionEvent = petitions.get(petitionTxId);
-    var result: Text = "";
-    switch(petitionEvent){
-      case(null){
+    var result : Text = "";
+    switch (petitionEvent) {
+      case (null) {
         result := "No petition event with that tx id";
       };
-      case(?petitionEvent){
+      case (?petitionEvent) {
         let requestHeaders = [
           { name = "Content-Type"; value = "application/json" },
           { name = "Accept"; value = "application/json" },
@@ -397,128 +484,128 @@ actor {
         let transactionAmount = await utils.getValue(parsedTxResult, "amount");
         let transactionData = await utils.getValue(parsedTxResult, "input");
 
-        let transactionNat: Nat = switch(petitionEvent.sendingChain){
-          case("0x1f"){
+        let transactionNat : Nat = switch (petitionEvent.sendingChain) {
+          case ("0x1f") {
             Nat64.toNat(utils.hexStringToNat64(transactionAmount));
           };
-          case(_){
+          case (_) {
             let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
-                switch(decodedDataResult) {
-                case(#ok(_, decodedAmountNat)) {
-                  Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
-                  decodedAmountNat;
+            switch (decodedDataResult) {
+              case (#ok(_, decodedAmountNat)) {
+                Debug.print("decodedAmountNat :" #Nat.toText(decodedAmountNat));
+                decodedAmountNat;
+              };
+              case (#err(err)) {
+                // Handle the error case here. You might want to log the error message
+                // and return a default value, or propagate the error up to the caller.
+                // For this example, let's just return 0.
+                Debug.print(err);
+                0;
+              };
+            };
+          };
+        };
+        try {
+
+          let paymentRequest = invoiceId;
+
+          Debug.print(paymentRequest);
+          // Verify if payment has been done to canister
+          let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
+          let payReqResponse = JSON.parse(decodedPayReq);
+          let amountString = await utils.getValue(payReqResponse, "num_satoshis");
+          let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+          let payment_hash = await utils.getValue(payReqResponse, "payment_hash");
+          Debug.print("Payment Hash: " #payment_hash);
+
+          let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
+          let parsedResponse = JSON.parse(paymentCheckResponse);
+          let isSettled = await utils.getValue(parsedResponse, "settled");
+
+          if (isSettled == falseString) {
+            Debug.print("Invoice not settled, pay invoice and try again");
+            return "Invoice not settled, pay invoice and try again";
+          };
+
+          Debug.print("Satoshis: " #amountString);
+          Debug.print("cleanAmountString: " #cleanAmountString);
+          let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
+          switch (amountCheckedOpt) {
+            case (null) {
+              result := "Failed to convert amountChecked to Nat. Skipping invoice.";
+            };
+            case (?amountChecked) {
+              let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
+                case (null) { 0 };
+                case (?value) { value };
+              };
+              // Verify if petition creator has been paid before
+              let petitionCreatorPaid : Bool = switch (solvePetitionCreatorPaid.get(petitionTxId)) {
+                case (null) { false };
+                case (?true) { true };
+                case (?false) { false };
+              };
+
+              Debug.print("Petiton creator paid before: " #Bool.toText(petitionCreatorPaid));
+              if (petitionCreatorPaid == false) {
+                Debug.print("Paying petition creator");
+                // Release ln payment to petition creator
+                let paymentResult = await LN.payInvoice(petitionEvent.invoiceId, derivationPath, keyName, timestamp, transform);
+                Debug.print(paymentResult);
+                let paymenttxDetails = JSON.parse(paymentResult);
+                let errorField = await utils.getValue(paymenttxDetails, "error");
+                let resultField = await utils.getValue(paymenttxDetails, "result");
+                let statusField = await utils.getValue(JSON.parse(resultField), "status");
+                let failureReason = await utils.getValue(JSON.parse(resultField), "failure_reason");
+
+                Debug.print(statusField);
+                // https://lightning.engineering/api-docs/api/lnd/router/send-payment-v2
+                if (Text.contains(paymentResult, #text "SUCCEEDED")) {
+                  // Save
+                  solvePetitionCreatorPaid.put(petitionTxId, true);
+                  Debug.print("Petition creator paid");
+                } else if (Text.contains(paymentResult, #text "FAILED")) {
+                  Debug.print("Payment to creator failed: " #failureReason);
+                  // Error
+                  result := "Payment to creator failed: " #failureReason;
+                  return result;
                 };
-                case(#err(err)) {
-                  // Handle the error case here. You might want to log the error message
-                  // and return a default value, or propagate the error up to the caller.
-                  // For this example, let's just return 0.
-                  Debug.print(err);
-                  0;
+
+              };
+              // Perform evm payment to petition solver
+              let transferResponse = await EVM.createAndSendTransaction(
+                petitionEvent.sendingChain,
+                petitionEvent.sentERC,
+                derivationPath,
+                keyName,
+                canisterAddress,
+                destAddress,
+                reward + transactionNat,
+                publicKey,
+                transform,
+              );
+              let isError = await utils.getValue(JSON.parse(transferResponse), "error");
+              switch (isError) {
+                case ("") {
+                  let _ = petitions.remove(petitionTxId);
+
+                  Debug.print("Petition solved");
+
+                  result := transferResponse;
+                };
+                case (errorValue) {
+                  Debug.print("Failed to transfer reward due to error: " # errorValue);
+                  result := "Failed to transfer reward";
                 };
               };
             };
           };
-          try {
+        } catch (e : Error.Error) {
+          // paidInvoicestoLN.put(invoiceId, (true, transactionNat));
+          // paidTransactions.put(transactionId, true);
 
-            let paymentRequest = invoiceId;
-
-            Debug.print(paymentRequest);
-            // Verify if payment has been done to canister
-            let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
-            let payReqResponse = JSON.parse(decodedPayReq);
-            let amountString = await utils.getValue(payReqResponse, "num_satoshis");
-            let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
-            let payment_hash = await utils.getValue(payReqResponse, "payment_hash");
-            Debug.print("Payment Hash: " #payment_hash);
-
-            let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
-            let parsedResponse = JSON.parse(paymentCheckResponse);
-            let isSettled = await utils.getValue(parsedResponse, "settled");
-
-            if (isSettled == falseString) {
-              Debug.print("Invoice not settled, pay invoice and try again");
-              return "Invoice not settled, pay invoice and try again";
-            };
-
-            Debug.print("Satoshis: " #amountString);
-            Debug.print("cleanAmountString: " #cleanAmountString);
-            let amountCheckedOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000");
-            switch (amountCheckedOpt) {
-              case (null) {
-                result := "Failed to convert amountChecked to Nat. Skipping invoice.";
-              };
-              case (?amountChecked) {
-                  let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
-                    case (null) { 0 };
-                    case (?value) { value };
-                  };
-                  // Verify if petition creator has been paid before
-                  let petitionCreatorPaid : Bool = switch (solvePetitionCreatorPaid.get(petitionTxId)) {
-                    case (null) { false };
-                    case (?true) { true };
-                    case (?false) { false };
-                  };
-                  
-                  Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
-                  if(petitionCreatorPaid == false){
-                    Debug.print("Paying petition creator");
-                    // Release ln payment to petition creator
-                    let paymentResult = await LN.payInvoice(petitionEvent.invoiceId, derivationPath, keyName, timestamp, transform);
-                    Debug.print(paymentResult);
-                    let paymenttxDetails = JSON.parse(paymentResult);
-                    let errorField = await utils.getValue(paymenttxDetails, "error");
-                    let resultField = await utils.getValue(paymenttxDetails, "result");
-                    let statusField = await utils.getValue(JSON.parse(resultField), "status");
-                    let failureReason = await utils.getValue(JSON.parse(resultField), "failure_reason");
-
-                    Debug.print(statusField);
-                    // https://lightning.engineering/api-docs/api/lnd/router/send-payment-v2
-                    if (Text.contains(paymentResult, #text "SUCCEEDED")) {
-                      // Save
-                      solvePetitionCreatorPaid.put(petitionTxId,true);
-                      Debug.print("Petition creator paid");
-                    } else if(Text.contains(paymentResult, #text "FAILED")){
-                      Debug.print("Payment to creator failed: "#failureReason);
-                      // Error
-                      result := "Payment to creator failed: "#failureReason;
-                      return result;
-                    };
-  
-                  };
-                  // Perform evm payment to petition solver
-                  let transferResponse = await EVM.createAndSendTransaction(
-                    petitionEvent.sendingChain,
-                    petitionEvent.sentERC,
-                    derivationPath,
-                    keyName,
-                    canisterAddress,
-                    destAddress,
-                    reward + transactionNat,
-                    publicKey,
-                    transform,
-                  );
-                  let isError = await utils.getValue(JSON.parse(transferResponse), "error");
-                  switch (isError) {
-                    case ("") {
-                      let _ = petitions.remove(petitionTxId);
-
-                      Debug.print("Petition solved");
-
-                      result:= transferResponse
-                    };
-                    case (errorValue) {
-                      Debug.print("Failed to transfer reward due to error: " # errorValue);
-                      result:= "Failed to transfer reward";
-                    };
-                  };
-              };
-            };
-          } catch (e : Error.Error) {
-            // paidInvoicestoLN.put(invoiceId, (true, transactionNat));
-            // paidTransactions.put(transactionId, true);
-
-            result := "Caught exception: " # Error.message(e);
-          };
+          result := "Caught exception: " # Error.message(e);
+        };
       };
     };
     result;
@@ -544,22 +631,22 @@ actor {
     let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
 
     // let transactionData = await utils.getValue(txDetails, "to");
-    let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
+    let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
 
     let transactionData = await utils.getValue(txDetails, "input");
 
     // If there is no sentERC20 it is considered that he sent native coin, or if he is sending wbtc
     if (petitionEvent.sentERC == "0" or petitionEvent.wbtc == false) {
-      if (receiverTransaction == "0x"#canisterAddress) {
+      if (receiverTransaction == "0x" #canisterAddress) {
         petitions.put(transactionId, petitionEvent);
-        petitionUsed.put(transactionId,true);
+        petitionUsed.put(transactionId, true);
         Debug.print("Petition created successfully");
-        Debug.print("isWBTC: "#Bool.toText(petitionEvent.wbtc));
-        Debug.print("sendingChain: "#petitionEvent.sendingChain);
-        Debug.print("wantedAddress: "#petitionEvent.wantedAddress);
-        Debug.print("wantedChain: "#petitionEvent.wantedChain);
-        Debug.print("wantedERC20: "#petitionEvent.wantedERC20);
-        Debug.print("sentERC20: "#petitionEvent.sentERC);
+        Debug.print("isWBTC: " #Bool.toText(petitionEvent.wbtc));
+        Debug.print("sendingChain: " #petitionEvent.sendingChain);
+        Debug.print("wantedAddress: " #petitionEvent.wantedAddress);
+        Debug.print("wantedChain: " #petitionEvent.wantedChain);
+        Debug.print("wantedERC20: " #petitionEvent.wantedERC20);
+        Debug.print("sentERC20: " #petitionEvent.sentERC);
 
         return "Petition created successfully";
       } else {
@@ -570,12 +657,12 @@ actor {
       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
       switch (decodedDataResult) {
         case (#ok((address, _))) {
-          Debug.print("Canister Address: "#canisterAddress);
-          Debug.print("ERC20 transfer data address: "#address);
-          if ("0x"#canisterAddress == address) {
+          Debug.print("Canister Address: " #canisterAddress);
+          Debug.print("ERC20 transfer data address: " #address);
+          if ("0x" #canisterAddress == address) {
             // Check if receiver of ERC20 is the canister
             petitions.put(transactionId, petitionEvent);
-            petitionUsed.put(transactionId,true);
+            petitionUsed.put(transactionId, true);
             Debug.print("Petition for ERC20 transfer created successfully");
             return "Petition for ERC20 transfer created successfully";
           } else {
@@ -602,7 +689,7 @@ actor {
         return "No petition found for this transaction";
       };
       case (?petitionEvent) {
-        let canisterAddress = await LN.getEvmAddr(derivationPath,keyName);
+        let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
 
         let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
         let reward : Nat = switch (Nat.fromText(petitionEvent.reward)) {
@@ -618,9 +705,7 @@ actor {
 
         let transactionAmount = await utils.getValue(txDetailsPetition, "value");
 
-
-
-      // Check the correct Amount depending if it was a ERC20 transaction or not
+        // Check the correct Amount depending if it was a ERC20 transaction or not
         let transactionNat : Nat = if (petitionEvent.wbtc == false or petitionEvent.sentERC == "0") {
           let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
           Nat64.toNat(transactionAmountNat64);
@@ -632,35 +717,35 @@ actor {
             case (#err(_)) { 0 };
           };
         };
-        Debug.print("Amount that needs to be sent: "#Nat.toText(transactionNat));
-        let isWBTC: Bool = switch(petitionEvent.wantedChain){
-          case("0x1f"){
+        Debug.print("Amount that needs to be sent: " #Nat.toText(transactionNat));
+        let isWBTC : Bool = switch (petitionEvent.wantedChain) {
+          case ("0x1f") {
             false;
           };
-          case(_){
+          case (_) {
             true;
           };
         };
         Debug.print("Validating transaction with parameters");
-        Debug.print("isWBTC: "#Bool.toText(isWBTC));
-        Debug.print("petitionEvent.wantedERC20: "#petitionEvent.wantedERC20);
-        Debug.print("proofTxId: "#proofTxId);
-        Debug.print("petitionEvent.wantedAddress: "#petitionEvent.wantedAddress);
-        Debug.print("transactionNat: "#Nat.toText(transactionNat));
-        Debug.print("petitionEvent.wantedChain: "#petitionEvent.wantedChain);
-        Debug.print("Canister Address: "#canisterAddress);
+        Debug.print("isWBTC: " #Bool.toText(isWBTC));
+        Debug.print("petitionEvent.wantedERC20: " #petitionEvent.wantedERC20);
+        Debug.print("proofTxId: " #proofTxId);
+        Debug.print("petitionEvent.wantedAddress: " #petitionEvent.wantedAddress);
+        Debug.print("transactionNat: " #Nat.toText(transactionNat));
+        Debug.print("petitionEvent.wantedChain: " #petitionEvent.wantedChain);
+        Debug.print("Canister Address: " #canisterAddress);
 
         let isValidTransaction = await EVM.validateTransaction(
           petitionEvent.wantedERC20,
           proofTxId,
-          "0x"#canisterAddress, // Expected address to be canister, after ok release payments
+          "0x" #canisterAddress, // Expected address to be canister, after ok release payments
           transactionNat, // Expected amount
           petitionEvent.wantedChain,
           signature,
           transform,
         );
         Debug.print("Petition event transaction validation finished");
-        if(isValidTransaction == false){
+        if (isValidTransaction == false) {
           Debug.print("Transaction Validation Failed");
         };
         Debug.print("Checking petition solve transaction");
@@ -682,10 +767,10 @@ actor {
             case (?true) { true };
             case (?false) { false };
           };
-          
-          Debug.print("Petiton creator paid before: "#Bool.toText(petitionCreatorPaid));
-          if(petitionCreatorPaid == false){
-          // Send transaction to petition creator
+
+          Debug.print("Petiton creator paid before: " #Bool.toText(petitionCreatorPaid));
+          if (petitionCreatorPaid == false) {
+            // Send transaction to petition creator
             Debug.print("Paying petition creator");
             let transferResponsePetitionCreator = await EVM.createAndSendTransaction(
               petitionEvent.wantedChain,
@@ -701,7 +786,7 @@ actor {
             let isErrorPetitionCreator = await utils.getValue(JSON.parse(transferResponsePetitionCreator), "error");
             switch (isErrorPetitionCreator) {
               case ("") {
-                solvePetitionCreatorPaid.put(petitionTxId,true);
+                solvePetitionCreatorPaid.put(petitionTxId, true);
                 Debug.print("Petition creator received transfer");
               };
               case (errorValue) {
@@ -749,8 +834,7 @@ actor {
     };
   };
 
-
-  public shared (msg) func swapLN2EVM(hexChainId : Text,wantedERC20: Text, payment_hash : Text, timestamp : Text) : async Text {
+  public shared (msg) func swapLN2EVM(hexChainId : Text, wantedERC20 : Text, payment_hash : Text, timestamp : Text) : async Text {
 
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
@@ -785,10 +869,21 @@ actor {
       return "Transaction/ Invoice is already paid";
     };
 
+    // Use the helper function to calculate the fee
+    let feeAmount = calculateFee(amount);
+    let amountAfterFee = amount - feeAmount;
+
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
-    let sendTxResponse = await EVM.swapLN2EVM(hexChainId,wantedERC20, derivationPath, keyName, amount, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
+    let sendTxResponse = await EVM.swapLN2EVM(hexChainId, wantedERC20, derivationPath, keyName, amountAfterFee, utils.subText(evm_addr, 1, evm_addr.size() - 1), transform);
 
     let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
+
+    // Accumulate the fee
+    let currentAccumulatedFees = totalAccumulatedFeesEVM.get(hexChainId);
+    let newAccumulatedFees = switch (currentAccumulatedFees) {
+      case (null) { feeAmount };
+      case (?existingAmount) { existingAmount + feeAmount };
+    };
 
     switch (isError) {
       case ("") {
@@ -811,7 +906,7 @@ actor {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
 
-    let address = await LN.getEvmAddr(derivationPath,keyName);
+    let address = await LN.getEvmAddr(derivationPath, keyName);
     return address;
   };
 
@@ -852,25 +947,25 @@ actor {
     let transactionAmount = await utils.getValue(parsedTxResult, "amount");
     let transactionData = await utils.getValue(parsedTxResult, "input");
 
-    let transactionNat: Nat = switch(transferEvent.sendingChain){
-      case("0x1f"){
+    let transactionNat : Nat = switch (transferEvent.sendingChain) {
+      case ("0x1f") {
         Nat64.toNat(utils.hexStringToNat64(transactionAmount));
       };
-      case(_){
+      case (_) {
         let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
-            switch(decodedDataResult) {
-            case(#ok(_, decodedAmountNat)) {
-              Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
-              decodedAmountNat;
-            };
-            case(#err(err)) {
-              // Handle the error case here. You might want to log the error message
-              // and return a default value, or propagate the error up to the caller.
-              // For this example, let's just return 0.
-              Debug.print(err);
-              0;
-            };
+        switch (decodedDataResult) {
+          case (#ok(_, decodedAmountNat)) {
+            Debug.print("decodedAmountNat :" #Nat.toText(decodedAmountNat));
+            decodedAmountNat;
           };
+          case (#err(err)) {
+            // Handle the error case here. You might want to log the error message
+            // and return a default value, or propagate the error up to the caller.
+            // For this example, let's just return 0.
+            Debug.print(err);
+            0;
+          };
+        };
       };
     };
     let transactionSender = await utils.getValue(parsedTxResult, "from");
@@ -884,7 +979,7 @@ actor {
       return "Wrong Signature";
     };
 
-    var result: Text = "";
+    var result : Text = "";
 
     let invoiceId = transferEvent.invoiceId;
 
@@ -942,10 +1037,151 @@ actor {
   };
 
   public query func getPetitions() : async [Types.PetitionEvent] {
-    var entries: [Types.PetitionEvent] = [];
+    var entries : [Types.PetitionEvent] = [];
     for ((_, value) in petitions.entries()) {
-      entries := Array.append(entries,[value]);
+      entries := Array.append(entries, [value]);
     };
     entries;
   };
+
+  // Add liquidity Lightning network
+
+  public shared (msg) func addLiquidityLN(payment_hash : Text, timestamp : Text) : async Text {
+    let principalId = msg.caller;
+    let paymentCheckResponse = await LN.checkInvoice(payment_hash, timestamp, transform);
+    let parsedResponse = JSON.parse(paymentCheckResponse);
+    let isSettled = await utils.getValue(parsedResponse, "settled");
+    let amountSatoshi = await utils.getValue(parsedResponse, "value");
+    let memo = await utils.getValue(parsedResponse, "memo");
+    let amount : Nat = switch (Nat.fromText(utils.subText(amountSatoshi, 1, amountSatoshi.size() - 1) # "0000000000")) {
+      case (null) { 0 };
+      case (?value) { value };
+    };
+    if (isSettled == falseString) {
+      return "Invoice not settled, pay invoice and try again";
+    };
+    if (memo != Principal.toText(principalId)) {
+      return "Invoice memo does not match your principal";
+    };
+    // Update totalLiquidityLN and liquidityProvidersLN
+    totalLiquidityLN := totalLiquidityLN + amount;
+    let currentLiquidity = liquidityProvidersLN.get(Principal.toText(principalId));
+    let newLiquidity = switch (currentLiquidity) {
+      case (null) { amount };
+      case (?existingAmount) { existingAmount + amount };
+    };
+    liquidityProvidersLN.put(Principal.toText(principalId), newLiquidity);
+    return "Liquidity added successfully";
+  };
+
+  public shared (msg) func addLiquidityEVM(txHash : Text, chainId : Text) : async Text {
+    let principalId = msg.caller;
+    let derivationPath = [Principal.toBlob(principalId)];
+    let evmAddress = await LN.getEvmAddr(derivationPath, keyName);
+    // Verify transaction
+    let resultTxDetails = await EVM.getTransactionDetails(txHash, chainId, transform);
+    let txDetails = JSON.parse(resultTxDetails);
+
+    let transactionToAddress = await utils.getValue(txDetails, "to");
+    let receiverTransaction = utils.subText(transactionToAddress, 1, transactionToAddress.size() - 1);
+    let transactionAmount = await utils.getValue(txDetails, "value");
+    let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
+    let amount = Nat64.toNat(transactionAmountNat64);
+
+    if (receiverTransaction != "0x" #evmAddress) {
+      return "Transaction receiver does not match the canister address";
+    };
+
+    // Update totalLiquidityEVM for the specified chain
+    let currentTotalLiquidity = totalLiquidityEVM.get(chainId);
+    let newTotalLiquidity = switch (currentTotalLiquidity) {
+      case (null) { amount };
+      case (?existingAmount) { existingAmount + amount };
+    };
+    totalLiquidityEVM.put(chainId, newTotalLiquidity);
+
+    // Update liquidityProvidersEVM for the specified chain
+    let chainProviders = switch (liquidityProvidersEVM.get(chainId)) {
+      case (null) {
+        let newMap = HashMap.HashMap<PrincipalIdText, Nat>(10, Text.equal, Text.hash);
+        liquidityProvidersEVM.put(chainId, newMap);
+        newMap;
+      };
+      case (?existingMap) { existingMap };
+    };
+
+    let currentLiquidity = chainProviders.get(Principal.toText(principalId));
+    let newLiquidity = switch (currentLiquidity) {
+      case (null) { amount };
+      case (?existingAmount) { existingAmount + amount };
+    };
+    chainProviders.put(Principal.toText(principalId), newLiquidity);
+
+    return "Liquidity added successfully to chain " # chainId;
+  };
+
+  //Withdraw fee
+
+  public shared (msg) func withdrawFeesLN(destinationPaymentRequest : Text, timestamp : Text) : async Text {
+    let principalId = msg.caller;
+    let providerId = Principal.toText(principalId);
+    let accumulatedFees = providerFeesLN.get(providerId);
+    switch (accumulatedFees) {
+      case (null) {
+        return "No fees to withdraw";
+      };
+      case (?amount) {
+        // Send the amount to the LP's Lightning node using the provided payment request
+        let paymentResult = await LN.payInvoice(destinationPaymentRequest, derivationPath, keyName, timestamp, transform);
+        let paymenttxDetails = JSON.parse(paymentResult);
+        let statusField = await utils.getValue(JSON.parse(paymenttxDetails), "status");
+        if (Text.contains(statusField, #text "SUCCEEDED")) {
+          providerFeesLN.remove(providerId);
+          return "Fees withdrawn successfully";
+        } else {
+          return "Failed to withdraw fees";
+        };
+      };
+    };
+  };
+
+  public shared (msg) func withdrawFeesEVM(destinationAddress : Text, chainId : Text) : async Text {
+    let principalId = msg.caller;
+    let providerId = Principal.toText(principalId);
+    let accumulatedFees = providerFeesEVM.get(providerId);
+    switch (accumulatedFees) {
+      case (null) {
+        return "No fees to withdraw";
+      };
+      case (?amount) {
+        let derivationPath = [Principal.toBlob(principalId)];
+        let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
+        let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+        // Create and send transaction to transfer fees to provider
+        let transferResponse = await EVM.createAndSendTransaction(
+          chainId,
+          "0", // Assuming native coin
+          derivationPath,
+          keyName,
+          canisterAddress,
+          destinationAddress,
+          amount,
+          publicKey,
+          transform,
+        );
+        let isError = await utils.getValue(JSON.parse(transferResponse), "error");
+        switch (isError) {
+          case ("") {
+            providerFeesEVM.remove(providerId);
+            return "Fees withdrawn successfully";
+          };
+          case (errorValue) {
+            return "Failed to withdraw fees due to error: " # errorValue;
+          };
+        };
+      };
+    };
+  };
+
 };

@@ -115,101 +115,101 @@ module {
 
   };
 
-  public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  // public func swapEVM2EVM(transferEvent : Types.TransferEvent, derivationPath : [Blob], keyName : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
 
-    let recipientAddr = transferEvent.recipientAddress;
-    let recipientChainId = transferEvent.recipientChain;
-    let sendingChainId = transferEvent.sendingChain;
-    let transactionId = transferEvent.proofTxId;
+  //   let recipientAddr = transferEvent.recipientAddress;
+  //   let recipientChainId = transferEvent.recipientChain;
+  //   let sendingChainId = transferEvent.sendingChain;
+  //   let transactionId = transferEvent.proofTxId;
 
-    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+  //   let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-    let canisterAddress = utils.publicKeyToAddress(publicKey);
+  //   let canisterAddress = utils.publicKeyToAddress(publicKey);
 
-    Debug.print("Recipient address: 0x" # recipientAddr);
-    Debug.print("recipientChainId " # recipientChainId);
-    Debug.print("sendingChainId " # sendingChainId);
+  //   Debug.print("Recipient address: 0x" # recipientAddr);
+  //   Debug.print("recipientChainId " # recipientChainId);
+  //   Debug.print("sendingChainId " # sendingChainId);
 
-    if (canisterAddress == "") {
-      Debug.print("Could not get address!");
-      return "";
-    } else {
-      Debug.print("Canister Address: 0x" # canisterAddress);
-    };
+  //   if (canisterAddress == "") {
+  //     Debug.print("Could not get address!");
+  //     return "";
+  //   } else {
+  //     Debug.print("Canister Address: 0x" # canisterAddress);
+  //   };
 
-    //We will check the transactionId on the sendingChain to see if he sent any money
+  //   //We will check the transactionId on the sendingChain to see if he sent any money
 
-    // Fetch transaction details using transactionId
-    let resultTxDetails = await getTransactionDetails(transactionId, transferEvent.sendingChain, transform);
-    let txDetails = JSON.parse(resultTxDetails);
+  //   // Fetch transaction details using transactionId
+  //   let resultTxDetails = await getTransactionDetails(transactionId, transferEvent.sendingChain, transform);
+  //   let txDetails = JSON.parse(resultTxDetails);
 
-    let transactionAmount = await utils.getValue(txDetails, "value");
-    Debug.print("transactionAmount  " # transactionAmount);
-    let transactionData = await utils.getValue(txDetails, "input");
+  //   let transactionAmount = await utils.getValue(txDetails, "value");
+  //   Debug.print("transactionAmount  " # transactionAmount);
+  //   let transactionData = await utils.getValue(txDetails, "input");
 
-    let transactionNat: Nat = switch(sendingChainId){
-      case("0x1f"){
-        Nat64.toNat(utils.hexStringToNat64(transactionAmount));
-      };
-      case(_){
-        let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
-            switch(decodedDataResult) {
-            case(#ok(_, decodedAmountNat)) {
-              Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
-              decodedAmountNat;
-            };
-            case(#err(err)) {
-              // Handle the error case here. You might want to log the error message
-              // and return a default value, or propagate the error up to the caller.
-              // For this example, let's just return 0.
-              Debug.print(err);
-              0;
-            };
-          };
-      };
-    };
-
-
+  //   let transactionNat: Nat = switch(sendingChainId){
+  //     case("0x1f"){
+  //       Nat64.toNat(utils.hexStringToNat64(transactionAmount));
+  //     };
+  //     case(_){
+  //       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
+  //           switch(decodedDataResult) {
+  //           case(#ok(_, decodedAmountNat)) {
+  //             Debug.print("decodedAmountNat :"#Nat.toText(decodedAmountNat));
+  //             decodedAmountNat;
+  //           };
+  //           case(#err(err)) {
+  //             // Handle the error case here. You might want to log the error message
+  //             // and return a default value, or propagate the error up to the caller.
+  //             // For this example, let's just return 0.
+  //             Debug.print(err);
+  //             0;
+  //           };
+  //         };
+  //     };
+  //   };
 
 
-    Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
-
-    Debug.print("Checking WBTC address sent: "#transferEvent.sentERC20);
-
-    let validTransaction = await validateTransaction(
-      transferEvent.sentERC20,
-      transactionId,
-      "0x"#canisterAddress,
-      transactionNat,
-      transferEvent.sendingChain,
-      transferEvent.signature,
-      transform
-    );
 
 
-    if(validTransaction == false){
-      Debug.print("Transaction does not match the criteria");
-      throw Error.reject("Error: Not valid transaction");
-    };
+  //   Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
 
-    Debug.print("Transaction validaded, processing payment");
-    Debug.print("Checking WBTC address to receive: "#transferEvent.wantedERC20);
-    Debug.print("recipientChainId: "#recipientChainId);
-    Debug.print("Sending payment");
+  //   Debug.print("Checking WBTC address sent: "#transferEvent.sentERC20);
 
-    return await createAndSendTransaction(
-      recipientChainId,
-      transferEvent.wantedERC20,
-      derivationPath,
-      keyName,
-      canisterAddress,
-      recipientAddr,
-      transactionNat,
-      publicKey,
-      transform,
-    );
+  //   let validTransaction = await validateTransaction(
+  //     transferEvent.sentERC20,
+  //     transactionId,
+  //     "0x"#canisterAddress,
+  //     transactionNat,
+  //     transferEvent.sendingChain,
+  //     transferEvent.signature,
+  //     transform
+  //   );
 
-  };
+
+  //   if(validTransaction == false){
+  //     Debug.print("Transaction does not match the criteria");
+  //     throw Error.reject("Error: Not valid transaction");
+  //   };
+
+  //   Debug.print("Transaction validaded, processing payment");
+  //   Debug.print("Checking WBTC address to receive: "#transferEvent.wantedERC20);
+  //   Debug.print("recipientChainId: "#recipientChainId);
+  //   Debug.print("Sending payment");
+
+  //   return await createAndSendTransaction(
+  //     recipientChainId,
+  //     transferEvent.wantedERC20,
+  //     derivationPath,
+  //     keyName,
+  //     canisterAddress,
+  //     recipientAddr,
+  //     transactionNat,
+  //     publicKey,
+  //     transform,
+  //   );
+
+  // };
 
   public func swapLN2EVM(hexChainId : Text,wantedERC20: Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
