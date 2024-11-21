@@ -1,23 +1,42 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
+import { InfoCircledIcon } from "@radix-ui/react-icons";
+
 import { ethers } from 'ethers';
 import ERC20ABI from '../../assets/contracts/abis/erc20Abi.json'; 
 import { main } from "../../../declarations/main";
 
-const EvmToEvm = ({
-  coinbase,
-  netId,
-  provider,
-  canisterAddr,
-  loadWeb3Modal,
-  chains
-}) => {
+import { AppContext } from '../AppContext';
+
+import TransactionsList from "../components/TransactionsList";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../components/ui/Alert"
+const EvmToEvm = () => {
+  const [searchParams] = useSearchParams();
+
+  const { 
+    netId,
+    coinbase,
+    provider,
+    canisterAddr,
+    loadWeb3Modal,
+    chains,
+    EXPLORER_BASEURL,
+    evm_address,
+    evm_txHash,
+    setEvmTxHash,
+    processing,
+    setProcessing,
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState();
-  const [evm_txHash, setEvmTxHash] = useState();
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState();
-  const [amount, setAmount] = useState();
-  const [EXPLORER_BASEURL, setExplorerBaseUrl] = useState("https://explorer.testnet.rsk.co/tx/");
+  const [amount, setAmount] = useState('');
+  const [originChain, setOriginChain] = useState('');
+  const [destinationChain, setDestinationChain] = useState('');
 
   const sendTxHash = async () => {
     setProcessing(true);
@@ -67,6 +86,7 @@ const EvmToEvm = ({
       const signer = await provider.getSigner();
       setMessage(`Sending token to ${canisterAddr}`);
       let tx;
+      setEvmTxHash();
       if (Number(netId) === 31) {
         tx = await signer.sendTransaction({
           to: `0x${canisterAddr}`,
@@ -79,9 +99,18 @@ const EvmToEvm = ({
       }
       console.log("Transaction sent:", tx.hash);
       setMessage(<>Tx sent: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a></>);
+      const  previousSwaps = localStorage.getItem('EvmToEvm_previousSwaps') ? JSON.parse(localStorage.getItem('EvmToEvm_previousSwaps')) : [];
+      console.log(previousSwaps)
+      previousSwaps.unshift(JSON.stringify({
+        txHash: tx.hash,
+        netId: tx.chainId.toString(),
+        chain: tx.chain
+      }));
+      console.log(previousSwaps)
+      localStorage.setItem('EvmToEvm_previousSwaps',JSON.stringify(previousSwaps));
+      setEvmTxHash(tx.hash);
       await tx.wait();
       setMessage(<>Tx confirmed: <a href={`${EXPLORER_BASEURL}${tx.hash}`} target="_blank">{tx.hash}</a>, generate invoice and ask payment</>);
-      setEvmTxHash(tx.hash);
     } catch (err) {
       console.log(err)
       setMessage(err.message);
@@ -93,82 +122,45 @@ const EvmToEvm = ({
   };
 
   useEffect(() => {
-    if (netId === 31) {
-      setExplorerBaseUrl("https://explorer.testnet.rsk.co/tx/");
-    } else {
-      setExplorerBaseUrl("https://sepolia.etherscan.io/tx/");
+    const urlAmount = searchParams.get('amount');
+    const urlDestinationChain = searchParams.get('destinationChain');
+    const urlOriginChain = searchParams.get('originChain');
+    setAmount(urlAmount);
+    setDestinationChain(urlDestinationChain);
+    setChain(urlDestinationChain);
+    setOriginChain(urlOriginChain);
+    if(urlOriginChain && coinbase && netId){
+      if(Number(JSON.parse(urlOriginChain).chainId) !== Number(netId)){
+        alert("wrong network, making metamask change network")
+      }
     }
-  }, [netId]);
-
-  useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
-
-  useEffect(() => {
-    if (chains) {
-      const initialChain = JSON.stringify(
-        {
-          rpc: chains[0].rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"))[0],
-          chainId: chains[0].chainId,
-          name: chains[0].name
-        }
-      );
-      setChain(initialChain);
-    }
-  }, [chains]);
+  },[]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">EVM to EVM Swap</h1>
 
       {/* Step 1 */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 1: Select recipient and EVM compatible chain</h2>
-        <label className="block mb-2">EVM Recipient Address</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={evm_address}
-          onChange={(ev) => setEvmAddr(ev.target.value)}
-          placeholder="Enter EVM address"
-        />
-        <label className="block mb-2">Select Destiny Chain</label>
-        <select
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          onChange={(ev) => setChain(ev.target.value)}
-        >
-          {
-            chains.map(item => (
-              <option key={item.chainId} value={JSON.stringify(
-                {
-                  rpc: item.rpc.filter(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}"))[0],
-                  chainId: item.chainId,
-                  name: item.name
-                }
-              )}>{item.name}</option>
-            ))
-          }
-        </select>
+        <h2 className="text-xl font-semibold mb-4">Step 1: Send token to 0x{canisterAddr}</h2>
         {
-          chain &&
-          <>
-            <p>Bridging to {JSON.parse(chain).name}</p>
-            <p>ChainId {JSON.parse(chain).chainId}</p>
-          </>
+        originChain &&
+        <p className="text-sm text-gray-600">
+            Bridging from <strong>{JSON.parse(originChain).name}</strong> (Chain ID: {JSON.parse(originChain).chainId})
+        </p>
         }
-      </div>
-
-      {/* Step 2 */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 2: Send token to 0x{canisterAddr}</h2>
-        <label className="block mb-2">Amount in satoshis</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={amount}
-          onChange={(ev) => setAmount(ev.target.value)}
-          placeholder="Satoshis"
-        />
+        {
+        destinationChain &&
+        <p className="text-sm text-gray-600">
+            Bridging to <strong>{JSON.parse(destinationChain).name}</strong> (Chain ID: {JSON.parse(destinationChain).chainId})
+        </p>
+        }
+        {
+        amount &&
+        <p className="text-sm text-gray-600">
+            Amount: {amount} satoshis
+        </p>
+        }
         {
           !coinbase ?
             <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={loadWeb3Modal}>Connect Wallet</button> :
@@ -179,28 +171,40 @@ const EvmToEvm = ({
       </div>
 
       {/* Step 3 */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Step 3: Input evm transaction hash</h2>
-        <label className="block mb-2">Transaction Hash</label>
-        <input
-          className="w-full p-2 border border-gray-300 rounded mb-4"
-          value={evm_txHash}
-          onChange={(ev) => setEvmTxHash(ev.target.value)}
-          placeholder="Transaction Hash"
-        />
-        {
-          !processing ?
-            <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={sendTxHash}>Finalize swap</button> :
-            <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
-        }
-      </div>
+      {
+        evm_txHash &&
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-4">Step 2: Input evm transaction hash</h2>
+          <label className="block mb-2">Transaction Hash</label>
+          <input
+            className="w-full p-2 border border-gray-300 rounded mb-4"
+            value={evm_txHash}
+            onChange={(ev) => setEvmTxHash(ev.target.value)}
+            placeholder="Transaction Hash"
+          />
+          {
+            !processing ?
+              <button className="w-full p-2 mt-2 bg-blue-500 text-white rounded" onClick={sendTxHash}>Finalize swap</button> :
+              <button className="w-full p-2 mt-2 bg-gray-400 text-white rounded" disabled>Wait current process</button>
+          }
+        </div>
+      }
 
       {/* Message Display */}
       {message && (
-        <div className="p-3 rounded mt-3 break-all bg-blue-100 text-blue-700">
-          {message}
-        </div>
+        <Alert variant="info">
+          <InfoCircledIcon className="h-4 w-4" />
+          <AlertTitle>Info</AlertTitle>
+          <AlertDescription>
+            {message}
+          </AlertDescription>
+        </Alert>
       )}
+      <TransactionsList 
+        name={'EvmToEvm'}
+        netId={netId}
+        setEvmTxHash={setEvmTxHash}
+      />
     </div>
   );
 };

@@ -1,14 +1,35 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext,useState, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
+import { InfoCircledIcon } from "@radix-ui/react-icons";
+
 import { ethers } from 'ethers';
 import { main } from "../../../declarations/main";
 
-const LightningToEvm = ({ chains, coinbase }) => {
+import { AppContext } from '../AppContext';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "../components/ui/Alert"
+
+const LightningToEvm = () => {
+  const [searchParams] = useSearchParams();
+
+  const { 
+    chains,
+    processing,
+    setProcessing,
+    evm_address,
+    setEvmAddr,
+  } = useContext(AppContext);
+
   const [message, setMessage] = useState('');
-  const [processing, setProcessing] = useState(false);
   const [amount, setAmount] = useState('');
+  const [originChain, setOriginChain] = useState('');
+  const [destinationChain, setDestinationChain] = useState('');
+  
   const [r_hash, setPaymentHash] = useState('');
   const [invoiceToPay, setInvoiceToPay] = useState('');
-  const [evm_address, setEvmAddr] = useState('');
   const [chain, setChain] = useState('');
   const [alertSeverity, setAlertSeverity] = useState('info');
 
@@ -64,24 +85,17 @@ const LightningToEvm = ({ chains, coinbase }) => {
   };
 
   useEffect(() => {
-    if (coinbase) {
-      setEvmAddr(coinbase);
-    }
-  }, [coinbase]);
-
-  useEffect(() => {
-    if (chains && chains.length > 0) {
-      const initialChain = JSON.stringify({
-        rpc: chains[0].rpc.find(rpcUrl => !rpcUrl.includes("${INFURA_API_KEY}")),
-        chainId: chains[0].chainId,
-        name: chains[0].name,
-      });
-      setChain(initialChain);
-    }
-  }, [chains]);
+    const urlAmount = searchParams.get('amount');
+    const urlDestinationChain = searchParams.get('destinationChain');
+    const urlOriginChain = searchParams.get('originChain');
+    setAmount(urlAmount);
+    setDestinationChain(urlDestinationChain);
+    setChain(urlDestinationChain);
+    setOriginChain(urlOriginChain);
+  },[]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold text-center mb-6">Lightning to EVM Swap</h1>
 
       {/* Step 1 */}
@@ -156,10 +170,9 @@ const LightningToEvm = ({ chains, coinbase }) => {
           {processing ? 'Loading...' : 'Check Invoice'}
         </button>
       </div>
-
       {/* Message Display */}
       {message && (
-        <div className={`p-3 rounded mt-3 break-all ${alertSeverity === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        <div className={`p-3 rounded mt-3 break-all ${alertSeverity === 'success' ? 'bg-green-100 text-green-700' : alertSeverity === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-gray-700'}`}>
           {message}
         </div>
       )}

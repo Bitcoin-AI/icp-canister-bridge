@@ -1,6 +1,17 @@
 import React from 'react';
 import { render } from "react-dom";
+import { HashRouter as Router } from 'react-router-dom';
+import { AppProvider } from './AppContext';
 import App from './App';
-import './input.css'; // Import the Tailwind CSS file
+import './input.css';
 
-render(<App />, document.getElementById("app"));
+render(
+  <React.StrictMode>
+    <AppProvider>
+      <Router>
+        <App />
+      </Router>
+    </AppProvider>
+  </React.StrictMode>,
+  document.getElementById("app")
+);
