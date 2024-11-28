@@ -38,8 +38,11 @@ actor {
   let providerFeesEVM = HashMap.HashMap<ChainId, HashMap.HashMap<PrincipalIdText, Nat>>(10, Text.equal, Text.hash);
 
   var totalAccumulatedFeesLN : Nat = 0;
+  let totalAccumulatedFeesEVM = HashMap.HashMap<ChainId, Nat>(10, Text.equal, Text.hash);
 
   let keyName = "dfx_test_key"; // this is for local network
+
+  let userLastAccumulatedFeesEVM = HashMap.HashMap<ChainId, HashMap.HashMap<PrincipalIdText, Nat>>(10, Text.equal, Text.hash);
 
   //let keyName = "test_key_1"; //This is for IC network
 
@@ -67,6 +70,10 @@ actor {
       ];
     };
     transformed;
+  };
+
+  func calculateFee(amount : Nat) : Nat {
+    return amount * feePercentage / 100;
   };
 
   type JSONField = (Text, JSON.JSON);
@@ -99,26 +106,31 @@ actor {
 
     let isPaid = paidTransactions.get(transactionId);
 
-    let isPaidBoolean : Bool = switch (isPaid) {
-      case (null) { false };
-      case (?true) { true };
-      case (?false) { false };
-    };
+    // let isPaidBoolean : Bool = switch (isPaid) {
+    //   case (null) { false };
+    //   case (?true) { true };
+    //   case (?false) { false };
+    // };
 
-    if (isPaidBoolean) {
-      return "Transaction/ Invoice is already paid";
-    };
+    // if (isPaidBoolean) {
+    //   return "Transaction/ Invoice is already paid";
+    // };
 
     // Fetch the transaction details from the sending chain
     let resultTxDetails = await EVM.getTransactionDetails(transactionId, transferEvent.sendingChain, transform);
+    Debug.print("resultTxDetails: " #resultTxDetails); // Debug message
+
+   
     let txDetails = JSON.parse(resultTxDetails);
 
     let transactionAmount = await utils.getValue(txDetails, "value");
     let transactionData = await utils.getValue(txDetails, "input");
 
+    Debug.print("transactionAmount: " #transactionAmount); // Debug message
+
     var transactionNat : Nat = 0;
 
-    if (transferEvent.sentERC == "0") {
+    if (transferEvent.sentERC20 == "0") {
       // Comparison uses '=='
       // Native token transfer
       let transactionAmountNat64 = utils.hexStringToNat64(transactionAmount);
@@ -138,16 +150,26 @@ actor {
     };
 
     let feeAmount = calculateFee(transactionNat);
-    let amountAfterFee = transactionNat - feeAmount;
+
+    Debug.print("transactionNat: " #Nat.toText(transactionNat)); // Debug message
+
+    Debug.print("feeAmount: " # Nat.toText(feeAmount)); // Debug message
+
+    let amountAfterFee = Nat.sub(transactionNat, feeAmount);
 
     // Accumulate the fee for the  wanted chain (the chain the funds are going to)
-    let chainId = transferEvent.wantedChain;
+    let chainId = transferEvent.recipientChain;
 
     let currentAccumulatedFees = totalAccumulatedFeesEVM.get(chainId);
     let newAccumulatedFees = switch (currentAccumulatedFees) {
       case (null) { feeAmount };
       case (?existingAmount) { existingAmount + feeAmount };
     };
+
+    Debug.print("newAccoumulated fees: " # Nat.toText(newAccumulatedFees)); // Debug message
+
+    Debug.print("chainId: " # chainId); // Debug message
+
     totalAccumulatedFeesEVM.put(chainId, newAccumulatedFees);
 
     // Perform swap from Lightning Network to EVM or to Any other EVM compatible chain to another EVM
@@ -162,8 +184,8 @@ actor {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     // Prepare the transfer parameters
-    let sendingChainId = transferEvent.wantedChain; // The chain we're sending to
-    let destinationAddress = transferEvent.wantedAddress;
+    let sendingChainId = transferEvent.recipientChain; // The chain we're sending to
+    let destinationAddress = transferEvent.recipientAddress;
     let tokenAddress = transferEvent.wantedERC20; // The token to send; "0" for native coin
 
     // Create and send the transaction
@@ -179,9 +201,8 @@ actor {
       transform,
     );
 
-
     //Handle the error
-    let isError = await utils.getValue(JSON.parse(sendTxResponse), "error");
+    let isError = await utils.getValue(JSON.parse(transferResponse), "error");
 
     switch (isError) {
       case ("") {
@@ -192,7 +213,7 @@ actor {
       };
     };
 
-    return sendTxResponse;
+    return transferResponse;
   };
 
   public shared (msg) func petitionLN2EVM(petitionEvent : Types.PetitionEvent, payment_hash : Text, timestamp : Text) : async Text {
@@ -1078,6 +1099,9 @@ actor {
     let principalId = msg.caller;
     let derivationPath = [Principal.toBlob(principalId)];
     let evmAddress = await LN.getEvmAddr(derivationPath, keyName);
+
+    Debug.print("evmAddress" #evmAddress);
+
     // Verify transaction
     let resultTxDetails = await EVM.getTransactionDetails(txHash, chainId, transform);
     let txDetails = JSON.parse(resultTxDetails);
@@ -1120,67 +1144,274 @@ actor {
     return "Liquidity added successfully to chain " # chainId;
   };
 
-  //Withdraw fee
+  //Withdraw fee LN TODO:
 
-  public shared (msg) func withdrawFeesLN(destinationPaymentRequest : Text, timestamp : Text) : async Text {
-    let principalId = msg.caller;
-    let providerId = Principal.toText(principalId);
-    let accumulatedFees = providerFeesLN.get(providerId);
-    switch (accumulatedFees) {
-      case (null) {
-        return "No fees to withdraw";
-      };
-      case (?amount) {
-        // Send the amount to the LP's Lightning node using the provided payment request
-        let paymentResult = await LN.payInvoice(destinationPaymentRequest, derivationPath, keyName, timestamp, transform);
-        let paymenttxDetails = JSON.parse(paymentResult);
-        let statusField = await utils.getValue(JSON.parse(paymenttxDetails), "status");
-        if (Text.contains(statusField, #text "SUCCEEDED")) {
-          providerFeesLN.remove(providerId);
-          return "Fees withdrawn successfully";
-        } else {
-          return "Failed to withdraw fees";
-        };
-      };
-    };
-  };
+  // public shared func withdrawFeesLN(providerId : Text, destinationPaymentRequest : Text, timestamp : Text) : async Text {
+
+  //   // No need to get the principal ID
+  //   // let principalId = msg.caller;
+
+  //   // No need to derive the derivation path from the principal ID
+  //   // let derivationPath = [Principal.toBlob(principalId)];
+
+  //   // Retrieve the provider's accumulated fees
+
+  //   let accumulatedFeesOpt = providerFeesLN.get(providerId);
+  //   let accumulatedFees : Nat = switch (accumulatedFeesOpt) {
+  //     case (null) { 0 };
+  //     case (?amount) { amount };
+  //   };
+
+  //   // Retrieve the provider's liquidity amount
+  //   let providerLiquidityOpt = liquidityProvidersLN.get(providerId);
+  //   let providerLiquidity : Nat = switch (providerLiquidityOpt) {
+  //     case (null) { 0 };
+  //     case (?amount) { amount };
+  //   };
+
+  //   // Total amount available to withdraw
+  //   let totalAmount : Nat = accumulatedFees + providerLiquidity;
+
+  //   if (totalAmount == 0) {
+  //     return "No fees or liquidity to withdraw";
+  //   };
+
+  //   // Decode the payment request to get the invoice amount
+  //   let paymentRequest = utils.trim(destinationPaymentRequest);
+  //   Debug.print("Payment Request: " # paymentRequest);
+  //   let decodedPayReq = await LN.decodePayReq(paymentRequest, timestamp, transform);
+  //   let payReqResponse = JSON.parse(decodedPayReq);
+
+  //   // Extract the amount in satoshis
+  //   let amountStringOpt = await utils.getValue(payReqResponse, "num_satoshis");
+  //   let amountString = switch (amountStringOpt) {
+  //     case (null) { return "Failed to retrieve invoice amount" };
+  //     case (?value) { value };
+  //   };
+  //   let cleanAmountString = utils.subText(amountString, 1, amountString.size() - 1);
+  //   Debug.print("Invoice Amount (satoshis): " # cleanAmountString);
+
+  //   // Convert the amount to Nat (satoshis)
+  //   let invoiceAmountOpt : ?Nat = Nat.fromText(cleanAmountString # "0000000000"); // Multiply by 10^10 to match units
+  //   let invoiceAmount = switch (invoiceAmountOpt) {
+  //     case (null) { return "Failed to parse invoice amount" };
+  //     case (?value) { value };
+  //   };
+
+  //   // Check if the invoice amount exceeds the total amount available
+  //   if (invoiceAmount > totalAmount) {
+  //     return "Invoice amount exceeds the total amount available to withdraw";
+  //   };
+
+  //   // Proceed to pay the invoice
+  //   // Since we don't have the principal ID, we'll use a default derivation path and key
+  //   let derivationPath = []; // Empty derivation path for canister's default key
+  //   let keyName = "canister_key"; // Replace with your actual key name
+
+  //   let paymentResult = await LN.payInvoice(paymentRequest, derivationPath, keyName, timestamp, transform);
+  //   Debug.print("Payment Result: " # paymentResult);
+  //   let paymenttxDetails = JSON.parse(paymentResult);
+
+  //   // Extract the payment status
+  //   let statusFieldOpt = await utils.getValue(paymenttxDetails, "status");
+  //   let statusField = switch (statusFieldOpt) {
+  //     case (null) { return "Failed to retrieve payment status" };
+  //     case (?jsonValue) {
+  //       switch (jsonValue) {
+  //         case (JSON.Text(statusText)) { statusText };
+  //         case (_) { return "Payment status is not a text value" };
+  //       };
+  //     };
+  //   };
+
+  //   // Check if the payment was successful
+  //   if (Text.contains(statusField, #text "SUCCEEDED")) {
+  //     // Deduct the invoice amount from the provider's accumulated fees and liquidity
+  //     var remainingAmount = invoiceAmount;
+  //     var feesToDeduct = 0;
+  //     var liquidityToDeduct = 0;
+
+  //     if (accumulatedFees >= remainingAmount) {
+  //       feesToDeduct := remainingAmount;
+  //       remainingAmount := 0;
+  //     } else {
+  //       feesToDeduct := accumulatedFees;
+  //       remainingAmount := remainingAmount - accumulatedFees;
+  //     };
+
+  //     if (remainingAmount > 0) {
+  //       // Deduct the rest from the provider's liquidity
+  //       if (providerLiquidity >= remainingAmount) {
+  //         liquidityToDeduct := remainingAmount;
+  //         remainingAmount := 0;
+  //       } else {
+  //         liquidityToDeduct := providerLiquidity;
+  //         remainingAmount := remainingAmount - providerLiquidity;
+  //       };
+  //     };
+
+  //     // Update the provider's accumulated fees and liquidity
+  //     if (feesToDeduct == accumulatedFees) {
+  //       providerFeesLN.remove(providerId);
+  //     } else {
+  //       providerFeesLN.put(providerId, accumulatedFees - feesToDeduct);
+  //     };
+
+  //     if (liquidityToDeduct == providerLiquidity) {
+  //       liquidityProvidersLN.remove(providerId);
+  //     } else {
+  //       liquidityProvidersLN.put(providerId, providerLiquidity - liquidityToDeduct);
+  //     };
+
+  //     // Update total liquidity and accumulated fees
+  //     totalAccumulatedFeesLN := totalAccumulatedFeesLN - feesToDeduct;
+  //     totalLiquidityLN := totalLiquidityLN - liquidityToDeduct;
+
+  //     return "Fees and liquidity withdrawn successfully";
+  //   } else {
+  //     return "Failed to withdraw fees and liquidity";
+  //   };
+  // };
 
   public shared (msg) func withdrawFeesEVM(destinationAddress : Text, chainId : Text) : async Text {
-    let principalId = msg.caller;
-    let providerId = Principal.toText(principalId);
-    let accumulatedFees = providerFeesEVM.get(providerId);
-    switch (accumulatedFees) {
-      case (null) {
-        return "No fees to withdraw";
-      };
-      case (?amount) {
-        let derivationPath = [Principal.toBlob(principalId)];
-        let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
-        let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
-        // Create and send transaction to transfer fees to provider
-        let transferResponse = await EVM.createAndSendTransaction(
-          chainId,
-          "0", // Assuming native coin
-          derivationPath,
-          keyName,
-          canisterAddress,
-          destinationAddress,
-          amount,
-          publicKey,
-          transform,
-        );
-        let isError = await utils.getValue(JSON.parse(transferResponse), "error");
-        switch (isError) {
-          case ("") {
-            providerFeesEVM.remove(providerId);
-            return "Fees withdrawn successfully";
-          };
-          case (errorValue) {
-            return "Failed to withdraw fees due to error: " # errorValue;
-          };
-        };
+    let principalId = msg.caller;
+
+    let derivationPath = [Principal.toBlob(principalId)];
+    // Logging
+    Debug.print("withdrawFeesEVM called with:");
+    Debug.print("  destinationAddress: " # destinationAddress);
+    Debug.print("  chainId: " # chainId);
+    Debug.print("  principalId: " # Principal.toText(principalId));
+
+    // Get total accumulated fees for the chain
+    let totalFeesOpt = totalAccumulatedFeesEVM.get(chainId);
+    let totalFees = switch (totalFeesOpt) {
+      case (null) {
+        return "No fees accumulated for chain " # chainId;
       };
+      case (?fees) { fees };
+    };
+
+    Debug.print("Total accumulated fees for chain " # chainId # ": " # Nat.toText(totalFees));
+
+    // Get total liquidity for the chain
+    let totalLiquidityOpt = totalLiquidityEVM.get(chainId);
+    let totalLiquidity = switch (totalLiquidityOpt) {
+      case (null) {
+        return "No liquidity provided for chain " # chainId;
+      };
+      case (?liq) { liq };
+    };
+
+    Debug.print("Total liquidity for chain " # chainId # ": " # Nat.toText(totalLiquidity));
+
+    if (totalLiquidity == 0) {
+      return "Total liquidity for chain " # chainId # " is zero. Cannot compute fees.";
+    };
+
+    // Get user's liquidity for the chain
+    let chainLiquidityProvidersOpt = liquidityProvidersEVM.get(chainId);
+    let chainLiquidityProviders = switch (chainLiquidityProvidersOpt) {
+      case (null) {
+        return "No liquidity providers for chain " # chainId;
+      };
+      case (?providers) { providers };
+    };
+
+    let userLiquidityOpt = chainLiquidityProviders.get(Principal.toText(principalId));
+    let userLiquidity = switch (userLiquidityOpt) {
+      case (null) {
+        return "You have not provided liquidity for chain " # chainId;
+      };
+      case (?liq) { liq };
+    };
+
+    Debug.print("User's liquidity for chain " # chainId # ": " # Nat.toText(userLiquidity));
+
+    // Get user's last accumulated fees for the chain
+    let chainUserLastFeesOpt = userLastAccumulatedFeesEVM.get(chainId);
+    let chainUserLastFees = switch (chainUserLastFeesOpt) {
+      case (null) {
+        // Initialize empty map for this chain
+        let newMap = HashMap.HashMap<PrincipalIdText, Nat>(10, Text.equal, Text.hash);
+        userLastAccumulatedFeesEVM.put(chainId, newMap);
+        newMap;
+      };
+      case (?map) { map };
+    };
+
+    let userLastAccumulatedFeesOpt = chainUserLastFees.get(destinationAddress);
+    let userLastAccumulatedFees = switch (userLastAccumulatedFeesOpt) {
+      case (null) { 0 };
+      case (?fees) { fees };
+    };
+
+    Debug.print("User's last accumulated fees for chain " # chainId # ": " # Nat.toText(userLastAccumulatedFees));
+
+    // Compute deltaFees
+    let deltaFees = Nat.sub(totalFees, userLastAccumulatedFees);
+
+    if (deltaFees == 0) {
+      return "No new fees to withdraw";
+    };
+
+    Debug.print("Delta fees since last withdrawal: " # Nat.toText(deltaFees));
+
+    // Compute user's share
+    let userShare = (userLiquidity * deltaFees) / totalLiquidity;
+
+    Debug.print("Computed userShare: " # Nat.toText(userShare));
+
+    if (userShare == 0) {
+      return "No fees to withdraw";
+    };
+
+
+    let canisterAddress = await LN.getEvmAddr(derivationPath, keyName);
+    Debug.print("Canister EVM Address: " # canisterAddress);
+
+    let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
+
+    // Create and send transaction to transfer fees to provider
+    Debug.print("Creating and sending transaction with the following parameters:");
+    Debug.print("  chainId: " # chainId);
+    Debug.print("  erc20: 0"); // Assuming native coin
+    Debug.print("  keyName: " # keyName);
+    Debug.print("  canisterAddress: " # canisterAddress);
+    Debug.print("  destinationAddress: " # destinationAddress);
+    Debug.print("  amount: " # Nat.toText(userShare));
+
+    let transferResponse = await EVM.createAndSendTransaction(
+      chainId,
+      "0", // Assuming native coin
+      derivationPath,
+      keyName,
+      canisterAddress,
+      destinationAddress,
+      userShare,
+      publicKey,
+      transform,
+    );
+
+    Debug.print("Transfer Response: " # transferResponse);
+
+    // Parse the transfer response
+    let transferResponseJson = JSON.parse(transferResponse);
+
+    // Get the 'error' field from the response
+    let isError = await utils.getValue(transferResponseJson, "error");
+    Debug.print("isError: " # isError);
+
+    if (isError == "") {
+      // Success case
+      // Update user's last accumulated fees
+      chainUserLastFees.put(Principal.toText(principalId), totalFees);
+
+      return "Fees withdrawn successfully";
+    } else {
+      // Error case
+      return "Failed to withdraw fees due to error: " # isError;
     };
   };
 

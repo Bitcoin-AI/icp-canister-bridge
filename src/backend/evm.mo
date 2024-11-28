@@ -41,7 +41,7 @@ module {
   public func validateTransaction(wantedERC20 : Text, transactionId : Text, expectedAddress : Text, expectedAmount : Nat, chainId : Text, signature : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Bool {
 
     // Fetch TransactionDetails
-    Debug.print("Validating transaction "#transactionId#" for chainId "#chainId);
+    Debug.print("Validating transaction " #transactionId # " for chainId " #chainId);
     let resultTxDetails = await getTransactionDetails(transactionId, chainId, transform);
     let txDetails = JSON.parse(resultTxDetails);
 
@@ -60,10 +60,10 @@ module {
 
     if ((wantedERC20 == "0")) {
       Debug.print("Validating direct value transfer");
-      Debug.print("Receiver Transaction: "#receiverTransaction);
-      Debug.print("Expected address: "#expectedAddress);
-      Debug.print("Expected Amount: "#Nat.toText(expectedAmount));
-      Debug.print("Transaction Nat: "#Nat.toText(transactionNat));
+      Debug.print("Receiver Transaction: " #receiverTransaction);
+      Debug.print("Expected address: " #expectedAddress);
+      Debug.print("Expected Amount: " #Nat.toText(expectedAmount));
+      Debug.print("Transaction Nat: " #Nat.toText(transactionNat));
       // Validate WBTC transaction or direct value transfer
       if ((receiverTransaction == expectedAddress) and (transactionNat == expectedAmount) and validSignature) {
         return true;
@@ -76,12 +76,12 @@ module {
       let decodedDataResult = await utils.decodeTransferERC20Data(transactionData);
       switch (decodedDataResult) {
         case (#ok((decodedAddress, decodedAmountNat))) {
-          Debug.print("Decoded Address: "#decodedAddress);
-          Debug.print("Expected Address: "#expectedAddress);
-          Debug.print("Decoded Amount Nat: "#Nat.toText(decodedAmountNat));
-          Debug.print("Expected Amount Nat: "#Nat.toText(expectedAmount));
-          Debug.print("receiverTransaction: "#receiverTransaction);
-          Debug.print("wantedERC20: "#wantedERC20);
+          Debug.print("Decoded Address: " #decodedAddress);
+          Debug.print("Expected Address: " #expectedAddress);
+          Debug.print("Decoded Amount Nat: " #Nat.toText(decodedAmountNat));
+          Debug.print("Expected Amount Nat: " #Nat.toText(expectedAmount));
+          Debug.print("receiverTransaction: " #receiverTransaction);
+          Debug.print("wantedERC20: " #wantedERC20);
           // Here, you need to ensure decodedAddress is the expected ERC20 contract address and decodedAmountNat matches the expectedAmount
           if (decodedAddress == expectedAddress and decodedAmountNat == expectedAmount and receiverTransaction == wantedERC20 and validSignature) {
             return true;
@@ -110,6 +110,7 @@ module {
     let transactionDetailsPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_getTransactionByHash\", \"params\": [\"" # transactionHash # "\"] }";
     let responseTransactionDetails : Text = await utils.httpRequest(?transactionDetailsPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     let parsedTransactionDetails = JSON.parse(responseTransactionDetails);
+    Debug.print("TEST#########" #responseTransactionDetails);
 
     return await utils.getValue(parsedTransactionDetails, "result");
 
@@ -169,9 +170,6 @@ module {
   //     };
   //   };
 
-
-
-
   //   Debug.print("Validating transaction "#transactionId#" from chain "#sendingChainId);
 
   //   Debug.print("Checking WBTC address sent: "#transferEvent.sentERC20);
@@ -185,7 +183,6 @@ module {
   //     transferEvent.signature,
   //     transform
   //   );
-
 
   //   if(validTransaction == false){
   //     Debug.print("Transaction does not match the criteria");
@@ -211,7 +208,7 @@ module {
 
   // };
 
-  public func swapLN2EVM(hexChainId : Text,wantedERC20: Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
+  public func swapLN2EVM(hexChainId : Text, wantedERC20 : Text, derivationPath : [Blob], keyName : Text, amount : Nat, recipientAddr : Text, transform : shared query Types.TransformArgs -> async Types.CanisterHttpResponsePayload) : async Text {
     let publicKey = Blob.toArray(await* IcEcdsaApi.create(keyName, derivationPath));
 
     let canisterAddress = utils.publicKeyToAddress(publicKey);
@@ -364,10 +361,10 @@ module {
 
     // This will be now a transaction without data
     Debug.print("Creating transaction with parameters");
-    Debug.print("hexChainId: "#hexChainId);
-    Debug.print("erc20: "#erc20);
-    Debug.print("recipientAddr: "#recipientAddr);
-    Debug.print("transactionAmount: "#Nat.toText(transactionAmount));
+    Debug.print("hexChainId: " #hexChainId);
+    Debug.print("erc20: " #erc20);
+    Debug.print("recipientAddr: " #recipientAddr);
+    Debug.print("transactionAmount: " #Nat.toText(transactionAmount));
 
     let method_sig = "transfer(address,uint256)";
     let keccak256_hex = AU.toText(HU.keccak(TU.encodeUtf8(method_sig), 256));
@@ -375,8 +372,8 @@ module {
     let address_64 = TU.fill(recipientAddr, '0', 64);
     let amount_hex = AU.toText(AU.fromNat256(transactionAmount));
     let amount_64 = TU.fill(amount_hex, '0', 64);
-    Debug.print("address_64: "#address_64);
-    Debug.print("Text.trimStart(address_64,#text '00000000000000000000000x'): "#Text.trimStart(address_64,#text "00000000000000000000000x"));
+    Debug.print("address_64: " #address_64);
+    Debug.print("Text.trimStart(address_64,#text '00000000000000000000000x'): " #Text.trimStart(address_64, #text "00000000000000000000000x"));
     let requestHeaders = [
       { name = "Content-Type"; value = "application/json" },
       { name = "Accept"; value = "application/json" },
@@ -385,16 +382,16 @@ module {
     let data : Text = if ((hexChainId == "0x1e" or hexChainId == "0x1f") and erc20 == "0") {
       "0x00";
     } else {
-      "0x" # method_id # "000000000000000000000000" # Text.trimStart(address_64,#text "00000000000000000000000x") # amount_64;
+      "0x" # method_id # "000000000000000000000000" # Text.trimStart(address_64, #text "00000000000000000000000x") # amount_64;
     };
-    Debug.print("Data: "#data);
+    Debug.print("Data: " #data);
     let transactionReceiver : Text = if (erc20 == "0") {
       recipientAddr;
     } else {
       erc20;
     };
 
-    Debug.print("Transaction receiver: "#transactionReceiver);
+    Debug.print("Transaction receiver: " #transactionReceiver);
 
     // Definition of gettxReceiver function
 
@@ -427,7 +424,7 @@ module {
     Debug.print("gasPrice" # gasPrice);
 
     let estimateGasPayload : Text = "{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"eth_estimateGas\", \"params\": [{\"from\": \"0x" # canisterAddress # "\", \"to\": \"" # transactionReceiver # "\", \"value\": \"0x0\", \"data\": \"" # data # "\"}] }";
-    Debug.print("estimateGasPayload: "#estimateGasPayload);
+    Debug.print("estimateGasPayload: " #estimateGasPayload);
 
     let responseGas : Text = await utils.httpRequest(?estimateGasPayload, API_URL # "/interactWithNode", ?requestHeaders, "post", transform);
     Debug.print("responseGas" # responseGas);
@@ -450,11 +447,11 @@ module {
     let chainId = utils.hexStringToNat64(hexChainId);
 
     let emptyAccessList : [(Text, [Text])] = [];
-    let transactionAmountSend: Nat = switch(hexChainId){
-      case("0x1f"){
+    let transactionAmountSend : Nat = switch (hexChainId) {
+      case ("0x1f") {
         transactionAmount;
       };
-      case(_){
+      case (_) {
         0;
       };
     };
