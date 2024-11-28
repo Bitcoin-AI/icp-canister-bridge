@@ -13,7 +13,9 @@
       },
       "source": [
         "src/frontend/assets",
-        "dist/frontend/"
+        "dist/frontend/",
+        "src/frontend/.well-known"
+
       ],
       "type": "assets"
     }
