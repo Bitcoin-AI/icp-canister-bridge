@@ -34,7 +34,8 @@ const Swap = () => {
     fetchBalance,
     fetchLNBalance,
     coinbase,
-    canisterAddr
+    canisterAddr,
+    loadWeb3Modal
   } = useContext(AppContext);
 
   const [originChain, setOriginChain] = useState();
@@ -49,9 +50,14 @@ const Swap = () => {
       const netId = JSON.parse(originChain).chainId;
       const rpc = JSON.parse(originChain).rpc;
       const chainProvider = new ethers.JsonRpcProvider(rpc);
-      fetchBalance(coinbase,chainProvider,netId).then(balance => {
-        setOriginUserBalance(balance);
-      })
+      if(chainProvider && rpc && netId){
+        fetchBalance(coinbase,chainProvider,netId).then(balance => {
+            setOriginUserBalance(balance);
+        })
+      } else {
+        setOriginUserBalance(2);
+      }
+
     }
   },[originChain,coinbase]);
 
@@ -196,9 +202,13 @@ const Swap = () => {
                             <div>
                                 <Button variant="destructive" size="lg">Invalid Amount</Button>
                             </div> :
+                            (amount > 1) ?
+                            <div>
+                                <Button variant="destructive" size="lg">For testing purpuses, please use at maximum 1 satoshi</Button>
+                            </div> :
                             <>
                             {
-                            JSON.parse(destinationChain).name === "Lightning" &&
+                            JSON.parse(originChain).name !== "Lightning" && JSON.parse(destinationChain).name === "Lightning" &&
                             <Link to={`/swap/evmToLightning?amount=${amount}&destinationChain=${destinationChain}&originChain=${originChain}`}>
                                 <Button variant="info" size="lg">Perform EVM to Lightning swap</Button>
                             </Link>
@@ -214,6 +224,11 @@ const Swap = () => {
                             <Link to={`/swap/evmToEvm?amount=${amount}&destinationChain=${destinationChain}&originChain=${originChain}`}>
                                 <Button variant="info" size="lg">Perform EVM to EVM swap</Button>
                             </Link>
+                            }
+                            {
+                            !coinbase && JSON.parse(originChain).name !== "Lightning" &&
+                            <Button variant="info" size="lg" onClick={loadWeb3Modal}>Connect Wallet</Button>
+
                             }
                             </>
                         }
