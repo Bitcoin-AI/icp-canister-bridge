@@ -2,9 +2,14 @@
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { ethers } from 'ethers';
 import axios from 'axios';
+import { nwc } from "@getalby/sdk";
+import dotenv from 'dotenv';
 
 import { main } from "../../declarations/main";
 import useWeb3Modal from "./hooks/useWeb3Modal";
+
+dotenv.config();
+const demoNWCUri = process.env.REACT_APP_NWC_URI;
 
 const AppContext = createContext();
 
@@ -23,6 +28,7 @@ const AppProvider = ({ children }) => {
 
   const [processing, setProcessing] = useState();
 
+  const [nwcApp,setNWC] = useState();
 
   const {
     netId,
@@ -38,6 +44,15 @@ const AppProvider = ({ children }) => {
     '11155111': '0x0311FC95124Ca345a3913b6133028Ac8DEe47AA5' // Sepolia
   };
 
+
+  useEffect(() => {
+    console.log(nwc)
+    const newNWC = new nwc.NWCClient({
+      nostrWalletConnectUrl: demoNWCUri,
+    });
+    console.log(newNWC);
+    setNWC(newNWC);
+  },[]);
   useEffect(() => {
     let rpcNodes = [];
     fetch("https://chainid.network/chains.json").then(async response => {
@@ -151,7 +166,7 @@ const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       activeTab, setActiveTab,
       rskBalance, setUserBalance,fetchBalance,
-      nodeInfo, setNodeInfo,
+      nodeInfo, setNodeInfo,nwcApp,
       chains, setChains,
       canisterAddr, setCanisterAddr,
       netId, coinbase, provider, loadWeb3Modal,

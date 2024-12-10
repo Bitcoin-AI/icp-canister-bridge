@@ -21,6 +21,7 @@ const LightningToEvm = () => {
     setProcessing,
     evm_address,
     setEvmAddr,
+    nwcApp
   } = useContext(AppContext);
 
   const [message, setMessage] = useState('');
@@ -84,6 +85,18 @@ const LightningToEvm = () => {
     setProcessing(false);
   };
 
+  const payInvoice = async () => {
+    setProcessing(true);
+
+    try{
+      const response = await nwcApp.payInvoice({ invoiceToPay });
+      console.log(response);
+    } catch(err){
+      console.error(err);
+    }
+    setProcessing(false);
+
+  };
   useEffect(() => {
     const urlAmount = searchParams.get('amount');
     const urlDestinationChain = searchParams.get('destinationChain');
@@ -146,9 +159,23 @@ const LightningToEvm = () => {
           {processing ? 'Loading...' : 'Get Invoice'}
         </button>
         {invoiceToPay && (
+          <>
           <div className="bg-blue-100 text-blue-700 p-3 rounded mt-3 break-all">
             <strong>Invoice to be paid:</strong> {invoiceToPay}
           </div>
+          {
+            !window.webln && nwcApp &&
+              <div>
+                <button
+                  onClick={payInvoice}
+                  disabled={processing}
+                  className={`w-full p-2 rounded mt-3 ${processing ? 'bg-gray-400' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                >
+                  {processing ? 'Loading...' : 'Pay Invoice'}
+                </button>
+              </div>
+            }
+          </>
         )}
       </div>
 
